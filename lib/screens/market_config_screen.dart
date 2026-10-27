@@ -4,6 +4,7 @@ import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/shopping_controller.dart';
+import '../theme/app_colors.dart';
 
 class MarketConfigScreen extends StatefulWidget {
   const MarketConfigScreen({
@@ -48,7 +49,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface(context),
           title: Text(
             existingMarket == null ? 'Novo Mercado' : 'Renomear Mercado',
           ),
@@ -77,6 +78,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
                 final name = textController.text.trim();
                 if (name.isEmpty) return;
@@ -101,7 +106,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface(context),
         title: const Text('Excluir Mercado'),
         content: Text('Deseja excluir o mercado "${market.name}"?'),
         actions: [
@@ -112,6 +117,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Excluir'),
@@ -160,7 +166,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface(context),
               title: const Text('Editar Palavra-Chave'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -219,6 +225,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                   child: const Text('Cancelar'),
                 ),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
                   onPressed: () {
                     final newText = controller.text.trim();
                     if (newText.isEmpty) return;
@@ -252,10 +262,22 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = AppColors.surface(context);
+    final borderColor = AppColors.border(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
         actions: [
+          IconButton(
+            tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
+            onPressed: widget.controller.toggleDarkMode,
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
+              size: 20,
+            ),
+          ),
           if (_selectedTab == _ConfigTab.marketOrder)
             TextButton.icon(
               onPressed: () => _showAddOrEditMarketDialog(),
@@ -268,7 +290,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    backgroundColor: Colors.white,
+                    backgroundColor: AppColors.surface(context),
                     title: const Text('Restaurar Padrão'),
                     content: Text(
                       'Deseja restaurar os itens padrão da categoria "${_selectedCategoryForKeywords.label}"?',
@@ -279,6 +301,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         child: const Text('Cancelar'),
                       ),
                       FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                          foregroundColor: Colors.white,
+                        ),
                         onPressed: () => Navigator.of(ctx).pop(true),
                         child: const Text('Restaurar'),
                       ),
@@ -302,10 +328,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: surfaceColor,
               border: Border(
-                bottom: BorderSide(color: Color(0xFFE2E8F0)),
+                bottom: BorderSide(color: borderColor),
               ),
             ),
             child: SegmentedButton<_ConfigTab>(
@@ -370,13 +396,16 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     final controller = widget.controller;
     final activeMarket = controller.selectedMarket;
     final categories = activeMarket.categoryOrder;
+    final surfaceColor = AppColors.surface(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-          color: Colors.white,
+          color: surfaceColor,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -403,9 +432,9 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                   Expanded(
                     child: Text(
                       'Arraste para definir a ordem dos produtos no mercado "${activeMarket.name}":',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF64748B),
+                        color: textSecondary,
                       ),
                     ),
                   ),
@@ -416,7 +445,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                     ),
-                    child: const Text('Renomear', style: TextStyle(fontSize: 12)),
+                    child: const Text(
+                      'Renomear',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                   if (controller.markets.length > 1)
                     TextButton(
@@ -437,10 +469,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+        Divider(height: 1, color: AppColors.border(context)),
         Expanded(
           child: Material(
-            color: Colors.white,
+            color: surfaceColor,
             child: ReorderableListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
               itemCount: categories.length,
@@ -458,106 +490,106 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
 
                 return Material(
                   key: ValueKey('${activeMarket.id}_${category.id}'),
-                  color: Colors.white,
+                  color: surfaceColor,
                   child: DecoratedBox(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       border: Border(
-                        bottom: BorderSide(color: Color(0xFFF1F5F9)),
+                        bottom: BorderSide(color: AppColors.divider(context)),
                       ),
                     ),
                     child: ListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 2,
-                    ),
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          child: Text(
-                            '${index + 1}º',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              color: Color(0xFF64748B),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 2,
+                      ),
+                      leading: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            child: Text(
+                              '${index + 1}º',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: textSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                        Icon(category.icon, color: category.color, size: 20),
-                      ],
-                    ),
-                    title: Text(
-                      category.label,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1E293B),
+                          Icon(category.icon, color: category.color, size: 20),
+                        ],
                       ),
-                    ),
-                    subtitle: Text(
-                      '$keywordCount palavras configuradas',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF94A3B8),
+                      title: Text(
+                        category.label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: textPrimary,
+                        ),
                       ),
-                    ),
-                    onTap: () {
-                      setState(() {
-                        _selectedCategoryForKeywords = category;
-                        _selectedTab = _ConfigTab.categoryKeywords;
-                      });
-                    },
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'Subir',
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(
-                            Icons.keyboard_arrow_up_rounded,
-                            size: 20,
-                            color: Color(0xFF64748B),
-                          ),
-                          onPressed: index > 0
-                              ? () => controller.moveMarketCategory(
-                                    activeMarket.id,
-                                    index,
-                                    index - 1,
-                                  )
-                              : null,
+                      subtitle: Text(
+                        '$keywordCount palavras configuradas',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: textSecondary,
                         ),
-                        IconButton(
-                          tooltip: 'Descer',
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 20,
-                            color: Color(0xFF64748B),
-                          ),
-                          onPressed: index < categories.length - 1
-                              ? () => controller.moveMarketCategory(
-                                    activeMarket.id,
-                                    index,
-                                    index + 1,
-                                  )
-                              : null,
-                        ),
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: const Padding(
-                            padding: EdgeInsets.only(left: 4),
-                            child: Icon(
-                              Icons.drag_handle_rounded,
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _selectedCategoryForKeywords = category;
+                          _selectedTab = _ConfigTab.categoryKeywords;
+                        });
+                      },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Subir',
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Icons.keyboard_arrow_up_rounded,
                               size: 20,
-                              color: Color(0xFFCBD5E1),
+                              color: textSecondary,
+                            ),
+                            onPressed: index > 0
+                                ? () => controller.moveMarketCategory(
+                                      activeMarket.id,
+                                      index,
+                                      index - 1,
+                                    )
+                                : null,
+                          ),
+                          IconButton(
+                            tooltip: 'Descer',
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 20,
+                              color: textSecondary,
+                            ),
+                            onPressed: index < categories.length - 1
+                                ? () => controller.moveMarketCategory(
+                                      activeMarket.id,
+                                      index,
+                                      index + 1,
+                                    )
+                                : null,
+                          ),
+                          ReorderableDragStartListener(
+                            index: index,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.drag_handle_rounded,
+                                size: 20,
+                                color: textSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 );
               },
@@ -578,19 +610,24 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
         : allKeywords
             .where((k) => CategoryClassifier.normalize(k).contains(search))
             .toList();
+    final surfaceColor = AppColors.surface(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+    final borderColor = AppColors.border(context);
+    final subtleBg = AppColors.subtleSurface(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          color: Colors.white,
+          color: surfaceColor,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Escolha uma categoria para personalizar quais produtos são reconhecidos automaticamente nela:',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                style: TextStyle(fontSize: 12, color: textSecondary),
               ),
               const SizedBox(height: 8),
               SingleChildScrollView(
@@ -625,30 +662,26 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         controller: _newKeywordController,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _handleAddKeyword(),
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14, color: textPrimary),
                         decoration: InputDecoration(
                           hintText:
                               'Adicionar item em ${_selectedCategoryForKeywords.label}...',
-                          hintStyle: const TextStyle(
+                          hintStyle: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF94A3B8),
+                            color: textSecondary,
                           ),
                           filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
+                          fillColor: subtleBg,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
+                            borderSide: BorderSide(color: borderColor),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
+                            borderSide: BorderSide(color: borderColor),
                           ),
                         ),
                       ),
@@ -658,6 +691,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                   SizedBox(
                     height: 40,
                     child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: _handleAddKeyword,
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Adicionar'),
@@ -671,18 +708,26 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                 child: TextField(
                   controller: _keywordSearchController,
                   onChanged: (_) => setState(() {}),
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: 13, color: textPrimary),
                   decoration: InputDecoration(
                     hintText:
                         'Filtrar itens de ${_selectedCategoryForKeywords.label} (${allKeywords.length})...',
-                    hintStyle: const TextStyle(
+                    hintStyle: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF94A3B8),
+                      color: textSecondary,
                     ),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      size: 18,
+                      color: textSecondary,
+                    ),
                     suffixIcon: _keywordSearchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 16),
+                            icon: Icon(
+                              Icons.clear_rounded,
+                              size: 16,
+                              color: textSecondary,
+                            ),
                             onPressed: () {
                               setState(() {
                                 _keywordSearchController.clear();
@@ -691,15 +736,15 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                    fillColor: subtleBg,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: BorderSide(color: borderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: BorderSide(color: borderColor),
                     ),
                   ),
                 ),
@@ -707,23 +752,23 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+        Divider(height: 1, color: borderColor),
         Expanded(
           child: Material(
-            color: Colors.white,
+            color: surfaceColor,
             child: filteredKeywords.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'Nenhum item cadastrado para este filtro.',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      style: TextStyle(color: textSecondary, fontSize: 13),
                     ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.only(bottom: 24),
                     itemCount: filteredKeywords.length,
-                    separatorBuilder: (_, _) => const Divider(
+                    separatorBuilder: (_, _) => Divider(
                       height: 1,
-                      color: Color(0xFFF1F5F9),
+                      color: AppColors.divider(context),
                     ),
                     itemBuilder: (context, index) {
                       final keyword = filteredKeywords[index];
@@ -739,9 +784,9 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         ),
                         title: Text(
                           keyword,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF1E293B),
+                            color: textPrimary,
                           ),
                         ),
                         trailing: Row(
@@ -750,10 +795,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                             IconButton(
                               tooltip: 'Editar palavra ou trocar categoria',
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.edit_outlined,
                                 size: 18,
-                                color: Color(0xFF94A3B8),
+                                color: textSecondary,
                               ),
                               onPressed: () => _showEditKeywordDialog(
                                 _selectedCategoryForKeywords,
@@ -763,10 +808,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                             IconButton(
                               tooltip: 'Remover',
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.close_rounded,
                                 size: 18,
-                                color: Color(0xFFCBD5E1),
+                                color: textSecondary,
                               ),
                               onPressed: () {
                                 controller.removeKeywordFromCategory(
@@ -791,6 +836,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     final isFirebaseReady = CloudSyncService.isFirebaseReady;
     final isConnected = controller.isCloudConnected;
     final currentSpaceCode = controller.sharedSpaceCode;
+    final surfaceColor = AppColors.surface(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+    final borderColor = AppColors.border(context);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -799,12 +848,12 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: surfaceColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isConnected
-                  ? const Color(0xFF99F6E4)
-                  : const Color(0xFFE2E8F0),
+                  ? AppColors.primaryGreen.withValues(alpha: 0.5)
+                  : borderColor,
             ),
           ),
           child: Column(
@@ -817,8 +866,8 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         ? Icons.cloud_done_rounded
                         : Icons.cloud_off_rounded,
                     color: isConnected
-                        ? const Color(0xFF0D9488)
-                        : const Color(0xFF64748B),
+                        ? AppColors.primaryGreen
+                        : textSecondary,
                     size: 22,
                   ),
                   const SizedBox(width: 10),
@@ -827,10 +876,10 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                       isConnected
                           ? 'Sincronização em Tempo Real Ativa'
                           : 'Modo Local (Apenas neste aparelho)',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: Color(0xFF1E293B),
+                        color: textPrimary,
                       ),
                     ),
                   ),
@@ -838,9 +887,9 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
               ),
               const SizedBox(height: 8),
               if (isConnected && currentSpaceCode != null) ...[
-                const Text(
+                Text(
                   'Compartilhe o código abaixo para sincronizarem a mesma lista, mercados e histórico em tempo real:',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 const SizedBox(height: 10),
                 Container(
@@ -849,9 +898,11 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDFA),
+                    color: AppColors.primaryGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFCCFBF1)),
+                    border: Border.all(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -866,7 +917,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.8,
-                              color: Color(0xFF0F766E),
+                              color: AppColors.accentGreen,
                             ),
                           ),
                         ),
@@ -928,9 +979,9 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                   ),
                 ),
               ] else ...[
-                const Text(
+                Text(
                   'Crie um código de espaço compartilhado ou digite o código gerado no outro celular para manterem a lista e o histórico sempre sincronizados.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
               ],
             ],
@@ -943,19 +994,19 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: surfaceColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: borderColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Vincular Aparelhos (Espaço Familiar)',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
-                  color: Color(0xFF1E293B),
+                  color: textPrimary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -990,7 +1041,8 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         }
                       },
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D9488),
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
                   alignment: Alignment.center,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -1008,14 +1060,14 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              Divider(height: 1, color: AppColors.divider(context)),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Já tem um código do outro aparelho?',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF475569),
+                  color: textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1027,24 +1079,21 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                       child: TextField(
                         controller: _joinSpaceCodeController,
                         textCapitalization: TextCapitalization.characters,
+                        style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
                           hintText: 'Ex: CASA-4829',
                           filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
+                          fillColor: AppColors.subtleSurface(context),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
+                            borderSide: BorderSide(color: borderColor),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
+                            borderSide: BorderSide(color: borderColor),
                           ),
                         ),
                       ),

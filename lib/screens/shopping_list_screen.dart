@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
 import '../services/shopping_controller.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 
 class ShoppingListScreen extends StatefulWidget {
@@ -129,7 +131,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -141,6 +143,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               nameController.text,
               marketId: selectedMarketId,
             );
+            final textPrimary = AppColors.textPrimary(context);
+            final textSecondary = AppColors.textSecondary(context);
+            final subtleBg = AppColors.subtleSurface(context);
 
             return Padding(
               padding: EdgeInsets.only(
@@ -170,7 +175,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                                 .titleMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E293B),
+                                  color: textPrimary,
                                 ),
                           ),
                         ),
@@ -187,7 +192,11 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                          icon: Icon(
+                            Icons.close,
+                            size: 20,
+                            color: textSecondary,
+                          ),
                           onPressed: () => Navigator.of(modalContext).pop(),
                         ),
                       ],
@@ -197,11 +206,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       controller: nameController,
                       autofocus: !focusPrice,
                       textCapitalization: TextCapitalization.sentences,
+                      style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Nome do produto',
                         errorText: errorText,
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: subtleBg,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -219,7 +229,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       decoration: InputDecoration(
                         labelText: 'Mercado para compra (Lista)',
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: subtleBg,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -247,8 +257,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                                   ? FontWeight.w600
                                   : FontWeight.normal,
                               color: isCheapest
-                                  ? const Color(0xFF0F766E)
-                                  : const Color(0xFF1E293B),
+                                  ? AppColors.accentGreen
+                                  : textPrimary,
                             ),
                           ),
                         );
@@ -267,7 +277,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       decoration: InputDecoration(
                         labelText: 'Categoria',
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: subtleBg,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -299,14 +309,19 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Preço pago (R\$)',
                         hintText: 'Ex: 12,90',
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: subtleBg,
                         suffixIcon: priceController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
+                                icon: Icon(
+                                  Icons.clear,
+                                  size: 18,
+                                  color: textSecondary,
+                                ),
                                 onPressed: () {
                                   setModalState(() {
                                     priceController.clear();
@@ -342,6 +357,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     ],
                     const SizedBox(height: 18),
                     FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: () {
                         final newName = nameController.text.trim();
                         if (newName.isEmpty) return;
@@ -401,7 +420,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             );
 
             return AlertDialog(
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.surface(context),
               title: const Text('Finalizar Compra'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -458,6 +477,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   child: const Text('Cancelar'),
                 ),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
                   onPressed: itemsToSave.isEmpty
                       ? null
                       : () {
@@ -487,6 +510,104 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     );
   }
 
+  Future<void> _showFiltersBottomSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return ListenableBuilder(
+          listenable: widget.controller,
+          builder: (context, _) {
+            final controller = widget.controller;
+            final activeMarket = controller.selectedMarket;
+            final textPrimary = AppColors.textPrimary(context);
+            final textSecondary = AppColors.textSecondary(context);
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filtros da Lista',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 20, color: textSecondary),
+                        onPressed: () => Navigator.of(modalContext).pop(),
+                      ),
+                    ],
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    activeThumbColor: AppColors.primaryGreen,
+                    title: Text(
+                      'Mostrar itens marcados',
+                      style: TextStyle(fontSize: 14, color: textPrimary),
+                    ),
+                    value: controller.showCheckedItems,
+                    onChanged: controller.setShowCheckedItems,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Filtrar por Categoria:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ChoiceChip(
+                        visualDensity: VisualDensity.compact,
+                        label: const Text('Todas Categorias'),
+                        selected: controller.categoryFilter == null,
+                        onSelected: (_) => controller.setCategoryFilter(null),
+                      ),
+                      ...activeMarket.categoryOrder.map((cat) {
+                        final isSelected = controller.categoryFilter == cat;
+                        return ChoiceChip(
+                          visualDensity: VisualDensity.compact,
+                          avatar: Icon(
+                            cat.icon,
+                            size: 15,
+                            color: cat.color,
+                          ),
+                          label: Text(cat.label),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            controller.setCategoryFilter(
+                              isSelected ? null : cat,
+                            );
+                          },
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -509,402 +630,563 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final effectiveTargetMarket =
         controller.marketById(effectiveTargetMarketId);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = AppColors.background(context);
+    final surfaceColor = AppColors.surface(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+
+    final listTitle = controller.filterBySelectedMarket
+        ? activeMarket.name
+        : 'Lista de Compras';
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lista de Compras'),
-        actions: [
-          if (controller.totalItemsCount > 0)
-            PopupMenuButton<String>(
-              tooltip: 'Opções da lista',
-              icon: const Icon(Icons.more_horiz_rounded),
-              onSelected: (action) {
-                if (action == 'finish') {
-                  _showFinishPurchaseDialog();
-                } else if (action == 'clear_checked') {
-                  controller.clearCheckedItems();
-                } else if (action == 'clear_all') {
-                  controller.clearAllItems();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'finish',
-                  child: Text('Finalizar compra (salvar histórico)'),
-                ),
-                if (controller.checkedItemsCount > 0)
-                  const PopupMenuItem(
-                    value: 'clear_checked',
-                    child: Text('Remover itens marcados'),
-                  ),
-                const PopupMenuItem(
-                  value: 'clear_all',
-                  child: Text('Limpar toda a lista'),
-                ),
-              ],
-            ),
-        ],
-      ),
+      backgroundColor: bgColor,
       body: Column(
         children: [
-          // Clean Header: Dynamic Single/Multi Input + Prominent Add Button + Market Lists + Category Filters
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-              ),
-            ),
+          // Stylized Hero Header with ListTop.jpg & Curved Bottom Wave + Frosted Add Input
+          _buildStylizedTopBanner(
+            context,
+            controller: controller,
+            isDark: isDark,
+            bgColor: bgColor,
+            rawInput: rawInput,
+            isMultipleDetected: isMultipleDetected,
+            detectedCount: detectedItems.length,
+          ),
+
+          // Main Content Area seamlessly flowing from the curved header
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _quickAddController,
-                        focusNode: _quickAddFocus,
-                        minLines: 1,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        onChanged: (_) => setState(() {}),
-                        style: const TextStyle(fontSize: 14, height: 1.4),
-                        decoration: InputDecoration(
-                          hintText:
-                              'Digite um produto ou cole vários itens...',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 14,
-                            height: 1.4,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Dynamic Feedback Banner when typing/pasting 1 or multiple products
+                      if (rawInput.isNotEmpty) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          isDense: true,
-                          constraints: const BoxConstraints(minHeight: 44),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
+                          decoration: BoxDecoration(
+                            color: (bestMarketRec != null || isMultipleDetected)
+                                ? AppColors.primaryGreen.withValues(alpha: 0.12)
+                                : surfaceColor,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color:
+                                  (bestMarketRec != null || isMultipleDetected)
+                                      ? AppColors.primaryGreen
+                                          .withValues(alpha: 0.35)
+                                      : AppColors.border(context),
+                            ),
                           ),
-                          suffixIcon: rawInput.isNotEmpty
-                              ? IconButton(
-                                  tooltip: 'Limpar texto',
-                                  icon: const Icon(
-                                    Icons.clear_rounded,
-                                    size: 18,
-                                    color: Color(0xFF94A3B8),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isMultipleDetected
+                                        ? Icons.playlist_add_check_rounded
+                                        : (bestMarketRec != null
+                                            ? Icons.trending_down_rounded
+                                            : Icons.storefront_outlined),
+                                    size: 16,
+                                    color: (bestMarketRec != null ||
+                                            isMultipleDetected)
+                                        ? AppColors.accentGreen
+                                        : textSecondary,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _quickAddController.clear();
-                                      _manualMarketOverrideForQuickAdd = null;
-                                    });
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE2E8F0),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      height: 44,
-                      child: FilledButton.icon(
-                        onPressed: _handleQuickAdd,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D9488),
-                          foregroundColor: Colors.white,
-                          elevation: 1,
-                          minimumSize: const Size(0, 44),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(
-                          Icons.add_circle_outline_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          isMultipleDetected
-                              ? 'Adicionar (${detectedItems.length})'
-                              : 'Adicionar',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Dynamic Feedback Banner when typing/pasting 1 or multiple products
-                if (rawInput.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (bestMarketRec != null || isMultipleDetected)
-                          ? const Color(0xFFF0FDFA)
-                          : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: (bestMarketRec != null || isMultipleDetected)
-                            ? const Color(0xFFCCFBF1)
-                            : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isMultipleDetected
-                                  ? Icons.playlist_add_check_rounded
-                                  : (bestMarketRec != null
-                                      ? Icons.trending_down_rounded
-                                      : Icons.storefront_outlined),
-                              size: 16,
-                              color: (bestMarketRec != null || isMultipleDetected)
-                                  ? const Color(0xFF0F766E)
-                                  : const Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                isMultipleDetected
-                                    ? '${detectedItems.length} produtos identificados automaticamente no texto!'
-                                    : (bestMarketRec != null
-                                        ? 'Compensa mais no ${bestMarketRec.market.name} (média ${AppFormatters.formatCurrency(bestMarketRec.averagePrice)})'
-                                        : 'Sem histórico de preço para "$singleTypedProduct"'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: (bestMarketRec != null ||
-                                          isMultipleDetected)
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  color: (bestMarketRec != null ||
-                                          isMultipleDetected)
-                                      ? const Color(0xFF0F766E)
-                                      : const Color(0xFF64748B),
-                                ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      isMultipleDetected
+                                          ? '${detectedItems.length} produtos identificados automaticamente no texto!'
+                                          : (bestMarketRec != null
+                                              ? 'Compensa mais no ${bestMarketRec.market.name} (média ${AppFormatters.formatCurrency(bestMarketRec.averagePrice)})'
+                                              : 'Sem histórico de preço para "$singleTypedProduct"'),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: (bestMarketRec != null ||
+                                                isMultipleDetected)
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                        color: (bestMarketRec != null ||
+                                                isMultipleDetected)
+                                            ? AppColors.accentGreen
+                                            : textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        PopupMenuButton<String>(
-                          tooltip: 'Escolher mercado para adicionar',
-                          onSelected: (marketId) {
-                            setState(() {
-                              _manualMarketOverrideForQuickAdd = marketId;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(0xFFCBD5E1),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _manualMarketOverrideForQuickAdd == null &&
-                                          isMultipleDetected
-                                      ? 'Auto (Mais barato)'
-                                      : 'Ir p/ ${effectiveTargetMarket.name}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF334155),
+                              PopupMenuButton<String>(
+                                tooltip: 'Escolher mercado para adicionar',
+                                onSelected: (marketId) {
+                                  setState(() {
+                                    _manualMarketOverrideForQuickAdd = marketId;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: surfaceColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: AppColors.border(context),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _manualMarketOverrideForQuickAdd ==
+                                                    null &&
+                                                isMultipleDetected
+                                            ? 'Auto (Mais barato)'
+                                            : 'Ir p/ ${effectiveTargetMarket.name}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        Icons.arrow_drop_down_rounded,
+                                        size: 16,
+                                        color: textSecondary,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 2),
-                                const Icon(
-                                  Icons.arrow_drop_down_rounded,
-                                  size: 16,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ],
-                            ),
+                                itemBuilder: (context) {
+                                  return controller.markets.map((m) {
+                                    return PopupMenuItem<String>(
+                                      value: m.id,
+                                      child: Text(m.name),
+                                    );
+                                  }).toList();
+                                },
+                              ),
+                            ],
                           ),
-                          itemBuilder: (context) {
-                            return controller.markets.map((m) {
-                              return PopupMenuItem<String>(
-                                value: m.id,
-                                child: Text(m.name),
-                              );
-                            }).toList();
-                          },
                         ),
                       ],
-                    ),
-                  ),
-                ],
 
-                const SizedBox(height: 8),
-                // Simultaneous Lists by Market selector bar
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ChoiceChip(
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(
-                          Icons.layers_outlined,
-                          size: 15,
-                          color: Color(0xFF475569),
+                      // Subtitle inspired by "Shared with..." / Market status
+                      Text(
+                        controller.isCloudConnected
+                            ? 'Sincronizado • Espaço ${controller.sharedSpaceCode}'
+                            : 'Selecione o mercado da lista',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: textSecondary,
                         ),
-                        label: Text(
-                          'Todos Mercados (${controller.totalItemsCount})',
-                        ),
-                        selected: !controller.filterBySelectedMarket,
-                        onSelected: (_) =>
-                            controller.setFilterBySelectedMarket(false),
                       ),
-                      const SizedBox(width: 6),
-                      ...controller.markets.map((market) {
-                        final count = controller.itemCountForMarket(market.id);
-                        final isSelected = controller.filterBySelectedMarket &&
-                            activeMarket.id == market.id;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            visualDensity: VisualDensity.compact,
-                            avatar: const Icon(
-                              Icons.storefront_outlined,
-                              size: 15,
-                              color: Color(0xFF0F766E),
+                      const SizedBox(height: 8),
+
+                      // Market Selector Pills
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              visualDensity: VisualDensity.compact,
+                              avatar: Icon(
+                                Icons.layers_outlined,
+                                size: 15,
+                                color: !controller.filterBySelectedMarket
+                                    ? AppColors.primaryGreen
+                                    : textSecondary,
+                              ),
+                              label: Text(
+                                'Todos Mercados (${controller.totalItemsCount})',
+                              ),
+                              selected: !controller.filterBySelectedMarket,
+                              onSelected: (_) =>
+                                  controller.setFilterBySelectedMarket(false),
                             ),
-                            label: Text('${market.name} ($count)'),
-                            selected: isSelected,
-                            onSelected: (_) {
-                              controller.setFilterBySelectedMarket(
-                                true,
-                                marketId: market.id,
+                            const SizedBox(width: 6),
+                            ...controller.markets.map((market) {
+                              final count =
+                                  controller.itemCountForMarket(market.id);
+                              final isSelected =
+                                  controller.filterBySelectedMarket &&
+                                      activeMarket.id == market.id;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  visualDensity: VisualDensity.compact,
+                                  avatar: Icon(
+                                    Icons.storefront_outlined,
+                                    size: 15,
+                                    color: isSelected
+                                        ? AppColors.primaryGreen
+                                        : textSecondary,
+                                  ),
+                                  label: Text('${market.name} ($count)'),
+                                  selected: isSelected,
+                                  onSelected: (_) {
+                                    controller.setFilterBySelectedMarket(
+                                      true,
+                                      marketId: market.id,
+                                    );
+                                  },
+                                ),
                               );
-                            },
+                            }),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Prominent Title + Filter Sliders Icon (matching inspiration image)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              listTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.4,
+                                color: textPrimary,
+                              ),
+                            ),
                           ),
-                        );
-                      }),
+                          if (controller.categoryFilter != null ||
+                              !controller.showCheckedItems)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: ActionChip(
+                                visualDensity: VisualDensity.compact,
+                                label: Text(
+                                  controller.categoryFilter?.label ??
+                                      'Sem ticados',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                onPressed: () {
+                                  controller.setCategoryFilter(null);
+                                  controller.setShowCheckedItems(true);
+                                },
+                              ),
+                            ),
+                          IconButton(
+                            tooltip: 'Filtrar categorias e itens',
+                            onPressed: _showFiltersBottomSheet,
+                            icon: Icon(
+                              Icons.tune_rounded,
+                              color: (controller.categoryFilter != null ||
+                                      !controller.showCheckedItems)
+                                  ? AppColors.primaryGreen
+                                  : textPrimary,
+                              size: 22,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 6),
-                // Category Filter Bar
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      FilterChip(
-                        visualDensity: VisualDensity.compact,
-                        selected: controller.showCheckedItems,
-                        onSelected: controller.setShowCheckedItems,
-                        label: const Text('Mostrar ticados'),
-                      ),
-                      const SizedBox(width: 6),
-                      ChoiceChip(
-                        visualDensity: VisualDensity.compact,
-                        label: const Text('Todas Categorias'),
-                        selected: controller.categoryFilter == null,
-                        onSelected: (_) => controller.setCategoryFilter(null),
-                      ),
-                      const SizedBox(width: 6),
-                      ...activeMarket.categoryOrder.map((cat) {
-                        final isSelected = controller.categoryFilter == cat;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            visualDensity: VisualDensity.compact,
-                            avatar: Icon(
-                              cat.icon,
-                              size: 15,
-                              color: cat.color,
-                            ),
-                            label: Text(cat.label),
-                            selected: isSelected,
-                            onSelected: (_) {
-                              controller.setCategoryFilter(
-                                isSelected ? null : cat,
-                              );
-                            },
+                // Table-style continuous list of items with sleek circular action buttons
+                Expanded(
+                  child: items.isEmpty
+                      ? _buildEmptyState(context)
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 84),
+                          itemCount: items.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: AppColors.divider(context),
                           ),
-                        );
-                      }),
-                    ],
-                  ),
+                          itemBuilder: (context, index) {
+                            return _buildStylizedRow(context, items[index]);
+                          },
+                        ),
                 ),
               ],
             ),
-          ),
-
-          // Table-style continuous list of items
-          Expanded(
-            child: items.isEmpty
-                ? _buildEmptyState(context)
-                : Material(
-                    color: Colors.white,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFF1F5F9),
-                      ),
-                      itemBuilder: (context, index) {
-                        return _buildTableRow(context, items[index]);
-                      },
-                    ),
-                  ),
           ),
         ],
       ),
       floatingActionButton: controller.checkedItemsCount > 0
           ? FloatingActionButton.extended(
               onPressed: _showFinishPurchaseDialog,
-              elevation: 2,
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+              elevation: 3,
               icon: const Icon(Icons.check_rounded, size: 18),
               label: Text(
                 'Finalizar (${controller.checkedItemsCount})',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             )
           : null,
     );
   }
 
-  Widget _buildTableRow(BuildContext context, ShoppingItem item) {
+  Widget _buildStylizedTopBanner(
+    BuildContext context, {
+    required ShoppingController controller,
+    required bool isDark,
+    required Color bgColor,
+    required String rawInput,
+    required bool isMultipleDetected,
+    required int detectedCount,
+  }) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return SizedBox(
+      height: topPadding + 190,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Clipped Image with Smooth Wave at the bottom
+          ClipPath(
+            clipper: _WaveHeaderClipper(),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/imgs/ListTop.jpg',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+                // Subtle gradient overlay for contrast
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: isDark ? 0.50 : 0.28),
+                        Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                        bgColor.withValues(alpha: isDark ? 0.25 : 0.15),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 2. Top Actions Row (Theme Toggle + List Options)
+          Positioned(
+            top: topPadding + 6,
+            left: 14,
+            right: 14,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Dark/Light Mode Glass Pill Button
+                _GlassCircleIconButton(
+                  tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
+                  icon: isDark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_outlined,
+                  onTap: controller.toggleDarkMode,
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (controller.totalItemsCount > 0)
+                      PopupMenuButton<String>(
+                        tooltip: 'Opções da lista',
+                        onSelected: (action) {
+                          if (action == 'finish') {
+                            _showFinishPurchaseDialog();
+                          } else if (action == 'clear_checked') {
+                            controller.clearCheckedItems();
+                          } else if (action == 'clear_all') {
+                            controller.clearAllItems();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'finish',
+                            child: Text('Finalizar compra (salvar histórico)'),
+                          ),
+                          if (controller.checkedItemsCount > 0)
+                            const PopupMenuItem(
+                              value: 'clear_checked',
+                              child: Text('Remover itens marcados'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'clear_all',
+                            child: Text('Limpar toda a lista'),
+                          ),
+                        ],
+                        child: const _GlassCircleIcon(
+                          icon: Icons.more_horiz_rounded,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 3. Frosted Glass "Add Items" Pill Bar inside the image (inspired by reference image)
+          Positioned(
+            top: topPadding + 62,
+            left: 18,
+            right: 18,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkSurface.withValues(alpha: 0.84)
+                        : Colors.white.withValues(alpha: 0.86),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.14)
+                          : Colors.white.withValues(alpha: 0.75),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.10),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _quickAddController,
+                          focusNode: _quickAddFocus,
+                          minLines: 1,
+                          maxLines: 3,
+                          textCapitalization: TextCapitalization.sentences,
+                          onChanged: (_) => setState(() {}),
+                          onSubmitted: (_) => _handleQuickAdd(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Adicionar itens (digite ou cole vários)...',
+                            hintStyle: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                              fontSize: 13.5,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                            ),
+                            suffixIcon: rawInput.isNotEmpty
+                                ? IconButton(
+                                    tooltip: 'Limpar texto',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: Icon(
+                                      Icons.clear_rounded,
+                                      size: 18,
+                                      color: isDark
+                                          ? AppColors.darkTextSecondary
+                                          : AppColors.lightTextSecondary,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _quickAddController.clear();
+                                        _manualMarketOverrideForQuickAdd = null;
+                                      });
+                                    },
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Add action button supporting both single "+" style and label for accessibility/tests
+                      Material(
+                        color: AppColors.primaryGreen,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _handleQuickAdd,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isMultipleDetected
+                                      ? 'Adicionar ($detectedCount)'
+                                      : 'Adicionar',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStylizedRow(BuildContext context, ShoppingItem item) {
     final itemMarket = widget.controller.marketById(item.marketId);
     final showMarketTag = !widget.controller.filterBySelectedMarket;
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
 
     return Dismissible(
       key: ValueKey(item.id),
@@ -912,7 +1194,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        color: const Color(0xFFFEE2E2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: const Icon(
           Icons.delete_outline_rounded,
           color: Color(0xFFEF4444),
@@ -922,101 +1207,149 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       onDismissed: (_) => widget.controller.removeItem(item.id),
       child: InkWell(
         onTap: () => _showEditItemModal(item, focusPrice: true),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 11),
           child: Row(
             children: [
-              // Tapping on the Checkbox OR the Product Name ticks the item
-              Flexible(
+              // Category subtle icon indicator + Tappable Product Name
+              Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => widget.controller.toggleItemChecked(item.id),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: item.isChecked,
-                          onChanged: (_) =>
-                              widget.controller.toggleItemChecked(item.id),
-                          visualDensity: VisualDensity.compact,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
+                  child: Row(
+                    children: [
+                      Icon(
+                        item.category.icon,
+                        size: 18,
+                        color: item.isChecked
+                            ? item.category.color.withValues(alpha: 0.4)
+                            : item.category.color,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                               item.name,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w400,
+                                fontWeight: FontWeight.w600,
                                 decoration: item.isChecked
                                     ? TextDecoration.lineThrough
                                     : null,
                                 color: item.isChecked
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF1E293B),
+                                    ? textSecondary
+                                    : textPrimary,
                               ),
+                            ),
+                            if (showMarketTag)
+                              Text(
+                                itemMarket.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Price / Value column (inspired by the clean number column in reference image)
+              GestureDetector(
+                onTap: () => _showEditItemModal(item, focusPrice: true),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: item.price != null && item.price! > 0
+                      ? Text(
+                          AppFormatters.formatCurrency(item.price!),
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: item.isChecked ? textSecondary : textPrimary,
+                          ),
+                        )
+                      : Tooltip(
+                          message: 'Informar preço',
+                          child: Text(
+                            'R\$ --',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: textSecondary.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
-              const Spacer(),
-              if (showMarketTag)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 95),
-                  child: Text(
-                    itemMarket.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-              if (item.price == null || item.price! <= 0)
-                const Tooltip(
-                  message: 'Sem preço preenchido (toque para informar)',
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(
-                      Icons.money_off_csred_outlined,
-                      size: 18,
-                      color: Color(0xFFF59E0B),
-                    ),
-                  ),
-                ),
+
+              const SizedBox(width: 6),
+
+              // Circular Outlined Check/Add Button (Green like the "+" circle in reference image)
               Tooltip(
-                message: item.category.label,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(
-                    item.category.icon,
-                    size: 19,
-                    color: item.isChecked
-                        ? item.category.color.withValues(alpha: 0.45)
-                        : item.category.color,
+                message: item.isChecked ? 'Desmarcar item' : 'Marcar item',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => widget.controller.toggleItemChecked(item.id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: item.isChecked
+                          ? AppColors.primaryGreen
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: AppColors.primaryGreen,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: item.isChecked
+                          ? Colors.white
+                          : AppColors.primaryGreen,
+                    ),
                   ),
                 ),
               ),
-              IconButton(
-                tooltip: 'Editar produto, mercado e preço',
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  size: 19,
-                  color: Color(0xFF94A3B8),
+
+              const SizedBox(width: 8),
+
+              // Circular Outlined Minus/Options Button (Grey like the "-" circle in reference image)
+              Tooltip(
+                message: 'Editar ou remover item',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => _showEditItemModal(item, focusPrice: true),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: textSecondary.withValues(alpha: 0.45),
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.more_horiz_rounded,
+                      size: 16,
+                      color: textSecondary,
+                    ),
+                  ),
                 ),
-                onPressed: () => _showEditItemModal(item, focusPrice: true),
               ),
             ],
           ),
@@ -1027,6 +1360,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
   Widget _buildEmptyState(BuildContext context) {
     final controller = widget.controller;
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
 
     if (controller.totalItemsCount > 0) {
       return Center(
@@ -1035,9 +1370,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Nenhum item para este filtro.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                style: TextStyle(color: textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 10),
               TextButton(
@@ -1054,33 +1389,123 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       );
     }
 
-    return const Center(
+    return Center(
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.checklist_rounded,
               size: 40,
-              color: Color(0xFFCBD5E1),
+              color: textSecondary.withValues(alpha: 0.5),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Sua lista está vazia',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF334155),
+                fontWeight: FontWeight.w700,
+                color: textPrimary,
               ),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              'Digite um produto ou cole uma lista inteira no campo acima e toque em Adicionar.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              'Digite um produto ou cole uma lista inteira na barra acima e toque em Adicionar.',
+              style: TextStyle(fontSize: 13, color: textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom S-curve wave clipper matching the organic curved header from the design reference image
+class _WaveHeaderClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 28);
+
+    // First gentle hill up, then swooping down on the right
+    final firstControlPoint = Offset(size.width * 0.26, size.height - 48);
+    final firstEndPoint = Offset(size.width * 0.54, size.height - 22);
+    path.quadraticBezierTo(
+      firstControlPoint.dx,
+      firstControlPoint.dy,
+      firstEndPoint.dx,
+      firstEndPoint.dy,
+    );
+
+    final secondControlPoint = Offset(size.width * 0.80, size.height + 4);
+    final secondEndPoint = Offset(size.width, size.height - 18);
+    path.quadraticBezierTo(
+      secondControlPoint.dx,
+      secondControlPoint.dy,
+      secondEndPoint.dx,
+      secondEndPoint.dy,
+    );
+
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _GlassCircleIconButton extends StatelessWidget {
+  const _GlassCircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: GestureDetector(
+        onTap: onTap,
+        child: _GlassCircleIcon(icon: icon),
+      ),
+    );
+  }
+}
+
+class _GlassCircleIcon extends StatelessWidget {
+  const _GlassCircleIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black.withValues(alpha: 0.28),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: Colors.white,
+          ),
         ),
       ),
     );

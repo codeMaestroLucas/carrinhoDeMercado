@@ -1,5 +1,6 @@
 import 'package:carrinhocompras/main.dart';
 import 'package:carrinhocompras/models/shopping_models.dart';
+import 'package:carrinhocompras/screens/shopping_list_screen.dart';
 import 'package:carrinhocompras/services/category_classifier.dart';
 import 'package:carrinhocompras/services/receipt_scanner_service.dart';
 import 'package:carrinhocompras/services/shopping_controller.dart';
@@ -71,20 +72,24 @@ CARTAO DE CREDITO 42,29
     });
   });
 
-  group('ShoppingController & 3 Screens Widget Tests', () {
+  group('ShoppingController & 4 Screens Widget Tests', () {
     testWidgets(
-      'Dynamic multi-item input, new tab order (Lista, Histórico, Configurações), and Adicionar Compra on History',
+      'Dynamic multi-item input, 4 tabs (Início, Lista, Histórico, Configurações), Home analytics, and Dark Mode toggle',
       (WidgetTester tester) async {
         final controller = ShoppingController(enablePersistence: false);
         await tester.pumpWidget(CarrinhoComprasApp(controller: controller));
 
-        // Verify Paste button was removed and prominent Adicionar button exists
+        // Verify Paste button was removed and prominent Adicionar button exists on Lista
         expect(find.text('Colar'), findsNothing);
         expect(find.text('Adicionar'), findsOneWidget);
 
-        // Dynamically enter multiple items in the single input field
+        // Dynamically enter multiple items in the single input field on Lista
+        final listInputFinder = find.descendant(
+          of: find.byType(ShoppingListScreen),
+          matching: find.byType(TextField),
+        );
         await tester.enterText(
-          find.byType(TextField).first,
+          listInputFinder.first,
           'Arroz\nFeijão\nDetergente',
         );
         await tester.pumpAndSettle();
@@ -98,28 +103,69 @@ CARTAO DE CREDITO 42,29
         expect(find.text('Feijão'), findsOneWidget);
         expect(find.text('Detergente'), findsOneWidget);
 
-        // Verify tab order: Lista (0), Histórico (1), Configurações (2)
+        // Verify tab order: Início (0), Lista (1), Histórico (2), Configurações (3)
         final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
         expect(
           (navBar.destinations[0] as NavigationDestination).label,
-          'Lista',
+          'Início',
         );
         expect(
           (navBar.destinations[1] as NavigationDestination).label,
-          'Histórico',
+          'Lista',
         );
         expect(
           (navBar.destinations[2] as NavigationDestination).label,
+          'Histórico',
+        );
+        expect(
+          (navBar.destinations[3] as NavigationDestination).label,
           'Configurações',
         );
 
-        // Navigate to Histórico (2nd tab)
+        // Add sample purchase history to verify Home screen analytics
+        controller.addPurchaseFromItems(
+          marketId: controller.selectedMarket.id,
+          date: DateTime.now().subtract(const Duration(days: 5)),
+          items: const [
+            PurchaseHistoryItem(
+              name: 'Arroz',
+              category: ProductCategory.alimentos,
+              price: 20.0,
+            ),
+          ],
+        );
+        controller.addPurchaseFromItems(
+          marketId: controller.selectedMarket.id,
+          date: DateTime.now(),
+          items: const [
+            PurchaseHistoryItem(
+              name: 'Arroz',
+              category: ProductCategory.alimentos,
+              price: 25.0,
+            ),
+          ],
+        );
+        await tester.pumpAndSettle();
+
+        // Navigate to Início (Home tab with house icon)
+        await tester.tap(find.text('Início'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Início & Análises'), findsOneWidget);
+        expect(find.text('Maiores Variações Recentes'), findsOneWidget);
+        expect(find.text('Análise por Produto'), findsOneWidget);
+
+        // Navigate to Histórico
         await tester.tap(find.text('Histórico'));
         await tester.pumpAndSettle();
 
-        // Verify "Adicionar Compra" button is present and "Total nas compras" is not shown
         expect(find.text('Adicionar Compra'), findsOneWidget);
-        expect(find.textContaining('Total nas compras'), findsNothing);
+
+        // Toggle Dark Mode
+        expect(controller.isDarkMode, false);
+        controller.toggleDarkMode();
+        await tester.pumpAndSettle();
+        expect(controller.isDarkMode, true);
       },
     );
   });

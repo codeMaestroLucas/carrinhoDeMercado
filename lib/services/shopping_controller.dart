@@ -39,6 +39,7 @@ class ShoppingController extends ChangeNotifier {
 
   ProductCategory? _categoryFilter;
   bool _showCheckedItems = true;
+  bool _isDarkMode = false;
 
   String? _sharedSpaceCode;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
@@ -50,6 +51,7 @@ class ShoppingController extends ChangeNotifier {
   List<PurchaseRecord> get history => List.unmodifiable(_history);
   ProductCategory? get categoryFilter => _categoryFilter;
   bool get showCheckedItems => _showCheckedItems;
+  bool get isDarkMode => _isDarkMode;
   bool get filterBySelectedMarket => _filterBySelectedMarket;
   Map<String, ProductCategory> get learnedCategories =>
       Map.unmodifiable(_learnedCategories);
@@ -273,6 +275,19 @@ class ShoppingController extends ChangeNotifier {
 
   void setShowCheckedItems(bool value) {
     _showCheckedItems = value;
+    notifyListeners();
+  }
+
+  void toggleDarkMode() {
+    _isDarkMode = !_isDarkMode;
+    _saveToDisk(pushCloud: false);
+    notifyListeners();
+  }
+
+  void setDarkMode(bool value) {
+    if (_isDarkMode == value) return;
+    _isDarkMode = value;
+    _saveToDisk(pushCloud: false);
     notifyListeners();
   }
 
@@ -908,6 +923,9 @@ class ShoppingController extends ChangeNotifier {
           }
         }
       }
+      if (data['isDarkMode'] is bool) {
+        _isDarkMode = data['isDarkMode'] as bool;
+      }
 
       notifyListeners();
     } catch (_) {
@@ -924,6 +942,7 @@ class ShoppingController extends ChangeNotifier {
         final payload = jsonEncode({
           ...stateMap,
           'sharedSpaceCode': _sharedSpaceCode,
+          'isDarkMode': _isDarkMode,
         });
         await file.writeAsString(payload);
       }

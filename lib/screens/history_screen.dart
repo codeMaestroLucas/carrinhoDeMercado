@@ -5,6 +5,7 @@ import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
 import '../services/receipt_scanner_service.dart';
 import '../services/shopping_controller.dart';
+import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -18,8 +19,6 @@ class HistoryScreen extends StatefulWidget {
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
-
-enum _HistoryViewMode { byMarket, byProduct }
 
 class ProductHistoryOccurrence {
   const ProductHistoryOccurrence({
@@ -168,7 +167,6 @@ class ProductHistoryAggregate {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  _HistoryViewMode _viewMode = _HistoryViewMode.byMarket;
   final TextEditingController _searchController = TextEditingController();
   String? _selectedMarketNameFilter;
 
@@ -229,59 +227,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  List<ProductHistoryAggregate> _buildProductAggregates(
-    List<PurchaseRecord> records,
-    String query,
-  ) {
-    final normalizedQuery = CategoryClassifier.normalize(query);
-    final grouped = <String, List<ProductHistoryOccurrence>>{};
-    final displayNames = <String, String>{};
-    final categories = <String, ProductCategory>{};
-
-    for (final record in records) {
-      if (_selectedMarketNameFilter != null &&
-          record.marketName != _selectedMarketNameFilter) {
-        continue;
-      }
-
-      for (final item in record.items) {
-        final key = CategoryClassifier.normalize(item.name);
-        if (key.isEmpty) continue;
-        if (normalizedQuery.isNotEmpty && !key.contains(normalizedQuery)) {
-          continue;
-        }
-
-        displayNames.putIfAbsent(key, () => item.name);
-        categories.putIfAbsent(key, () => item.category);
-        grouped.putIfAbsent(key, () => []).add(
-              ProductHistoryOccurrence(
-                productName: item.name,
-                category: item.category,
-                price: item.price,
-                marketName: record.marketName,
-                date: record.date,
-              ),
-            );
-      }
-    }
-
-    final aggregates = grouped.entries.map((entry) {
-      return ProductHistoryAggregate(
-        normalizedKey: entry.key,
-        displayName: displayNames[entry.key]!,
-        category: categories[entry.key]!,
-        occurrences: entry.value,
-      );
-    }).toList();
-
-    aggregates.sort(
-      (a, b) => a.displayName.toLowerCase().compareTo(
-            b.displayName.toLowerCase(),
-          ),
-    );
-    return aggregates;
-  }
-
   void _openProductAnalytics(BuildContext context, String productName) {
     final aggregate = _buildAggregateForProduct(
       productName,
@@ -312,13 +257,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (modalContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final textPrimary = AppColors.textPrimary(context);
+            final textSecondary = AppColors.textSecondary(context);
+            final subtleBg = AppColors.subtleSurface(context);
+
             Future<void> pickAndScanImage(ImageSource source) async {
               try {
                 final pickedFile = await imagePicker.pickImage(
@@ -383,7 +332,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       children: [
                         const Icon(
                           Icons.receipt_long_rounded,
-                          color: Color(0xFF0D9488),
+                          color: AppColors.primaryGreen,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -394,12 +343,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 .titleMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E293B),
+                                  color: textPrimary,
                                 ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                          icon: Icon(Icons.close, size: 20, color: textSecondary),
                           onPressed: () => Navigator.of(modalContext).pop(),
                         ),
                       ],
@@ -418,7 +367,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 labelText: 'Mercado onde fez a compra',
                                 isDense: true,
                                 filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
+                                fillColor: subtleBg,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -462,7 +411,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 hintText: 'Ex: Supermercado Extra',
                                 isDense: true,
                                 filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
+                                fillColor: subtleBg,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -526,16 +475,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     if (isScanning) ...[
                       const SizedBox(height: 16),
-                      const Center(
+                      Center(
                         child: Column(
                           children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 8),
+                            const CircularProgressIndicator(
+                              color: AppColors.primaryGreen,
+                            ),
+                            const SizedBox(height: 8),
                             Text(
                               'Identificando produtos e preços da Nota Fiscal...',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF64748B),
+                                color: textSecondary,
                               ),
                             ),
                           ],
@@ -574,12 +525,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             child: TextField(
                               controller: manualNameController,
                               textCapitalization: TextCapitalization.sentences,
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(fontSize: 13, color: textPrimary),
                               decoration: InputDecoration(
                                 hintText: 'Produto...',
                                 isDense: true,
                                 filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
+                                fillColor: subtleBg,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 10,
                                   vertical: 8,
@@ -602,12 +553,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   const TextInputType.numberWithOptions(
                                 decimal: true,
                               ),
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(fontSize: 13, color: textPrimary),
                               decoration: InputDecoration(
                                 hintText: 'R\$ 0,00',
                                 isDense: true,
                                 filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
+                                fillColor: subtleBg,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 10,
                                   vertical: 8,
@@ -654,10 +605,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           Text(
                             'Itens identificados (${scannedItems.length}):',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF475569),
+                              color: textSecondary,
                             ),
                           ),
                           Text(
@@ -665,7 +616,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F766E),
+                              color: AppColors.accentGreen,
                             ),
                           ),
                         ],
@@ -673,13 +624,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       const SizedBox(height: 6),
                       Flexible(
                         child: Material(
-                          color: Colors.white,
+                          color: AppColors.surface(context),
                           child: ListView.separated(
                             shrinkWrap: true,
                             itemCount: scannedItems.length,
-                            separatorBuilder: (_, _) => const Divider(
+                            separatorBuilder: (_, _) => Divider(
                               height: 1,
-                              color: Color(0xFFF1F5F9),
+                              color: AppColors.divider(context),
                             ),
                             itemBuilder: (context, idx) {
                               final item = scannedItems[idx];
@@ -695,9 +646,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                                 title: Text(
                                   item.name,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
+                                    color: textPrimary,
                                   ),
                                 ),
                                 trailing: Row(
@@ -705,18 +657,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   children: [
                                     Text(
                                       AppFormatters.formatCurrency(item.price),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 13,
-                                        color: Color(0xFF1E293B),
+                                        color: textPrimary,
                                       ),
                                     ),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
-                                      icon: const Icon(
+                                      icon: Icon(
                                         Icons.close_rounded,
                                         size: 16,
-                                        color: Color(0xFF94A3B8),
+                                        color: textSecondary,
                                       ),
                                       onPressed: () {
                                         setModalState(() {
@@ -774,7 +726,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               }
                             },
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       icon: const Icon(Icons.check_rounded, size: 18),
@@ -819,16 +772,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return true;
     }).toList();
 
+    final surfaceColor = AppColors.surface(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+    final borderColor = AppColors.border(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico de Gastos'),
+        title: const Text('Histórico de Compras'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton.icon(
               onPressed: _showAddReceiptPurchaseModal,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
+                backgroundColor: AppColors.primaryGreen,
                 foregroundColor: Colors.white,
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -848,56 +806,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: Column(
         children: [
           Material(
-            color: Colors.white,
+            color: surfaceColor,
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0xFFE2E8F0)),
+                  bottom: BorderSide(color: borderColor),
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SegmentedButton<_HistoryViewMode>(
-                    segments: const [
-                      ButtonSegment(
-                        value: _HistoryViewMode.byMarket,
-                        icon: Icon(Icons.storefront_outlined, size: 18),
-                        label: Text('Por Mercado'),
-                      ),
-                      ButtonSegment(
-                        value: _HistoryViewMode.byProduct,
-                        icon: Icon(Icons.shopping_bag_outlined, size: 18),
-                        label: Text('Por Produto'),
-                      ),
-                    ],
-                    selected: {_viewMode},
-                    onSelectionChanged: (newSelection) {
-                      setState(() {
-                        _viewMode = newSelection.first;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 10),
                   SizedBox(
                     height: 40,
                     child: TextField(
                       controller: _searchController,
                       onChanged: (_) => setState(() {}),
-                      style: const TextStyle(fontSize: 14),
+                      style: TextStyle(fontSize: 14, color: textPrimary),
                       decoration: InputDecoration(
-                        hintText: _viewMode == _HistoryViewMode.byMarket
-                            ? 'Buscar mercado ou produto...'
-                            : 'Buscar produto para ver análise...',
-                        hintStyle: const TextStyle(
+                        hintText: 'Buscar mercado ou produto nas compras...',
+                        hintStyle: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF94A3B8),
+                          color: textSecondary,
                         ),
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          size: 18,
+                          color: textSecondary,
+                        ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 16),
+                                icon: Icon(
+                                  Icons.clear_rounded,
+                                  size: 16,
+                                  color: textSecondary,
+                                ),
                                 onPressed: () {
                                   setState(() {
                                     _searchController.clear();
@@ -906,18 +849,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               )
                             : null,
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: AppColors.subtleSurface(context),
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: BorderSide(color: borderColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: BorderSide(color: borderColor),
                         ),
                       ),
                     ),
@@ -967,15 +908,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           Expanded(
             child: allRecords.isEmpty
-                ? _buildEmptyHistoryState()
+                ? _buildEmptyHistoryState(context)
                 : Material(
-                    color: Colors.white,
-                    child: _viewMode == _HistoryViewMode.byMarket
-                        ? _buildByMarketView(context, filteredRecords)
-                        : _buildByProductView(
-                            context,
-                            _buildProductAggregates(allRecords, query),
-                          ),
+                    color: surfaceColor,
+                    child: _buildByMarketView(context, filteredRecords),
                   ),
           ),
         ],
@@ -987,11 +923,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     BuildContext context,
     List<PurchaseRecord> records,
   ) {
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+
     if (records.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Nenhuma compra encontrada.',
-          style: TextStyle(color: Color(0xFF94A3B8)),
+          style: TextStyle(color: textSecondary),
         ),
       );
     }
@@ -999,9 +938,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 24),
       itemCount: records.length,
-      separatorBuilder: (_, _) => const Divider(
+      separatorBuilder: (_, _) => Divider(
         height: 1,
-        color: Color(0xFFF1F5F9),
+        color: AppColors.divider(context),
       ),
       itemBuilder: (context, index) {
         final record = records[index];
@@ -1009,44 +948,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
           shape: const Border(),
           collapsedShape: const Border(),
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          leading: const Icon(
+          leading: Icon(
             Icons.storefront_outlined,
-            color: Color(0xFF475569),
+            color: textSecondary,
             size: 20,
           ),
           title: Text(
             record.marketName,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 14,
-              color: Color(0xFF1E293B),
+              color: textPrimary,
             ),
           ),
           subtitle: Text(
             '${AppFormatters.formatDate(record.date)} • ${record.items.length} ${record.items.length == 1 ? 'item' : 'itens'}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF64748B),
+              color: textSecondary,
             ),
           ),
           trailing: Text(
             AppFormatters.formatCurrency(record.totalAmount),
             style: const TextStyle(
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               fontSize: 14,
-              color: Color(0xFF0F766E),
+              color: AppColors.accentGreen,
             ),
           ),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 4, 24, 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Toque em um produto abaixo para abrir a análise individual:',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF94A3B8),
+                    color: textSecondary,
                   ),
                 ),
               ),
@@ -1063,10 +1002,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
                 title: Text(
                   item.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1E293B),
+                    color: textPrimary,
                   ),
                 ),
                 trailing: Row(
@@ -1074,17 +1013,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     Text(
                       AppFormatters.formatCurrency(item.price),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 13,
-                        color: Color(0xFF475569),
+                        color: textSecondary,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
-                      color: Color(0xFF94A3B8),
+                      color: textSecondary,
                     ),
                   ],
                 ),
@@ -1124,10 +1063,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   IconButton(
                     tooltip: 'Excluir registro',
                     visualDensity: VisualDensity.compact,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.delete_outline_rounded,
                       size: 18,
-                      color: Color(0xFF94A3B8),
+                      color: textSecondary,
                     ),
                     onPressed: () {
                       widget.controller.deletePurchaseRecord(record.id);
@@ -1142,113 +1081,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildByProductView(
-    BuildContext context,
-    List<ProductHistoryAggregate> products,
-  ) {
-    if (products.isEmpty) {
-      return const Center(
-        child: Text(
-          'Nenhum produto encontrado.',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-      );
-    }
+  Widget _buildEmptyHistoryState(BuildContext context) {
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
 
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 24),
-      itemCount: products.length,
-      separatorBuilder: (_, _) => const Divider(
-        height: 1,
-        color: Color(0xFFF1F5F9),
-      ),
-      itemBuilder: (context, index) {
-        final product = products[index];
-        final variation = product.variationPercentFromLastTime;
-
-        return ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          onTap: () => _openProductAnalytics(context, product.displayName),
-          leading: Icon(
-            product.category.icon,
-            color: product.category.color,
-            size: 20,
-          ),
-          title: Text(
-            product.displayName,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          subtitle: Text(
-            'Média: ${AppFormatters.formatCurrency(product.averagePrice)} • ${product.lastMarket}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    AppFormatters.formatCurrency(product.lastPrice),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  _VariationBadge(variationPercent: variation),
-                ],
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: Color(0xFFCBD5E1),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyHistoryState() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.receipt_long_outlined,
               size: 44,
-              color: Color(0xFFCBD5E1),
+              color: textSecondary,
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Nenhuma compra finalizada',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF334155),
+                color: textPrimary,
               ),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              'Ao finalizar uma compra na aba Lista, o histórico por mercado e por produto aparecerá aqui.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              'Ao finalizar uma compra na aba Lista ou escanear uma Nota Fiscal acima, o registro completo aparecerá aqui.',
+              style: TextStyle(fontSize: 13, color: textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1258,8 +1118,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-class _VariationBadge extends StatelessWidget {
-  const _VariationBadge({
+class VariationBadge extends StatelessWidget {
+  const VariationBadge({
+    super.key,
     required this.variationPercent,
     this.fontSize = 11,
   });
@@ -1274,7 +1135,7 @@ class _VariationBadge extends StatelessWidget {
         '1ª compra',
         style: TextStyle(
           fontSize: fontSize,
-          color: const Color(0xFF94A3B8),
+          color: AppColors.textSecondary(context),
         ),
       );
     }
@@ -1286,7 +1147,7 @@ class _VariationBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
-          color: const Color(0xFF64748B),
+          color: AppColors.textSecondary(context),
         ),
       );
     }
@@ -1294,7 +1155,7 @@ class _VariationBadge extends StatelessWidget {
     final isUp = val > 0;
     final sign = isUp ? '+' : '';
     final arrow = isUp ? '↗' : '↘';
-    final color = isUp ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
+    final color = isUp ? const Color(0xFFDC2626) : AppColors.primaryGreen;
 
     return Text(
       '$sign${val.toStringAsFixed(0)}% $arrow',
@@ -1327,9 +1188,12 @@ class ProductAnalyticsScreen extends StatelessWidget {
     final insight = aggregate.marketComparisonInsight;
     final chronological = aggregate.chronologicalPricedOccurrences;
 
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+
     String pricePositionLabel = 'Dentro da média histórica';
-    Color pricePositionColor = const Color(0xFF475569);
-    Color pricePositionBg = const Color(0xFFF1F5F9);
+    Color pricePositionColor = textSecondary;
+    Color pricePositionBg = AppColors.subtleSurface(context);
     if (minOcc != null && maxOcc != null && minOcc.price != maxOcc.price) {
       if (aggregate.lastPrice <= minOcc.price * 1.02) {
         pricePositionLabel = 'Comprado perto da mínima histórica';
@@ -1383,11 +1247,11 @@ class ProductAnalyticsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Último Preço Pago',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: textSecondary,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1398,13 +1262,13 @@ class ProductAnalyticsScreen extends StatelessWidget {
                           children: [
                             Text(
                               AppFormatters.formatCurrency(aggregate.lastPrice),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
+                                color: textPrimary,
                               ),
                             ),
-                            _VariationBadge(
+                            VariationBadge(
                               variationPercent: variation,
                               fontSize: 12,
                             ),
@@ -1417,9 +1281,9 @@ class ProductAnalyticsScreen extends StatelessWidget {
                               : aggregate.lastMarket,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF94A3B8),
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -1433,11 +1297,11 @@ class ProductAnalyticsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Preço Médio Histórico',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: textSecondary,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1446,7 +1310,7 @@ class ProductAnalyticsScreen extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F766E),
+                            color: AppColors.accentGreen,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1454,9 +1318,9 @@ class ProductAnalyticsScreen extends StatelessWidget {
                           'Em ${aggregate.pricedOccurrences.length} ${aggregate.pricedOccurrences.length == 1 ? 'compra' : 'compras'}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF94A3B8),
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -1480,21 +1344,21 @@ class ProductAnalyticsScreen extends StatelessWidget {
                   alignment: WrapAlignment.spaceBetween,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const Row(
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.emoji_events_outlined,
                           size: 18,
-                          color: Color(0xFF475569),
+                          color: textSecondary,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
                           'Recordes de Preço',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
-                            color: Color(0xFF1E293B),
+                            color: textPrimary,
                           ),
                         ),
                       ],
@@ -1546,9 +1410,9 @@ class ProductAnalyticsScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Menor preço já pago: ${AppFormatters.formatCurrency(minOcc.price)} em ${AppFormatters.formatShortDate(minOcc.date)} (${minOcc.marketName})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF334155),
+                            color: textPrimary,
                           ),
                         ),
                       ),
@@ -1581,9 +1445,9 @@ class ProductAnalyticsScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Maior preço pago: ${AppFormatters.formatCurrency(maxOcc.price)} em ${AppFormatters.formatShortDate(maxOcc.date)} (${maxOcc.marketName})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF334155),
+                            color: textPrimary,
                           ),
                         ),
                       ),
@@ -1611,21 +1475,21 @@ class ProductAnalyticsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(
                       Icons.storefront_outlined,
                       size: 18,
-                      color: Color(0xFF475569),
+                      color: textSecondary,
                     ),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'Onde vale mais a pena comprar?',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: Color(0xFF1E293B),
+                          color: textPrimary,
                         ),
                       ),
                     ),
@@ -1637,26 +1501,28 @@ class ProductAnalyticsScreen extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDFA),
+                      color: AppColors.primaryGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFCCFBF1)),
+                      border: Border.all(
+                        color: AppColors.primaryGreen.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Text(
                       insight,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F766E),
+                        color: AppColors.accentGreen,
                       ),
                     ),
                   ),
                 ],
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Ranking de Mercados e último preço por estabelecimento:',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF64748B),
+                    color: textSecondary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1683,10 +1549,10 @@ class ProductAnalyticsScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     '${index + 1}º ${stat.marketName}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13,
-                                      color: Color(0xFF1E293B),
+                                      color: textPrimary,
                                     ),
                                   ),
                                   if (isCheapest)
@@ -1714,10 +1580,10 @@ class ProductAnalyticsScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             Text(
                               'Último: ${AppFormatters.formatCurrency(stat.lastPrice)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1E293B),
+                                color: textPrimary,
                               ),
                             ),
                           ],
@@ -1728,10 +1594,10 @@ class ProductAnalyticsScreen extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: ratio,
                             minHeight: 6,
-                            backgroundColor: const Color(0xFFF1F5F9),
+                            backgroundColor: AppColors.subtleSurface(context),
                             color: isCheapest
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFF94A3B8),
+                                ? AppColors.primaryGreen
+                                : textSecondary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1742,18 +1608,18 @@ class ProductAnalyticsScreen extends StatelessWidget {
                               child: Text(
                                 'Média no local: ${AppFormatters.formatCurrency(stat.averagePrice)}',
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF64748B),
+                                  color: textSecondary,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'Em ${AppFormatters.formatShortDate(stat.lastDate)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF94A3B8),
+                                color: textSecondary,
                               ),
                             ),
                           ],
@@ -1773,12 +1639,12 @@ class ProductAnalyticsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Histórico de Compras deste Item',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
-                    color: Color(0xFF1E293B),
+                    color: textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1787,10 +1653,10 @@ class ProductAnalyticsScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.calendar_today_outlined,
                           size: 15,
-                          color: Color(0xFF94A3B8),
+                          color: textSecondary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1801,17 +1667,17 @@ class ProductAnalyticsScreen extends StatelessWidget {
                                 occ.marketName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF1E293B),
+                                  color: textPrimary,
                                 ),
                               ),
                               Text(
                                 AppFormatters.formatDate(occ.date),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF94A3B8),
+                                  color: textSecondary,
                                 ),
                               ),
                             ],
@@ -1820,10 +1686,10 @@ class ProductAnalyticsScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           AppFormatters.formatCurrency(occ.price),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF334155),
+                            color: textPrimary,
                           ),
                         ),
                       ],
@@ -1849,9 +1715,9 @@ class _AnalyticsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border(context)),
       ),
       child: child,
     );
@@ -1908,34 +1774,36 @@ class _InteractivePriceTrendChartState
         : (pts.isNotEmpty ? pts.length - 1 : null);
     final selectedPoint =
         effectiveIndex != null ? pts[effectiveIndex] : null;
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
             Icon(
               Icons.show_chart_rounded,
               size: 18,
-              color: Color(0xFF475569),
+              color: textSecondary,
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 'Evolução de Preço no Tempo',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color: Color(0xFF1E293B),
+                  color: textPrimary,
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Toque ou arraste sobre os pontos do gráfico para visualizar o preço exato, data e mercado.',
-          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          style: TextStyle(fontSize: 12, color: textSecondary),
         ),
         if (selectedPoint != null) ...[
           const SizedBox(height: 10),
@@ -1943,9 +1811,9 @@ class _InteractivePriceTrendChartState
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.subtleSurface(context),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.border(context)),
             ),
             child: Wrap(
               spacing: 8,
@@ -1958,14 +1826,14 @@ class _InteractivePriceTrendChartState
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: Color(0xFF0F766E),
+                    color: AppColors.accentGreen,
                   ),
                 ),
                 Text(
                   '${selectedPoint.marketName} • ${AppFormatters.formatShortDate(selectedPoint.date)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF475569),
+                    color: textSecondary,
                   ),
                 ),
               ],
@@ -1977,12 +1845,12 @@ class _InteractivePriceTrendChartState
           height: 185,
           width: double.infinity,
           child: pts.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'Sem preços informados para gerar gráfico.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF94A3B8),
+                      color: textSecondary,
                     ),
                   ),
                 )
@@ -2004,6 +1872,9 @@ class _InteractivePriceTrendChartState
                           points: pts,
                           averagePrice: widget.averagePrice,
                           selectedIndex: effectiveIndex,
+                          gridColor: AppColors.divider(context),
+                          labelColor: textSecondary,
+                          surfaceColor: AppColors.surface(context),
                         ),
                       ),
                     );
@@ -2020,11 +1891,17 @@ class _PriceTrendLineChartPainter extends CustomPainter {
     required this.points,
     required this.averagePrice,
     required this.selectedIndex,
+    required this.gridColor,
+    required this.labelColor,
+    required this.surfaceColor,
   });
 
   final List<ProductHistoryOccurrence> points;
   final double averagePrice;
   final int? selectedIndex;
+  final Color gridColor;
+  final Color labelColor;
+  final Color surfaceColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2050,7 +1927,7 @@ class _PriceTrendLineChartPainter extends CustomPainter {
     }
 
     final gridPaint = Paint()
-      ..color = const Color(0xFFF1F5F9)
+      ..color = gridColor
       ..strokeWidth = 1;
 
     for (var i = 0; i <= 2; i++) {
@@ -2066,9 +1943,9 @@ class _PriceTrendLineChartPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: 'R\$${priceVal.toStringAsFixed(0)}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: Color(0xFF94A3B8),
+            color: labelColor,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -2100,8 +1977,8 @@ class _PriceTrendLineChartPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF0D9488).withValues(alpha: 0.16),
-            const Color(0xFF0D9488).withValues(alpha: 0.0),
+            AppColors.primaryGreen.withValues(alpha: 0.2),
+            AppColors.primaryGreen.withValues(alpha: 0.0),
           ],
         ).createShader(Rect.fromLTWH(leftPad, topPad, chartWidth, chartHeight));
       canvas.drawPath(fillPath, fillPaint);
@@ -2112,7 +1989,7 @@ class _PriceTrendLineChartPainter extends CustomPainter {
       }
 
       final linePaint = Paint()
-        ..color = const Color(0xFF0D9488)
+        ..color = AppColors.primaryGreen
         ..strokeWidth = 2.2
         ..style = PaintingStyle.stroke;
       canvas.drawPath(linePath, linePaint);
@@ -2124,7 +2001,7 @@ class _PriceTrendLineChartPainter extends CustomPainter {
         selectedIndex! < offsets.length) {
       final selOffset = offsets[selectedIndex!];
       final guidePaint = Paint()
-        ..color = const Color(0xFF0D9488).withValues(alpha: 0.35)
+        ..color = AppColors.primaryGreen.withValues(alpha: 0.35)
         ..strokeWidth = 1.2;
       canvas.drawLine(
         Offset(selOffset.dx, topPad),
@@ -2133,10 +2010,10 @@ class _PriceTrendLineChartPainter extends CustomPainter {
       );
     }
 
-    final dotFill = Paint()..color = const Color(0xFF0D9488);
-    final selectedDotFill = Paint()..color = const Color(0xFF0F766E);
+    final dotFill = Paint()..color = AppColors.primaryGreen;
+    final selectedDotFill = Paint()..color = AppColors.accentGreen;
     final dotBorder = Paint()
-      ..color = Colors.white
+      ..color = surfaceColor
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
@@ -2158,8 +2035,8 @@ class _PriceTrendLineChartPainter extends CustomPainter {
               fontSize: 10,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
               color: isSelected
-                  ? const Color(0xFF0F766E)
-                  : const Color(0xFF64748B),
+                  ? AppColors.primaryGreen
+                  : labelColor,
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -2199,7 +2076,7 @@ class _PriceTrendLineChartPainter extends CustomPainter {
         Rect.fromLTWH(clampedX, pillY, pillWidth, pillHeight),
         const Radius.circular(6),
       );
-      canvas.drawRRect(rrect, Paint()..color = const Color(0xFF0F766E));
+      canvas.drawRRect(rrect, Paint()..color = AppColors.accentGreen);
       tp.paint(canvas, Offset(clampedX + 6, pillY + 3));
     }
   }
@@ -2208,6 +2085,7 @@ class _PriceTrendLineChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _PriceTrendLineChartPainter oldDelegate) {
     return oldDelegate.points != points ||
         oldDelegate.averagePrice != averagePrice ||
-        oldDelegate.selectedIndex != selectedIndex;
+        oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.gridColor != gridColor;
   }
 }
