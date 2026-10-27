@@ -270,14 +270,6 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
       appBar: AppBar(
         title: const Text('Configurações'),
         actions: [
-          IconButton(
-            tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
-            onPressed: widget.controller.toggleDarkMode,
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
-              size: 20,
-            ),
-          ),
           if (_selectedTab == _ConfigTab.marketOrder)
             TextButton.icon(
               onPressed: () => _showAddOrEditMarketDialog(),
@@ -320,6 +312,14 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
               icon: const Icon(Icons.restore_rounded, size: 18),
               label: const Text('Restaurar'),
             ),
+          IconButton(
+            tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
+            onPressed: widget.controller.toggleDarkMode,
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
+              size: 21,
+            ),
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -844,6 +844,64 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Hero Banner using drawIcons.jpg & cartoonIcons.jpg
+        Container(
+          height: 96,
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Compras em Família',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sincronize itens, mercados e preços em tempo real.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                width: 120,
+                height: 96,
+                color: Colors.white,
+                child: Image.asset(
+                  'assets/imgs/cartoonIcons.jpg',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // 1. Status Card
         Container(
           padding: const EdgeInsets.all(16),
@@ -1002,7 +1060,7 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Vincular Aparelhos (Espaço Familiar)',
+                'Vincular Aparelhos',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
@@ -1017,11 +1075,12 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                         setState(() => _isSyncBusy = true);
                         try {
                           final code = await controller.createNewSharedSpace();
+                          await Clipboard.setData(ClipboardData(text: code));
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Espaço compartilhado "$code" criado!',
+                                  'Código "$code" gerado e copiado para a área de transferência!',
                                 ),
                                 behavior: SnackBarBehavior.floating,
                               ),

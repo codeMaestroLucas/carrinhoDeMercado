@@ -103,6 +103,14 @@ CARTAO DE CREDITO 42,29
         expect(find.text('Feijão'), findsOneWidget);
         expect(find.text('Detergente'), findsOneWidget);
 
+        // Verify Checkbox was removed and tapping the item opens the price configuration panel
+        expect(find.byType(Checkbox), findsNothing);
+        await tester.tap(find.text('Arroz'));
+        await tester.pumpAndSettle();
+        expect(find.text('Configurar Preço e Produto'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.close).first);
+        await tester.pumpAndSettle();
+
         // Verify tab order: Início (0), Lista (1), Histórico (2), Configurações (3)
         final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
         expect(

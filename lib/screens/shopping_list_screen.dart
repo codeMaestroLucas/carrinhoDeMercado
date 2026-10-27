@@ -18,6 +18,35 @@ class ShoppingListScreen extends StatefulWidget {
   State<ShoppingListScreen> createState() => _ShoppingListScreenState();
 }
 
+class _MarketBargainItem {
+  const _MarketBargainItem({
+    required this.item,
+    required this.cheapestMarketPrice,
+    required this.savingsAmount,
+    required this.savingsPercent,
+  });
+
+  final ShoppingItem item;
+  final double cheapestMarketPrice;
+  final double? savingsAmount;
+  final double? savingsPercent;
+}
+
+class _MarketBargainGroup {
+  const _MarketBargainGroup({
+    required this.market,
+    required this.bargains,
+  });
+
+  final MarketProfile market;
+  final List<_MarketBargainItem> bargains;
+
+  double get totalSavings => bargains.fold<double>(
+        0.0,
+        (sum, b) => sum + (b.savingsAmount ?? 0.0),
+      );
+}
+
 class _ShoppingListScreenState extends State<ShoppingListScreen> {
   final TextEditingController _quickAddController = TextEditingController();
   final FocusNode _quickAddFocus = FocusNode();
@@ -88,17 +117,279 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         ),
       );
     } else {
-      final assignedMarket = widget.controller.marketById(item.marketId);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '"${item.name}" adicionado na lista de ${assignedMarket.name}',
-          ),
+          content: Text('"${item.name}" adicionado à lista!'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
       );
     }
+  }
+
+  /// Computes which items in the current shopping list are historically cheaper at each market.
+  List<_MarketBargainGroup> _computeMarketBargainGroups(
+    List<ShoppingItem> items,
+  ) {
+    final byMarket = <String, List<_MarketBargainItem>>{};
+    final marketProfiles = <String, MarketProfile>{};
+
+    for (final item in items) {
+      final recs = widget.controller.marketRecommendationsForProduct(item.name);
+      if (recs.isEmpty) continue;
+
+      final cheapest = recs.first;
+      double? savingsAmt;
+      double? savingsPct;
+      if (recs.length >= 2) {
+        final nextPrice = recs[1].averagePrice;
+        final diff = nextPrice - cheapest.averagePrice;
+        if (diff > 0.05 && nextPrice > 0) {
+          savingsAmt = diff;
+          savingsPct = (diff / nextPrice) * 100.0;
+        }
+      }
+
+      marketProfiles[cheapest.market.id] = cheapest.market;
+      byMarket.putIfAbsent(cheapest.market.id, () => []).add(
+            _MarketBargainItem(
+              item: item,
+              cheapestMarketPrice: cheapest.averagePrice,
+              savingsAmount: savingsAmt,
+              savingsPercent: savingsPct,
+            ),
+          );
+    }
+
+    final groups = byMarket.entries.map((entry) {
+      return _MarketBargainGroup(
+        market: marketProfiles[entry.key]!,
+        bargains: entry.value,
+      );
+    }).toList();
+
+    groups.sort((a, b) => b.bargains.length.compareTo(a.bargains.length));
+    return groups;
+  }
+
+  void _showMarketSavingsModal(List<_MarketBargainGroup> groups) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (modalContext) {
+        final textPrimary = AppColors.textPrimary(modalContext);
+        final textSecondary = AppColors.textSecondary(modalContext);
+        final borderColor = AppColors.border(modalContext);
+
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGreen.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.savings_outlined,
+                          color: AppColors.primaryGreen,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Onde Comprar Mais Barato',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Itens da sua lista agrupados pelo mercado com menor preço',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 20, color: textSecondary),
+                        onPressed: () => Navigator.of(modalContext).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: scrollController,
+                      itemCount: groups.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, idx) {
+                        final group = groups[idx];
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.subtleSurface(context),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.storefront_rounded,
+                                          size: 18,
+                                          color: AppColors.primaryGreen,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            group.market.name,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryGreen.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${group.bargains.length} ${group.bargains.length == 1 ? 'item mais barato' : 'itens mais baratos'}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.accentGreen,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (group.totalSavings > 0.05) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Economia estimada de ${AppFormatters.formatCurrency(group.totalSavings)} comprando estes itens aqui',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.accentGreen,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: group.bargains.map((b) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface(context),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          b.item.category.icon,
+                                          size: 14,
+                                          color: b.item.category.color,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          b.item.name,
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          AppFormatters.formatCurrency(
+                                            b.cheapestMarketPrice,
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.accentGreen,
+                                          ),
+                                        ),
+                                        if (b.savingsPercent != null) ...[
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '(-${b.savingsPercent!.toStringAsFixed(0)}%)',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primaryGreen,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _showEditItemModal(
@@ -107,7 +398,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   }) async {
     final nameController = TextEditingController(text: item.name);
     final priceController = TextEditingController(
-      text: item.price != null
+      text: item.price != null && item.price! > 0
           ? item.price!.toStringAsFixed(2).replaceAll('.', ',')
           : '',
     );
@@ -169,7 +460,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Editar Produto',
+                            'Configurar Preço e Produto',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
@@ -201,6 +492,68 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 14),
+                    // Primary field: Price configuration right at the top
+                    TextField(
+                      controller: priceController,
+                      autofocus: focusPrice,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Preço pago (R\$)',
+                        hintText: 'Ex: 12,90',
+                        prefixIcon: const Icon(
+                          Icons.attach_money_rounded,
+                          color: AppColors.primaryGreen,
+                        ),
+                        filled: true,
+                        fillColor: subtleBg,
+                        suffixIcon: priceController.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  size: 18,
+                                  color: textSecondary,
+                                ),
+                                onPressed: () {
+                                  setModalState(() {
+                                    priceController.clear();
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (_) => setModalState(() {}),
+                    ),
+                    if (lastHistoricalPrice != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ActionChip(
+                          avatar: const Icon(Icons.history_rounded, size: 15),
+                          label: Text(
+                            'Usar último preço: ${AppFormatters.formatCurrency(lastHistoricalPrice)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () {
+                            setModalState(() {
+                              priceController.text = lastHistoricalPrice
+                                  .toStringAsFixed(2)
+                                  .replaceAll('.', ',');
+                            });
+                          },
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
@@ -302,64 +655,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         }
                       },
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: priceController,
-                      autofocus: focusPrice,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      style: TextStyle(color: textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Preço pago (R\$)',
-                        hintText: 'Ex: 12,90',
-                        filled: true,
-                        fillColor: subtleBg,
-                        suffixIcon: priceController.text.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.clear,
-                                  size: 18,
-                                  color: textSecondary,
-                                ),
-                                onPressed: () {
-                                  setModalState(() {
-                                    priceController.clear();
-                                  });
-                                },
-                              )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onChanged: (_) => setModalState(() {}),
-                    ),
-                    if (lastHistoricalPrice != null) ...[
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: ActionChip(
-                          avatar: const Icon(Icons.history_rounded, size: 15),
-                          label: Text(
-                            'Último preço: ${AppFormatters.formatCurrency(lastHistoricalPrice)}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onPressed: () {
-                            setModalState(() {
-                              priceController.text = lastHistoricalPrice
-                                  .toStringAsFixed(2)
-                                  .replaceAll('.', ',');
-                            });
-                          },
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 18),
                     FilledButton(
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primaryGreen,
                         foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                       onPressed: () {
                         final newName = nameController.text.trim();
@@ -386,7 +687,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         }
                         Navigator.of(modalContext).pop();
                       },
-                      child: const Text('Salvar'),
+                      child: const Text(
+                        'Salvar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ],
                 ),
@@ -617,28 +921,21 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final rawInput = _quickAddController.text.trim();
     final detectedItems = _detectItemsFromInput(rawInput);
     final isMultipleDetected = detectedItems.length > 1;
-    final singleTypedProduct =
-        detectedItems.length == 1 ? detectedItems.first : rawInput;
-
-    final bestMarketRec =
-        (!isMultipleDetected && singleTypedProduct.isNotEmpty)
-            ? controller.recommendCheapestMarketForProduct(singleTypedProduct)
-            : null;
-    final effectiveTargetMarketId = _manualMarketOverrideForQuickAdd ??
-        bestMarketRec?.market.id ??
-        activeMarket.id;
-    final effectiveTargetMarket =
-        controller.marketById(effectiveTargetMarketId);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = AppColors.background(context);
-    final surfaceColor = AppColors.surface(context);
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
 
     final listTitle = controller.filterBySelectedMarket
         ? activeMarket.name
         : 'Lista de Compras';
+
+    // Compute intuitive market bargain groups for the items currently in the list
+    final bargainGroups = _computeMarketBargainGroups(controller.allItems);
+    final activeMarketBargainGroup = bargainGroups
+        .where((g) => g.market.id == activeMarket.id)
+        .firstOrNull;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -657,291 +954,347 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
           // Main Content Area seamlessly flowing from the curved header
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Dynamic Feedback Banner when typing/pasting 1 or multiple products
-                      if (rawInput.isNotEmpty) ...[
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (bestMarketRec != null || isMultipleDetected)
-                                ? AppColors.primaryGreen.withValues(alpha: 0.12)
-                                : surfaceColor,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color:
-                                  (bestMarketRec != null || isMultipleDetected)
-                                      ? AppColors.primaryGreen
-                                          .withValues(alpha: 0.35)
-                                      : AppColors.border(context),
-                            ),
-                          ),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Market Selector Pills
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
                             children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isMultipleDetected
-                                        ? Icons.playlist_add_check_rounded
-                                        : (bestMarketRec != null
-                                            ? Icons.trending_down_rounded
-                                            : Icons.storefront_outlined),
-                                    size: 16,
-                                    color: (bestMarketRec != null ||
-                                            isMultipleDetected)
-                                        ? AppColors.accentGreen
-                                        : textSecondary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      isMultipleDetected
-                                          ? '${detectedItems.length} produtos identificados automaticamente no texto!'
-                                          : (bestMarketRec != null
-                                              ? 'Compensa mais no ${bestMarketRec.market.name} (média ${AppFormatters.formatCurrency(bestMarketRec.averagePrice)})'
-                                              : 'Sem histórico de preço para "$singleTypedProduct"'),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: (bestMarketRec != null ||
-                                                isMultipleDetected)
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                        color: (bestMarketRec != null ||
-                                                isMultipleDetected)
-                                            ? AppColors.accentGreen
-                                            : textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              PopupMenuButton<String>(
-                                tooltip: 'Escolher mercado para adicionar',
-                                onSelected: (marketId) {
-                                  setState(() {
-                                    _manualMarketOverrideForQuickAdd = marketId;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: surfaceColor,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: AppColors.border(context),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _manualMarketOverrideForQuickAdd ==
-                                                    null &&
-                                                isMultipleDetected
-                                            ? 'Auto (Mais barato)'
-                                            : 'Ir p/ ${effectiveTargetMarket.name}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Icon(
-                                        Icons.arrow_drop_down_rounded,
-                                        size: 16,
-                                        color: textSecondary,
-                                      ),
-                                    ],
-                                  ),
+                              ChoiceChip(
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(
+                                  Icons.layers_outlined,
+                                  size: 15,
+                                  color: !controller.filterBySelectedMarket
+                                      ? AppColors.primaryGreen
+                                      : textSecondary,
                                 ),
-                                itemBuilder: (context) {
-                                  return controller.markets.map((m) {
-                                    return PopupMenuItem<String>(
-                                      value: m.id,
-                                      child: Text(m.name),
-                                    );
-                                  }).toList();
-                                },
+                                label: Text(
+                                  'Todos Mercados (${controller.totalItemsCount})',
+                                ),
+                                selected: !controller.filterBySelectedMarket,
+                                onSelected: (_) =>
+                                    controller.setFilterBySelectedMarket(false),
                               ),
+                              const SizedBox(width: 6),
+                              ...controller.markets.map((market) {
+                                final count =
+                                    controller.itemCountForMarket(market.id);
+                                final isSelected =
+                                    controller.filterBySelectedMarket &&
+                                        activeMarket.id == market.id;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ChoiceChip(
+                                    visualDensity: VisualDensity.compact,
+                                    avatar: Icon(
+                                      Icons.storefront_outlined,
+                                      size: 15,
+                                      color: isSelected
+                                          ? AppColors.primaryGreen
+                                          : textSecondary,
+                                    ),
+                                    label: Text('${market.name} ($count)'),
+                                    selected: isSelected,
+                                    onSelected: (_) {
+                                      controller.setFilterBySelectedMarket(
+                                        true,
+                                        marketId: market.id,
+                                      );
+                                    },
+                                  ),
+                                );
+                              }),
                             ],
                           ),
                         ),
-                      ],
 
-                      // Subtitle inspired by "Shared with..." / Market status
-                      Text(
-                        controller.isCloudConnected
-                            ? 'Sincronizado • Espaço ${controller.sharedSpaceCode}'
-                            : 'Selecione o mercado da lista',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Market Selector Pills
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            ChoiceChip(
-                              visualDensity: VisualDensity.compact,
-                              avatar: Icon(
-                                Icons.layers_outlined,
-                                size: 15,
-                                color: !controller.filterBySelectedMarket
-                                    ? AppColors.primaryGreen
-                                    : textSecondary,
-                              ),
-                              label: Text(
-                                'Todos Mercados (${controller.totalItemsCount})',
-                              ),
-                              selected: !controller.filterBySelectedMarket,
-                              onSelected: (_) =>
-                                  controller.setFilterBySelectedMarket(false),
-                            ),
-                            const SizedBox(width: 6),
-                            ...controller.markets.map((market) {
-                              final count =
-                                  controller.itemCountForMarket(market.id);
-                              final isSelected =
-                                  controller.filterBySelectedMarket &&
-                                      activeMarket.id == market.id;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ChoiceChip(
-                                  visualDensity: VisualDensity.compact,
-                                  avatar: Icon(
-                                    Icons.storefront_outlined,
-                                    size: 15,
-                                    color: isSelected
-                                        ? AppColors.primaryGreen
-                                        : textSecondary,
-                                  ),
-                                  label: Text('${market.name} ($count)'),
-                                  selected: isSelected,
-                                  onSelected: (_) {
-                                    controller.setFilterBySelectedMarket(
-                                      true,
-                                      marketId: market.id,
-                                    );
-                                  },
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Prominent Title + Filter Sliders Icon (matching inspiration image)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              listTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.4,
-                                color: textPrimary,
-                              ),
-                            ),
-                          ),
-                          if (controller.categoryFilter != null ||
-                              !controller.showCheckedItems)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: ActionChip(
-                                visualDensity: VisualDensity.compact,
-                                label: Text(
-                                  controller.categoryFilter?.label ??
-                                      'Sem ticados',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                onPressed: () {
-                                  controller.setCategoryFilter(null);
-                                  controller.setShowCheckedItems(true);
-                                },
-                              ),
-                            ),
-                          IconButton(
-                            tooltip: 'Filtrar categorias e itens',
-                            onPressed: _showFiltersBottomSheet,
-                            icon: Icon(
-                              Icons.tune_rounded,
-                              color: (controller.categoryFilter != null ||
-                                      !controller.showCheckedItems)
-                                  ? AppColors.primaryGreen
-                                  : textPrimary,
-                              size: 22,
-                            ),
+                        // Intuitive Market Savings Guide ("Quais itens podem ser comprados mais baratos em tal mercado")
+                        if (bargainGroups.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildMarketBargainBanner(
+                            context,
+                            bargainGroups: bargainGroups,
+                            activeMarketGroup: controller.filterBySelectedMarket
+                                ? activeMarketBargainGroup
+                                : null,
                           ),
                         ],
-                      ),
-                    ],
+
+                        const SizedBox(height: 10),
+
+                        // Prominent Title + Filter Sliders Icon + Finish Purchase Action
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.4,
+                                  color: textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (controller.categoryFilter != null ||
+                                !controller.showCheckedItems)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: ActionChip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: Text(
+                                    controller.categoryFilter?.label ??
+                                        'Sem marcados',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  onPressed: () {
+                                    controller.setCategoryFilter(null);
+                                    controller.setShowCheckedItems(true);
+                                  },
+                                ),
+                              ),
+                            IconButton(
+                              tooltip: 'Filtrar categorias e itens',
+                              onPressed: _showFiltersBottomSheet,
+                              icon: Icon(
+                                Icons.tune_rounded,
+                                color: (controller.categoryFilter != null ||
+                                        !controller.showCheckedItems)
+                                    ? AppColors.primaryGreen
+                                    : textPrimary,
+                                size: 22,
+                              ),
+                            ),
+                            if (controller.totalItemsCount > 0)
+                              PopupMenuButton<String>(
+                                tooltip: 'Opções da lista',
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  color: textSecondary,
+                                  size: 21,
+                                ),
+                                onSelected: (action) {
+                                  if (action == 'finish') {
+                                    _showFinishPurchaseDialog();
+                                  } else if (action == 'clear_checked') {
+                                    controller.clearCheckedItems();
+                                  } else if (action == 'clear_all') {
+                                    controller.clearAllItems();
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'finish',
+                                    child: Text(
+                                      'Finalizar compra (salvar histórico)',
+                                    ),
+                                  ),
+                                  if (controller.checkedItemsCount > 0)
+                                    const PopupMenuItem(
+                                      value: 'clear_checked',
+                                      child: Text('Remover itens marcados'),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'clear_all',
+                                    child: Text('Limpar toda a lista'),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
-                // Table-style continuous list of items with sleek circular action buttons
-                Expanded(
-                  child: items.isEmpty
-                      ? _buildEmptyState(context)
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 84),
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: AppColors.divider(context),
-                          ),
-                          itemBuilder: (context, index) {
-                            return _buildStylizedRow(context, items[index]);
-                          },
-                        ),
-                ),
+                // Continuous list of items or empty state inside slivers to prevent vertical overflow when keyboard opens
+                if (items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(context),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 84),
+                    sliver: SliverList.separated(
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: AppColors.divider(context),
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final bestRec = controller
+                            .recommendCheapestMarketForProduct(item.name);
+                        final isCheaperHere = bestRec != null &&
+                            (!controller.filterBySelectedMarket ||
+                                bestRec.market.id == activeMarket.id);
+
+                        return _buildStylizedRow(
+                          context,
+                          item,
+                          isCheaperHighlight: isCheaperHere,
+                          cheapestMarketName: bestRec?.market.name,
+                        );
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: controller.checkedItemsCount > 0
+      floatingActionButton: controller.totalItemsCount > 0
           ? FloatingActionButton.extended(
               onPressed: _showFinishPurchaseDialog,
               backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
               elevation: 3,
-              icon: const Icon(Icons.check_rounded, size: 18),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 18),
               label: Text(
-                'Finalizar (${controller.checkedItemsCount})',
+                controller.checkedItemsCount > 0
+                    ? 'Finalizar (${controller.checkedItemsCount})'
+                    : 'Finalizar Compra',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildMarketBargainBanner(
+    BuildContext context, {
+    required List<_MarketBargainGroup> bargainGroups,
+    required _MarketBargainGroup? activeMarketGroup,
+  }) {
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+
+    // If a specific market tab is selected and has cheaper items, highlight those specific items
+    if (activeMarketGroup != null && activeMarketGroup.bargains.isNotEmpty) {
+      final itemNames =
+          activeMarketGroup.bargains.map((b) => b.item.name).join(', ');
+      return InkWell(
+        onTap: () => _showMarketSavingsModal(bargainGroups),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppColors.primaryGreen.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.primaryGreen.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.local_offer_rounded,
+                size: 17,
+                color: AppColors.primaryGreen,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Mais baratos no ${activeMarketGroup.market.name}: $itemNames',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.accentGreen,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Otherwise show a compact summary across markets so user can tap and see which items are cheaper where
+    final topGroup = bargainGroups.first;
+    final sampleNames =
+        topGroup.bargains.take(3).map((b) => b.item.name).join(', ');
+    return InkWell(
+      onTap: () => _showMarketSavingsModal(bargainGroups),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.primaryGreen.withValues(alpha: 0.11),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primaryGreen.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.savings_outlined,
+              size: 18,
+              color: AppColors.primaryGreen,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Veja onde seus itens estão mais baratos',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                  ),
+                  Text(
+                    '${topGroup.market.name}: $sampleNames${topGroup.bargains.length > 3 ? ' +${topGroup.bargains.length - 3}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGreen,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Ver itens',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -957,7 +1310,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
 
     return SizedBox(
-      height: topPadding + 190,
+      height: topPadding + 185,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
@@ -991,15 +1344,14 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             ),
           ),
 
-          // 2. Top Actions Row (Theme Toggle + List Options)
+          // 2. Top Actions Row: Dark/Light Mode Button in the exact top-right corner across all screens
           Positioned(
             top: topPadding + 6,
             left: 14,
-            right: 14,
+            right: 12,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Dark/Light Mode Glass Pill Button
                 _GlassCircleIconButton(
                   tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
                   icon: isDark
@@ -1007,49 +1359,13 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       : Icons.dark_mode_outlined,
                   onTap: controller.toggleDarkMode,
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (controller.totalItemsCount > 0)
-                      PopupMenuButton<String>(
-                        tooltip: 'Opções da lista',
-                        onSelected: (action) {
-                          if (action == 'finish') {
-                            _showFinishPurchaseDialog();
-                          } else if (action == 'clear_checked') {
-                            controller.clearCheckedItems();
-                          } else if (action == 'clear_all') {
-                            controller.clearAllItems();
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'finish',
-                            child: Text('Finalizar compra (salvar histórico)'),
-                          ),
-                          if (controller.checkedItemsCount > 0)
-                            const PopupMenuItem(
-                              value: 'clear_checked',
-                              child: Text('Remover itens marcados'),
-                            ),
-                          const PopupMenuItem(
-                            value: 'clear_all',
-                            child: Text('Limpar toda a lista'),
-                          ),
-                        ],
-                        child: const _GlassCircleIcon(
-                          icon: Icons.more_horiz_rounded,
-                        ),
-                      ),
-                  ],
-                ),
               ],
             ),
           ),
 
           // 3. Frosted Glass "Add Items" Pill Bar inside the image (inspired by reference image)
           Positioned(
-            top: topPadding + 62,
+            top: topPadding + 58,
             left: 18,
             right: 18,
             child: ClipRRect(
@@ -1135,7 +1451,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      // Add action button supporting both single "+" style and label for accessibility/tests
                       Material(
                         color: AppColors.primaryGreen,
                         borderRadius: BorderRadius.circular(12),
@@ -1182,11 +1497,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     );
   }
 
-  Widget _buildStylizedRow(BuildContext context, ShoppingItem item) {
-    final itemMarket = widget.controller.marketById(item.marketId);
-    final showMarketTag = !widget.controller.filterBySelectedMarket;
+  Widget _buildStylizedRow(
+    BuildContext context,
+    ShoppingItem item, {
+    required bool isCheaperHighlight,
+    required String? cheapestMarketName,
+  }) {
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
+    final hasPrice = item.price != null && item.price! > 0;
+    final isChecked = item.isChecked;
 
     return Dismissible(
       key: ValueKey(item.id),
@@ -1205,155 +1525,153 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         ),
       ),
       onDismissed: (_) => widget.controller.removeItem(item.id),
-      child: InkWell(
-        onTap: () => _showEditItemModal(item, focusPrice: true),
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          child: Row(
-            children: [
-              // Category subtle icon indicator + Tappable Product Name
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => widget.controller.toggleItemChecked(item.id),
-                  child: Row(
-                    children: [
-                      Icon(
-                        item.category.icon,
-                        size: 18,
-                        color: item.isChecked
-                            ? item.category.color.withValues(alpha: 0.4)
+      child: Row(
+        children: [
+          // Left 75%: Tapping toggles checked (ticado) state of the item
+          Expanded(
+            flex: 3,
+            child: InkWell(
+              onTap: () => widget.controller.toggleItemChecked(item.id),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    // Category Icon / Checked Badge
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isChecked
+                            ? AppColors.primaryGreen.withValues(alpha: 0.16)
+                            : item.category.color.withValues(alpha: 0.13),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isChecked ? Icons.check_rounded : item.category.icon,
+                        size: 17,
+                        color: isChecked
+                            ? AppColors.primaryGreen
                             : item.category.color,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.name,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                decoration: item.isChecked
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: item.isChecked
-                                    ? textSecondary
-                                    : textPrimary,
-                              ),
-                            ),
-                            if (showMarketTag)
-                              Text(
-                                itemMarket.name,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: textSecondary,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
+                    const SizedBox(width: 12),
 
-              const SizedBox(width: 8),
-
-              // Price / Value column (inspired by the clean number column in reference image)
-              GestureDetector(
-                onTap: () => _showEditItemModal(item, focusPrice: true),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: item.price != null && item.price! > 0
-                      ? Text(
-                          AppFormatters.formatCurrency(item.price!),
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: item.isChecked ? textSecondary : textPrimary,
-                          ),
-                        )
-                      : Tooltip(
-                          message: 'Informar preço',
-                          child: Text(
-                            'R\$ --',
+                    // Product Name + subtle bargain badge if cheaper in a known market
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: textSecondary.withValues(alpha: 0.7),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isChecked ? textSecondary : textPrimary,
+                              decoration: isChecked
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              decorationColor: textSecondary,
                             ),
                           ),
-                        ),
-                ),
-              ),
-
-              const SizedBox(width: 6),
-
-              // Circular Outlined Check/Add Button (Green like the "+" circle in reference image)
-              Tooltip(
-                message: item.isChecked ? 'Desmarcar item' : 'Marcar item',
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => widget.controller.toggleItemChecked(item.id),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: item.isChecked
-                          ? AppColors.primaryGreen
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: AppColors.primaryGreen,
-                        width: 1.5,
+                          if (isCheaperHighlight && cheapestMarketName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.trending_down_rounded,
+                                    size: 13,
+                                    color: AppColors.accentGreen,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'Mais barato no $cheapestMarketName',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.accentGreen,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    child: Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: item.isChecked
-                          ? Colors.white
-                          : AppColors.primaryGreen,
-                    ),
-                  ),
+                  ],
                 ),
               ),
-
-              const SizedBox(width: 8),
-
-              // Circular Outlined Minus/Options Button (Grey like the "-" circle in reference image)
-              Tooltip(
-                message: 'Editar ou remover item',
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => _showEditItemModal(item, focusPrice: true),
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: textSecondary.withValues(alpha: 0.45),
-                        width: 1.4,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.more_horiz_rounded,
-                      size: 16,
-                      color: textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+
+          // Right 25%: Priced status indicator icon + 3 dots button to open item configuration
+          Expanded(
+            flex: 1,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Tooltip(
+                    message:
+                        hasPrice ? 'Produto precificado' : 'Sem preço definido',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => _showEditItemModal(item, focusPrice: true),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: hasPrice
+                              ? AppColors.primaryGreen.withValues(alpha: 0.14)
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: hasPrice
+                                ? AppColors.primaryGreen
+                                : textSecondary.withValues(alpha: 0.35),
+                            width: 1.4,
+                          ),
+                        ),
+                        child: Icon(
+                          hasPrice
+                              ? Icons.sell_rounded
+                              : Icons.sell_outlined,
+                          size: 14,
+                          color: hasPrice
+                              ? AppColors.primaryGreen
+                              : textSecondary.withValues(alpha: 0.65),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Configurar item',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => _showEditItemModal(item, focusPrice: true),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.more_vert_rounded,
+                          size: 20,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1365,7 +1683,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
     if (controller.totalItemsCount > 0) {
       return Center(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1390,17 +1708,17 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     }
 
     return Center(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.checklist_rounded,
-              size: 40,
-              color: textSecondary.withValues(alpha: 0.5),
+              Icons.shopping_basket_outlined,
+              size: 72,
+              color: textSecondary.withValues(alpha: 0.45),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Text(
               'Sua lista está vazia',
               style: TextStyle(
@@ -1491,8 +1809,8 @@ class _GlassCircleIcon extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Container(
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: Colors.black.withValues(alpha: 0.28),
@@ -1503,7 +1821,7 @@ class _GlassCircleIcon extends StatelessWidget {
           ),
           child: Icon(
             icon,
-            size: 18,
+            size: 19,
             color: Colors.white,
           ),
         ),

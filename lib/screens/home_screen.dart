@@ -241,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
               size: 21,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
         ],
       ),
       body: allRecords.isEmpty
@@ -254,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Card 1: Resumo de Gastos do Mês Atual
+                        // Card 1: Resumo de Gastos do Mês Atual (com banner gocery.jpg)
                         _buildMonthlySpendingCard(
                           context,
                           monthName: _monthNames[now.month - 1],
@@ -271,33 +271,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (productsWithVariation.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.insights_rounded,
-                                    size: 18,
-                                    color: AppColors.accentGreen,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Maiores Variações Recentes',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: textPrimary,
-                                    ),
-                                  ),
-                                ],
+                              const Icon(
+                                Icons.insights_rounded,
+                                size: 18,
+                                color: AppColors.accentGreen,
                               ),
-                              Text(
-                                'Toque p/ detalhes',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: textSecondary,
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Maiores Variações Recentes',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: textPrimary,
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -594,138 +587,185 @@ class _HomeScreenState extends State<HomeScreen> {
         hasCurrentMonthData ? 'Gastos em $monthName' : 'Total Acumulado';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor),
         boxShadow: isDark
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryGreen.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_outlined,
-                      size: 18,
-                      color: AppColors.primaryGreen,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    periodTitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.subtleSurface(context),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$displayCount ${displayCount == 1 ? 'compra' : 'compras'}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: textSecondary,
-                  ),
+          // Decorative gocery.jpg visual accent on the right side
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 135,
+            child: ShaderMask(
+              shaderCallback: (rect) {
+                return const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Colors.transparent, Colors.black],
+                ).createShader(rect);
+              },
+              blendMode: BlendMode.dstIn,
+              child: Opacity(
+                opacity: isDark ? 0.22 : 0.18,
+                child: Image.asset(
+                  'assets/imgs/gocery.jpg',
+                  fit: BoxFit.cover,
                 ),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                AppFormatters.formatCurrency(displayTotal),
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(width: 10),
-              if (monthDiffPercent != null && hasCurrentMonthData)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: monthDiffPercent > 0
-                          ? const Color(0xFFFEE2E2)
-                          : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${monthDiffPercent > 0 ? '+' : ''}${monthDiffPercent.toStringAsFixed(0)}% vs mês ant.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: monthDiffPercent > 0
-                            ? const Color(0xFFDC2626)
-                            : const Color(0xFF15803D),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGreen.withValues(
+                                alpha: 0.14,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 18,
+                              color: AppColors.primaryGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              periodTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '$displayCount ${displayCount == 1 ? 'compra' : 'compras'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      AppFormatters.formatCurrency(displayTotal),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    if (monthDiffPercent != null && hasCurrentMonthData)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: monthDiffPercent > 0
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${monthDiffPercent > 0 ? '+' : ''}${monthDiffPercent.toStringAsFixed(0)}% vs mês ant.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: monthDiffPercent > 0
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF15803D),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (hasCurrentMonthData &&
+                    allRecordsCountOtherThanCurrent(
+                      allTimeTotal,
+                      currentMonthTotal,
+                    )) ...[
+                  const SizedBox(height: 10),
+                  Divider(height: 1, color: AppColors.divider(context)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          prevMonthTotal > 0
+                              ? 'Mês anterior: ${AppFormatters.formatCurrency(prevMonthTotal)}'
+                              : 'Histórico geral ($allTimePurchasesCount compras)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: textSecondary),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Total: ${AppFormatters.formatCurrency(allTimeTotal)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-            ],
-          ),
-          if (hasCurrentMonthData && allRecordsCountOtherThanCurrent(allTimeTotal, currentMonthTotal)) ...[
-            const SizedBox(height: 10),
-            Divider(height: 1, color: AppColors.divider(context)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                   prevMonthTotal > 0
-                      ? 'Mês anterior: ${AppFormatters.formatCurrency(prevMonthTotal)}'
-                      : 'Histórico geral ($allTimePurchasesCount compras)',
-                  style: TextStyle(fontSize: 12, color: textSecondary),
-                ),
-                Text(
-                  'Total: ${AppFormatters.formatCurrency(allTimeTotal)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: textPrimary,
-                  ),
-                ),
+                ],
               ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -851,15 +891,31 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(18),
+              width: 170,
+              height: 115,
               decoration: BoxDecoration(
-                color: AppColors.primaryGreen.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border(context)),
               ),
-              child: const Icon(
-                Icons.insights_rounded,
-                size: 40,
-                color: AppColors.primaryGreen,
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/imgs/gocery.jpg',
+                    fit: BoxFit.cover,
+                  ),
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    child: const Center(
+                      child: Icon(
+                        Icons.insights_rounded,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),

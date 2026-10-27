@@ -772,6 +772,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return true;
     }).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = AppColors.surface(context);
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
@@ -781,26 +782,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('Histórico de Compras'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton.icon(
-              onPressed: _showAddReceiptPurchaseModal,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: const Icon(Icons.document_scanner_outlined, size: 16),
-              label: const Text(
-                'Adicionar Compra',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          FilledButton.icon(
+            onPressed: _showAddReceiptPurchaseModal,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
+            icon: const Icon(Icons.document_scanner_outlined, size: 15),
+            label: const Text(
+              'Adicionar Compra',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+            ),
           ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
+            onPressed: controller.toggleDarkMode,
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -1087,16 +1095,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 44,
-              color: textSecondary,
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: 340),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border(context)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset(
+                'assets/imgs/cartoonIcons.jpg',
+                fit: BoxFit.contain,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               'Nenhuma compra finalizada',
               style: TextStyle(

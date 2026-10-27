@@ -64,6 +64,10 @@ flutter:
 
   assets:
     - assets/imgs/ListTop.jpg
+    - assets/imgs/cartoonIcons.jpg
+    - assets/imgs/gocery.jpg
+    - assets/lotties/Shopping cart.lottie
+    - assets/lotties/shopping_cart.json
     - assets/icons/cart.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
