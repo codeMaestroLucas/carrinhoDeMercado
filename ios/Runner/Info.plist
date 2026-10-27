@@ -4,6 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Precisamos da câmera para fotografar e ler os itens da sua Nota Fiscal.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Precisamos acessar a galeria para selecionar a foto da sua Nota Fiscal.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

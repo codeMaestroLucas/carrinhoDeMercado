@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/shopping_models.dart';
 import 'category_classifier.dart';
+import 'cloud_sync_service.dart';
 
 class PasteListResult {
   const PasteListResult({
@@ -23,6 +26,8 @@ class ShoppingController extends ChangeNotifier {
   }
 
   final bool enablePersistence;
+  final String _clientId =
+      'client_${DateTime.now().microsecondsSinceEpoch}';
 
   List<ShoppingItem> _items = [];
   List<MarketProfile> _markets = [];
@@ -35,6 +40,11 @@ class ShoppingController extends ChangeNotifier {
   ProductCategory? _categoryFilter;
   bool _showCheckedItems = true;
 
+  String? _sharedSpaceCode;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _cloudSubscription;
+  bool _isApplyingRemoteUpdate = false;
+
   List<ShoppingItem> get allItems => List.unmodifiable(_items);
   List<MarketProfile> get markets => List.unmodifiable(_markets);
   List<PurchaseRecord> get history => List.unmodifiable(_history);
@@ -43,6 +53,9 @@ class ShoppingController extends ChangeNotifier {
   bool get filterBySelectedMarket => _filterBySelectedMarket;
   Map<String, ProductCategory> get learnedCategories =>
       Map.unmodifiable(_learnedCategories);
+  String? get sharedSpaceCode => _sharedSpaceCode;
+  bool get isCloudConnected =>
+      _sharedSpaceCode != null && _sharedSpaceCode!.isNotEmpty;
 
   List<String> keywordsForCategory(ProductCategory category) {
     final list = _categoryDictionary[category] ?? const [];
@@ -194,11 +207,11 @@ class ShoppingController extends ChangeNotifier {
   int get pendingItemsCount => _items.where((e) => !e.isChecked).length;
 
   double get totalEstimatedAmount =>
-      _items.fold(0.0, (sum, item) => sum + (item.price ?? 0.0));
+      _items.fold(0.0, (acc, item) => acc + (item.price ?? 0.0));
 
   double get checkedTotalAmount => _items
       .where((e) => e.isChecked)
-      .fold(0.0, (sum, item) => sum + (item.price ?? 0.0));
+      .fold(0.0, (acc, item) => acc + (item.price ?? 0.0));
 
   int countForCategory(ProductCategory category) {
     return _items.where((item) {
@@ -601,6 +614,32 @@ class ShoppingController extends ChangeNotifier {
     return record;
   }
 
+  PurchaseRecord? addPurchaseFromItems({
+    required String marketId,
+    required List<PurchaseHistoryItem> items,
+    DateTime? date,
+  }) {
+    if (items.isEmpty) return null;
+
+    final targetMarket = _markets.firstWhere(
+      (m) => m.id == marketId,
+      orElse: () => selectedMarket,
+    );
+
+    final record = PurchaseRecord(
+      id: 'purchase_${DateTime.now().microsecondsSinceEpoch}',
+      marketId: targetMarket.id,
+      marketName: targetMarket.name,
+      date: date ?? DateTime.now(),
+      items: items,
+    );
+
+    _history.insert(0, record);
+    _saveToDisk();
+    notifyListeners();
+    return record;
+  }
+
   void deletePurchaseRecord(String recordId) {
     _history.removeWhere((r) => r.id == recordId);
     _saveToDisk();
@@ -674,6 +713,164 @@ class ShoppingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Cloud Sync (Firebase Firestore) Methods
+  Future<void> initializeCloudSync() async {
+    if (!enablePersistence) return;
+    final ready = await CloudSyncService.initializeFirebase();
+    if (ready && _sharedSpaceCode != null && _sharedSpaceCode!.isNotEmpty) {
+      _startCloudListener(_sharedSpaceCode!);
+    }
+    notifyListeners();
+  }
+
+  Future<String> createNewSharedSpace() async {
+    final code = CloudSyncService.generateSpaceCode();
+    await CloudSyncService.pushStateToSharedSpace(
+      spaceCode: code,
+      stateMap: _buildStateMap(),
+      clientId: _clientId,
+      verifyServer: true,
+    );
+    _sharedSpaceCode = code;
+    _startCloudListener(code);
+    await _saveToDisk(pushCloud: false);
+    notifyListeners();
+    return code;
+  }
+
+  Future<void> joinExistingSharedSpace(String rawCode) async {
+    final code = CloudSyncService.normalizeSpaceCode(rawCode);
+    if (code.isEmpty) {
+      throw Exception('Informe um código válido.');
+    }
+
+    final existingData = await CloudSyncService.fetchSharedSpace(code);
+    if (existingData != null) {
+      _applyStateFromMap(existingData);
+    } else {
+      await CloudSyncService.pushStateToSharedSpace(
+        spaceCode: code,
+        stateMap: _buildStateMap(),
+        clientId: _clientId,
+      );
+    }
+
+    _sharedSpaceCode = code;
+    _startCloudListener(code);
+    await _saveToDisk(pushCloud: false);
+    notifyListeners();
+  }
+
+  Future<void> disconnectSharedSpace() async {
+    await _cloudSubscription?.cancel();
+    _cloudSubscription = null;
+    _sharedSpaceCode = null;
+    await _saveToDisk(pushCloud: false);
+    notifyListeners();
+  }
+
+  void _startCloudListener(String spaceCode) {
+    _cloudSubscription?.cancel();
+    if (!CloudSyncService.isFirebaseReady) return;
+
+    _cloudSubscription = CloudSyncService.listenToSharedSpace(
+      spaceCode: spaceCode,
+      onData: (data) {
+        // Ignore echo updates originated from this same client instance
+        if (data['updatedByClientId'] == _clientId) {
+          return;
+        }
+        _isApplyingRemoteUpdate = true;
+        try {
+          _applyStateFromMap(data);
+          _saveToDisk(pushCloud: false);
+          notifyListeners();
+        } finally {
+          _isApplyingRemoteUpdate = false;
+        }
+      },
+    );
+  }
+
+  Map<String, dynamic> _buildStateMap() {
+    return {
+      'items': _items.map((e) => e.toJson()).toList(),
+      'markets': _markets.map((m) => m.toJson()).toList(),
+      'selectedMarketId': _selectedMarketId,
+      'history': _history.map((h) => h.toJson()).toList(),
+      'learnedCategories': {
+        for (final entry in _learnedCategories.entries)
+          entry.key: entry.value.id,
+      },
+      'categoryDictionary': {
+        for (final entry in _categoryDictionary.entries)
+          entry.key.id: entry.value,
+      },
+      'showCheckedItems': _showCheckedItems,
+    };
+  }
+
+  void _applyStateFromMap(Map<String, dynamic> data) {
+    if (data['items'] is List) {
+      final loaded = (data['items'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ShoppingItem.fromJson)
+          .toList();
+      final seen = <String>{};
+      _items = loaded
+          .where((item) => seen.add(CategoryClassifier.normalize(item.name)))
+          .toList();
+    }
+
+    if (data['markets'] is List) {
+      final loadedMarkets = (data['markets'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(MarketProfile.fromJson)
+          .toList();
+      if (loadedMarkets.isNotEmpty) {
+        _markets = loadedMarkets;
+      }
+    }
+
+    if (data['selectedMarketId'] is String) {
+      final id = data['selectedMarketId'] as String;
+      if (_markets.any((m) => m.id == id)) {
+        _selectedMarketId = id;
+      }
+    }
+
+    if (data['history'] is List) {
+      _history = (data['history'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(PurchaseRecord.fromJson)
+          .toList();
+    }
+
+    if (data['learnedCategories'] is Map) {
+      final rawMap = data['learnedCategories'] as Map<String, dynamic>;
+      _learnedCategories = {
+        for (final entry in rawMap.entries)
+          if (entry.value is String)
+            entry.key: ProductCategory.fromId(entry.value as String),
+      };
+    }
+
+    if (data['categoryDictionary'] is Map) {
+      final rawDict = data['categoryDictionary'] as Map<String, dynamic>;
+      for (final entry in rawDict.entries) {
+        final cat = ProductCategory.fromId(entry.key);
+        if (entry.value is List) {
+          _categoryDictionary[cat] =
+              (entry.value as List).whereType<String>().toList();
+        }
+      }
+    }
+
+    if (data['showCheckedItems'] is bool) {
+      _showCheckedItems = data['showCheckedItems'] as bool;
+    }
+  }
+
   File? _resolveStorageFile() {
     if (kIsWeb) return null;
     try {
@@ -700,64 +897,16 @@ class ShoppingController extends ChangeNotifier {
       if (content.trim().isEmpty) return;
 
       final data = jsonDecode(content) as Map<String, dynamic>;
+      _applyStateFromMap(data);
 
-      if (data['items'] is List) {
-        final loaded = (data['items'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(ShoppingItem.fromJson)
-            .toList();
-        final seen = <String>{};
-        _items = loaded
-            .where((item) => seen.add(CategoryClassifier.normalize(item.name)))
-            .toList();
-      }
-
-      if (data['markets'] is List) {
-        final loadedMarkets = (data['markets'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(MarketProfile.fromJson)
-            .toList();
-        if (loadedMarkets.isNotEmpty) {
-          _markets = loadedMarkets;
-        }
-      }
-
-      if (data['selectedMarketId'] is String) {
-        final id = data['selectedMarketId'] as String;
-        if (_markets.any((m) => m.id == id)) {
-          _selectedMarketId = id;
-        }
-      }
-
-      if (data['history'] is List) {
-        _history = (data['history'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(PurchaseRecord.fromJson)
-            .toList();
-      }
-
-      if (data['learnedCategories'] is Map) {
-        final rawMap = data['learnedCategories'] as Map<String, dynamic>;
-        _learnedCategories = {
-          for (final entry in rawMap.entries)
-            if (entry.value is String)
-              entry.key: ProductCategory.fromId(entry.value as String),
-        };
-      }
-
-      if (data['categoryDictionary'] is Map) {
-        final rawDict = data['categoryDictionary'] as Map<String, dynamic>;
-        for (final entry in rawDict.entries) {
-          final cat = ProductCategory.fromId(entry.key);
-          if (entry.value is List) {
-            _categoryDictionary[cat] =
-                (entry.value as List).whereType<String>().toList();
+      if (data['sharedSpaceCode'] is String) {
+        final savedCode = (data['sharedSpaceCode'] as String).trim();
+        if (savedCode.isNotEmpty) {
+          _sharedSpaceCode = savedCode;
+          if (CloudSyncService.isFirebaseReady) {
+            _startCloudListener(savedCode);
           }
         }
-      }
-
-      if (data['showCheckedItems'] is bool) {
-        _showCheckedItems = data['showCheckedItems'] as bool;
       }
 
       notifyListeners();
@@ -766,31 +915,38 @@ class ShoppingController extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveToDisk() async {
+  Future<void> _saveToDisk({bool pushCloud = true}) async {
     if (!enablePersistence) return;
     try {
+      final stateMap = _buildStateMap();
       final file = _resolveStorageFile();
-      if (file == null) return;
+      if (file != null) {
+        final payload = jsonEncode({
+          ...stateMap,
+          'sharedSpaceCode': _sharedSpaceCode,
+        });
+        await file.writeAsString(payload);
+      }
 
-      final payload = jsonEncode({
-        'items': _items.map((e) => e.toJson()).toList(),
-        'markets': _markets.map((m) => m.toJson()).toList(),
-        'selectedMarketId': _selectedMarketId,
-        'history': _history.map((h) => h.toJson()).toList(),
-        'learnedCategories': {
-          for (final entry in _learnedCategories.entries)
-            entry.key: entry.value.id,
-        },
-        'categoryDictionary': {
-          for (final entry in _categoryDictionary.entries)
-            entry.key.id: entry.value,
-        },
-        'showCheckedItems': _showCheckedItems,
-      });
-
-      await file.writeAsString(payload);
+      if (pushCloud &&
+          !_isApplyingRemoteUpdate &&
+          _sharedSpaceCode != null &&
+          _sharedSpaceCode!.isNotEmpty &&
+          CloudSyncService.isFirebaseReady) {
+        await CloudSyncService.pushStateToSharedSpace(
+          spaceCode: _sharedSpaceCode!,
+          stateMap: stateMap,
+          clientId: _clientId,
+        );
+      }
     } catch (_) {
-      // Ignore file system errors
+      // Ignore file system / network errors
     }
+  }
+
+  @override
+  void dispose() {
+    _cloudSubscription?.cancel();
+    super.dispose();
   }
 }

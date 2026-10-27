@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
 import '../services/shopping_controller.dart';
@@ -29,11 +28,21 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     super.dispose();
   }
 
+  /// Dynamically detects whether the user typed a single item or pasted/typed multiple items.
+  List<String> _detectItemsFromInput(String rawText) {
+    return CategoryClassifier.parsePastedList(rawText);
+  }
+
   void _handleQuickAdd() {
     final text = _quickAddController.text.trim();
     if (text.isEmpty) return;
 
-    if (text.contains('\n') || text.contains(';')) {
+    final detectedItems = _detectItemsFromInput(text);
+
+    // Dynamically handle multiple items vs single item
+    if (detectedItems.length > 1 ||
+        text.contains('\n') ||
+        text.contains(';')) {
       final result = widget.controller.addItemsFromPastedTextWithReport(
         text,
         overrideMarketId: _manualMarketOverrideForQuickAdd,
@@ -44,8 +53,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       });
       if (mounted) {
         final msg = result.skippedDuplicatesCount > 0
-            ? '${result.addedCount} adicionados (${result.skippedDuplicatesCount} duplicados ignorados)'
-            : '${result.addedCount} itens distribuídos nas listas!';
+            ? '${result.addedCount} itens adicionados (${result.skippedDuplicatesCount} duplicados ignorados)'
+            : '${result.addedCount} itens adicionados à lista!';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
@@ -88,210 +97,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         ),
       );
     }
-  }
-
-  Future<void> _showPasteListModal() async {
-    final textController = TextEditingController();
-    List<String> previewItems = [];
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (modalContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            void updatePreview(String value) {
-              setModalState(() {
-                previewItems = CategoryClassifier.parsePastedList(value);
-              });
-            }
-
-            final newItems = previewItems
-                .where((name) => !widget.controller.isDuplicateItemName(name))
-                .toList();
-            final newItemsCount = newItems.length;
-            final duplicateCount = previewItems.length - newItemsCount;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.content_paste_go_rounded,
-                        color: Color(0xFF475569),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Colar Lista de Compras',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E293B),
-                              ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.of(modalContext).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Os itens serão separados automaticamente por categoria e direcionados para o mercado onde são mais baratos (com base no seu histórico).',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        final data =
-                            await Clipboard.getData(Clipboard.kTextPlain);
-                        if (data?.text != null &&
-                            data!.text!.trim().isNotEmpty) {
-                          textController.text = data.text!;
-                          updatePreview(data.text!);
-                        }
-                      },
-                      icon: const Icon(Icons.paste_rounded, size: 16),
-                      label: const Text('Colar da área de transferência'),
-                    ),
-                  ),
-                  TextField(
-                    controller: textController,
-                    maxLines: 5,
-                    minLines: 4,
-                    autofocus: true,
-                    onChanged: updatePreview,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Ex:\nArroz\nFeijão\nDetergente\nPapel higiênico',
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                    ),
-                  ),
-                  if (newItems.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      duplicateCount > 0
-                          ? '$newItemsCount novos itens ($duplicateCount já existentes serão ignorados):'
-                          : 'Prévia de alocação por mercado ($newItemsCount itens):',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 110),
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: newItems.map((name) {
-                            final rec = widget.controller
-                                .recommendCheapestMarketForProduct(name);
-                            final targetMarketName = rec?.market.name ??
-                                widget.controller.selectedMarket.name;
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: rec != null
-                                    ? const Color(0xFFF0FDFA)
-                                    : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: rec != null
-                                      ? const Color(0xFFCCFBF1)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: Text(
-                                rec != null
-                                    ? '$name → $targetMarketName (${AppFormatters.formatCurrency(rec.averagePrice)})'
-                                    : '$name → $targetMarketName',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: rec != null
-                                      ? const Color(0xFF0F766E)
-                                      : const Color(0xFF475569),
-                                  fontWeight: rec != null
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  FilledButton(
-                    onPressed: newItemsCount == 0
-                        ? null
-                        : () {
-                            final result = widget.controller
-                                .addItemsFromPastedTextWithReport(
-                              textController.text,
-                            );
-                            Navigator.of(modalContext).pop();
-                            if (mounted && result.addedCount > 0) {
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    result.skippedDuplicatesCount > 0
-                                        ? '${result.addedCount} itens adicionados (${result.skippedDuplicatesCount} duplicados ignorados).'
-                                        : '${result.addedCount} itens adicionados às listas!',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          },
-                    child: Text(
-                      newItemsCount == 0
-                          ? 'Adicionar à lista'
-                          : 'Adicionar $newItemsCount ${newItemsCount == 1 ? 'item' : 'itens'}',
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _showEditItemModal(
@@ -408,7 +213,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // Market / Simultaneous List Selector (with cheapest indicator, 100% editable)
                     DropdownButtonFormField<String>(
                       initialValue: selectedMarketId,
                       isExpanded: true,
@@ -423,7 +227,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       items: widget.controller.markets.map((market) {
                         final rec = recByMarketId[market.id];
                         final isCheapest = market.id == cheapestMarketId &&
-                            recommendations.length >= 1;
+                            recommendations.isNotEmpty;
                         String label = market.name;
                         if (rec != null) {
                           label +=
@@ -689,10 +493,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final items = controller.filteredAndSortedItems;
     final activeMarket = controller.selectedMarket;
 
-    final typedProduct = _quickAddController.text.trim();
-    final bestMarketRec = typedProduct.isNotEmpty
-        ? controller.recommendCheapestMarketForProduct(typedProduct)
-        : null;
+    final rawInput = _quickAddController.text.trim();
+    final detectedItems = _detectItemsFromInput(rawInput);
+    final isMultipleDetected = detectedItems.length > 1;
+    final singleTypedProduct =
+        detectedItems.length == 1 ? detectedItems.first : rawInput;
+
+    final bestMarketRec =
+        (!isMultipleDetected && singleTypedProduct.isNotEmpty)
+            ? controller.recommendCheapestMarketForProduct(singleTypedProduct)
+            : null;
     final effectiveTargetMarketId = _manualMarketOverrideForQuickAdd ??
         bestMarketRec?.market.id ??
         activeMarket.id;
@@ -736,7 +546,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       ),
       body: Column(
         children: [
-          // Clean Header: Input + Live Market Recommendation + Simultaneous Market Lists + Category Filters
+          // Clean Header: Dynamic Single/Multi Input + Prominent Add Button + Market Lists + Category Filters
           Container(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             decoration: const BoxDecoration(
@@ -749,63 +559,91 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: SizedBox(
-                        height: 42,
-                        child: TextField(
-                          controller: _quickAddController,
-                          focusNode: _quickAddFocus,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.done,
-                          onChanged: (_) => setState(() {}),
-                          onSubmitted: (_) => _handleQuickAdd(),
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: 'Adicionar produto...',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 14,
+                      child: TextField(
+                        controller: _quickAddController,
+                        focusNode: _quickAddFocus,
+                        minLines: 1,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(fontSize: 14, height: 1.4),
+                        decoration: InputDecoration(
+                          hintText:
+                              'Digite um produto ou cole vários itens...',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          isDense: true,
+                          constraints: const BoxConstraints(minHeight: 44),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          suffixIcon: rawInput.isNotEmpty
+                              ? IconButton(
+                                  tooltip: 'Limpar texto',
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _quickAddController.clear();
+                                      _manualMarketOverrideForQuickAdd = null;
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
                             ),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 0,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            suffixIcon: IconButton(
-                              tooltip: 'Adicionar',
-                              icon: const Icon(Icons.add_rounded, size: 20),
-                              onPressed: _handleQuickAdd,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE2E8F0),
                             ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     SizedBox(
-                      height: 42,
-                      child: OutlinedButton.icon(
-                        onPressed: _showPasteListModal,
-                        icon: const Icon(Icons.content_paste_rounded, size: 16),
-                        label: const Text('Colar'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      height: 44,
+                      child: FilledButton.icon(
+                        onPressed: _handleQuickAdd,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF0D9488),
+                          foregroundColor: Colors.white,
+                          elevation: 1,
+                          minimumSize: const Size(0, 44),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isMultipleDetected
+                              ? 'Adicionar (${detectedItems.length})'
+                              : 'Adicionar',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
                           ),
                         ),
                       ),
@@ -813,8 +651,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   ],
                 ),
 
-                // Live Recommendation Banner when typing a product name
-                if (typedProduct.isNotEmpty) ...[
+                // Dynamic Feedback Banner when typing/pasting 1 or multiple products
+                if (rawInput.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -822,12 +660,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: bestMarketRec != null
+                      color: (bestMarketRec != null || isMultipleDetected)
                           ? const Color(0xFFF0FDFA)
                           : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: bestMarketRec != null
+                        color: (bestMarketRec != null || isMultipleDetected)
                             ? const Color(0xFFCCFBF1)
                             : const Color(0xFFE2E8F0),
                       ),
@@ -842,26 +680,32 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              bestMarketRec != null
-                                  ? Icons.trending_down_rounded
-                                  : Icons.storefront_outlined,
+                              isMultipleDetected
+                                  ? Icons.playlist_add_check_rounded
+                                  : (bestMarketRec != null
+                                      ? Icons.trending_down_rounded
+                                      : Icons.storefront_outlined),
                               size: 16,
-                              color: bestMarketRec != null
+                              color: (bestMarketRec != null || isMultipleDetected)
                                   ? const Color(0xFF0F766E)
                                   : const Color(0xFF64748B),
                             ),
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                bestMarketRec != null
-                                    ? 'Compensa mais no ${bestMarketRec.market.name} (média ${AppFormatters.formatCurrency(bestMarketRec.averagePrice)})'
-                                    : 'Sem histórico de preço para "$typedProduct"',
+                                isMultipleDetected
+                                    ? '${detectedItems.length} produtos identificados automaticamente no texto!'
+                                    : (bestMarketRec != null
+                                        ? 'Compensa mais no ${bestMarketRec.market.name} (média ${AppFormatters.formatCurrency(bestMarketRec.averagePrice)})'
+                                        : 'Sem histórico de preço para "$singleTypedProduct"'),
                                 style: TextStyle(
                                   fontSize: 12,
-                                  fontWeight: bestMarketRec != null
+                                  fontWeight: (bestMarketRec != null ||
+                                          isMultipleDetected)
                                       ? FontWeight.w600
                                       : FontWeight.normal,
-                                  color: bestMarketRec != null
+                                  color: (bestMarketRec != null ||
+                                          isMultipleDetected)
                                       ? const Color(0xFF0F766E)
                                       : const Color(0xFF64748B),
                                 ),
@@ -870,7 +714,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           ],
                         ),
                         PopupMenuButton<String>(
-                          tooltip: 'Escolher outro mercado para este item',
+                          tooltip: 'Escolher mercado para adicionar',
                           onSelected: (marketId) {
                             setState(() {
                               _manualMarketOverrideForQuickAdd = marketId;
@@ -892,7 +736,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Ir p/ ${effectiveTargetMarket.name}',
+                                  _manualMarketOverrideForQuickAdd == null &&
+                                          isMultipleDetected
+                                      ? 'Auto (Mais barato)'
+                                      : 'Ir p/ ${effectiveTargetMarket.name}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -935,7 +782,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           size: 15,
                           color: Color(0xFF475569),
                         ),
-                        label: Text('Todos Mercados (${controller.totalItemsCount})'),
+                        label: Text(
+                          'Todos Mercados (${controller.totalItemsCount})',
+                        ),
                         selected: !controller.filterBySelectedMarket,
                         onSelected: (_) =>
                             controller.setFilterBySelectedMarket(false),
@@ -1181,8 +1030,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
     if (controller.totalItemsCount > 0) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1206,17 +1055,17 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     }
 
     return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.checklist_rounded,
-              size: 44,
+              size: 40,
               color: Color(0xFFCBD5E1),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 10),
             Text(
               'Sua lista está vazia',
               style: TextStyle(
@@ -1227,7 +1076,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             ),
             SizedBox(height: 6),
             Text(
-              'Digite um produto acima ou cole sua lista em texto.',
+              'Digite um produto ou cole uma lista inteira no campo acima e toque em Adicionar.',
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
               textAlign: TextAlign.center,
             ),

@@ -3,6 +3,12 @@ import 'screens/history_screen.dart';
 import 'screens/market_config_screen.dart';
 import 'screens/shopping_list_screen.dart';
 import 'services/shopping_controller.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+
+// Conecta automaticamente ao seu banco '(default)'
+final db = FirebaseFirestore.instance;
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +35,9 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
   void initState() {
     super.initState();
     _controller = widget.controller ?? ShoppingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.initializeCloudSync();
+    });
   }
 
   @override
@@ -99,8 +108,8 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
         builder: (context, _) {
           final screens = [
             ShoppingListScreen(controller: _controller),
-            MarketConfigScreen(controller: _controller),
             HistoryScreen(controller: _controller),
+            MarketConfigScreen(controller: _controller),
           ];
 
           return Scaffold(
@@ -137,11 +146,6 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
                     ),
                     label: 'Lista',
                   ),
-                  const NavigationDestination(
-                    icon: Icon(Icons.tune_rounded),
-                    selectedIcon: Icon(Icons.tune_rounded),
-                    label: 'Configurações',
-                  ),
                   NavigationDestination(
                     icon: Badge(
                       isLabelVisible: _controller.history.isNotEmpty,
@@ -151,6 +155,11 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
                     ),
                     selectedIcon: const Icon(Icons.analytics_rounded),
                     label: 'Histórico',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.tune_rounded),
+                    selectedIcon: Icon(Icons.tune_rounded),
+                    label: 'Configurações',
                   ),
                 ],
               ),

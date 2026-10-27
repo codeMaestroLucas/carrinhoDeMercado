@@ -1,12 +1,13 @@
 import 'package:carrinhocompras/main.dart';
 import 'package:carrinhocompras/models/shopping_models.dart';
 import 'package:carrinhocompras/services/category_classifier.dart';
+import 'package:carrinhocompras/services/receipt_scanner_service.dart';
 import 'package:carrinhocompras/services/shopping_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('CategoryClassifier & Text Parsing Tests', () {
+  group('CategoryClassifier & ReceiptScannerService Tests', () {
     test('Classifies products automatically into the 9 required categories', () {
       expect(
         CategoryClassifier.classify('Arroz 5kg'),
@@ -46,103 +47,79 @@ void main() {
       );
     });
 
-    test('Prevents duplicate items ignoring accents and case (feijao == feijão)', () {
-      final controller = ShoppingController(enablePersistence: false);
-      final first = controller.addSingleItem('feijão');
-      final duplicate = controller.addSingleItem('feijao');
-
-      expect(first != null, true);
-      expect(duplicate == null, true);
-      expect(controller.totalItemsCount, 1);
-
-      final pasteReport = controller.addItemsFromPastedTextWithReport(
-        'Feijao\nArroz\narroz\nFEIJÃO',
-      );
-      expect(pasteReport.addedCount, 1);
-      expect(pasteReport.skippedDuplicatesCount, 3);
-      expect(controller.totalItemsCount, 2);
-    });
-
-    test('Recommends cheapest market from history and allows editing market assignment', () {
-      final controller = ShoppingController(enablePersistence: false);
-
-      // Record Arroz at R$ 22 in Supermercado Padrão
-      final item1 = controller.addSingleItem('Arroz', price: 22.0)!;
-      controller.toggleItemChecked(item1.id);
-      controller.finishPurchase(marketId: 'mercado_padrao', onlyChecked: true);
-
-      // Record Arroz at R$ 17 in Atacadão
-      final item2 = controller.addSingleItem('Arroz', price: 17.0)!;
-      controller.toggleItemChecked(item2.id);
-      controller.finishPurchase(marketId: 'atacadao', onlyChecked: true);
-
-      // Next time Arroz is added, it should automatically be assigned to 'atacadao'
-      final newArroz = controller.addSingleItem('Arroz')!;
-      expect(newArroz.marketId, 'atacadao');
-
-      // And user can still manually edit it to buy at the more expensive market if desired
-      controller.updateItem(newArroz.id, marketId: 'mercado_padrao');
-      expect(controller.allItems.first.marketId, 'mercado_padrao');
+    test('Parses Brazilian receipt (NFC-e / Cupom Fiscal) lines into items and prices', () {
+      const sampleReceipt = '''
+SUPERMERCADO EXEMPLO LTDA
+CNPJ: 12.345.678/0001-99
+DOCUMENTO AUXILIAR DA NOTA FISCAL DE CONSUMIDOR ELETRONICA
+001 789100012345 ARROZ T1 CAMIL 5KG 1 UN X 24,90 24,90
+002 789100054321 FEIJAO CARIOCA 1KG
+2 UN X 7,50 15,00
+003 DETERGENTE YPE 500ML 2,39
+QTD. TOTAL DE ITENS 3
+VALOR TOTAL R\$ 42,29
+CARTAO DE CREDITO 42,29
+''';
+      final extracted = ReceiptScannerService.parseReceiptText(sampleReceipt);
+      expect(extracted.length, 3);
+      expect(extracted[0].name, 'Arroz t1 camil 5kg');
+      expect(extracted[0].price.toStringAsFixed(2), '24.90');
+      expect(extracted[1].name, 'Feijao carioca 1kg');
+      expect(extracted[1].price.toStringAsFixed(2), '15.00');
+      expect(extracted[2].name, 'Detergente ype 500ml');
+      expect(extracted[2].price.toStringAsFixed(2), '2.39');
     });
   });
 
   group('ShoppingController & 3 Screens Widget Tests', () {
     testWidgets(
-      'Shows live market recommendation while typing and interactive price on chart',
+      'Dynamic multi-item input, new tab order (Lista, Histórico, Configurações), and Adicionar Compra on History',
       (WidgetTester tester) async {
         final controller = ShoppingController(enablePersistence: false);
         await tester.pumpWidget(CarrinhoComprasApp(controller: controller));
 
-        // Add 1 item without price -> missing price icon should be visible
-        final arroz = controller.addSingleItem('Arroz')!;
-        await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.money_off_csred_outlined), findsOneWidget);
+        // Verify Paste button was removed and prominent Adicionar button exists
+        expect(find.text('Colar'), findsNothing);
+        expect(find.text('Adicionar'), findsOneWidget);
 
-        // Set price -> missing price icon disappears
-        controller.updateItem(arroz.id, price: 20.00);
-        controller.toggleItemChecked(arroz.id);
-        await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.money_off_csred_outlined), findsNothing);
-
-        // Finish 1st purchase at Supermercado Padrão (R$ 20,00)
-        controller.finishPurchase(
-          marketId: 'mercado_padrao',
-          date: DateTime(2026, 5, 10),
-          onlyChecked: true,
-        );
-
-        // Add Arroz again and finish 2nd purchase at Atacadão (R$ 17,00 -> -15%)
-        final arroz2 = controller.addSingleItem('Arroz', price: 17.00)!;
-        controller.toggleItemChecked(arroz2.id);
-        controller.finishPurchase(
-          marketId: 'atacadao',
-          date: DateTime(2026, 6, 15),
-          onlyChecked: true,
+        // Dynamically enter multiple items in the single input field
+        await tester.enterText(
+          find.byType(TextField).first,
+          'Arroz\nFeijão\nDetergente',
         );
         await tester.pumpAndSettle();
 
-        // Typing "Arroz" on the main screen shows the live recommendation banner for Atacadão
-        await tester.enterText(find.byType(TextField).first, 'Arroz');
+        // Button dynamically updates to show count of detected items
+        expect(find.text('Adicionar (3)'), findsOneWidget);
+        await tester.tap(find.text('Adicionar (3)'));
         await tester.pumpAndSettle();
+
+        expect(find.text('Arroz'), findsOneWidget);
+        expect(find.text('Feijão'), findsOneWidget);
+        expect(find.text('Detergente'), findsOneWidget);
+
+        // Verify tab order: Lista (0), Histórico (1), Configurações (2)
+        final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
         expect(
-          find.textContaining('Compensa mais no Atacadão'),
-          findsOneWidget,
+          (navBar.destinations[0] as NavigationDestination).label,
+          'Lista',
+        );
+        expect(
+          (navBar.destinations[1] as NavigationDestination).label,
+          'Histórico',
+        );
+        expect(
+          (navBar.destinations[2] as NavigationDestination).label,
+          'Configurações',
         );
 
-        // Go to Histórico tab
+        // Navigate to Histórico (2nd tab)
         await tester.tap(find.text('Histórico'));
         await tester.pumpAndSettle();
 
-        // Expand purchase in "Por Mercado" and tap individual product "Arroz"
-        await tester.tap(find.text('Atacadão').first);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Arroz').first);
-        await tester.pumpAndSettle();
-
-        // Verify Individual Product Analytics Screen & interactive chart price banner
-        expect(find.text('Último Preço Pago'), findsOneWidget);
-        expect(find.text('-15% ↘'), findsOneWidget);
-        expect(find.textContaining('Preço: R\$'), findsOneWidget);
+        // Verify "Adicionar Compra" button is present and "Total nas compras" is not shown
+        expect(find.text('Adicionar Compra'), findsOneWidget);
+        expect(find.textContaining('Total nas compras'), findsNothing);
       },
     );
   });

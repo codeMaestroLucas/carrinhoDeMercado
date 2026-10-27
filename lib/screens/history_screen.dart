@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
+import '../services/receipt_scanner_service.dart';
 import '../services/shopping_controller.dart';
 import '../utils/formatters.dart';
 
@@ -294,6 +296,504 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  Future<void> _showAddReceiptPurchaseModal() async {
+    final imagePicker = ImagePicker();
+    String selectedMarketId = widget.controller.selectedMarket.id;
+    final newMarketController = TextEditingController();
+    bool isCreatingNewMarket = false;
+    bool isScanning = false;
+    String? scanError;
+    final scannedItems = <ScannedReceiptItem>[];
+
+    final manualNameController = TextEditingController();
+    final manualPriceController = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> pickAndScanImage(ImageSource source) async {
+              try {
+                final pickedFile = await imagePicker.pickImage(
+                  source: source,
+                  imageQuality: 90,
+                );
+                if (pickedFile == null) return;
+
+                setModalState(() {
+                  isScanning = true;
+                  scanError = null;
+                });
+
+                final rawText =
+                    await ReceiptScannerService.recognizeTextFromImage(
+                  pickedFile.path,
+                );
+                final extracted =
+                    ReceiptScannerService.parseReceiptText(rawText);
+
+                setModalState(() {
+                  isScanning = false;
+                  if (extracted.isEmpty) {
+                    scanError =
+                        'Não foi possível identificar produtos e preços automaticamente nesta imagem. Tente tirar uma foto mais próxima dos itens da nota ou adicione abaixo.';
+                  } else {
+                    scannedItems
+                      ..clear()
+                      ..addAll(extracted);
+                  }
+                });
+              } catch (e) {
+                setModalState(() {
+                  isScanning = false;
+                  scanError =
+                      'Erro ao ler imagem da Nota Fiscal. Verifique as permissões de câmera/galeria.';
+                });
+              }
+            }
+
+            final totalScannedValue = scannedItems.fold<double>(
+              0.0,
+              (sum, item) => sum + item.price,
+            );
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long_rounded,
+                          color: Color(0xFF0D9488),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Adicionar Compra por Nota Fiscal',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.of(modalContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Step 1: Select or Create the Market where the purchase was made
+                    if (!isCreatingNewMarket)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: selectedMarketId,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Mercado onde fez a compra',
+                                isDense: true,
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              items: widget.controller.markets.map((m) {
+                                return DropdownMenuItem<String>(
+                                  value: m.id,
+                                  child: Text(
+                                    m.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setModalState(() => selectedMarketId = val);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton.icon(
+                            onPressed: () {
+                              setModalState(() => isCreatingNewMarket = true);
+                            },
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text('Novo'),
+                          ),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: newMarketController,
+                              autofocus: true,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                labelText: 'Nome do novo mercado',
+                                hintText: 'Ex: Supermercado Extra',
+                                isDense: true,
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() => isCreatingNewMarket = false);
+                            },
+                            child: const Text('Cancelar'),
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 12),
+
+                    // Step 2: Camera / Gallery buttons to scan the Nota Fiscal image
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: isScanning
+                                ? null
+                                : () => pickAndScanImage(ImageSource.camera),
+                            icon: const Icon(
+                              Icons.camera_alt_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Fotografar Nota'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: isScanning
+                                ? null
+                                : () => pickAndScanImage(ImageSource.gallery),
+                            icon: const Icon(
+                              Icons.photo_library_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Escolher Imagem'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (isScanning) ...[
+                      const SizedBox(height: 16),
+                      const Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 8),
+                            Text(
+                              'Identificando produtos e preços da Nota Fiscal...',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    if (scanError != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Text(
+                          scanError!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB91C1C),
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    // Manual / Quick Add item row so user can also add/complement any item
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 38,
+                            child: TextField(
+                              controller: manualNameController,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'Produto...',
+                                isDense: true,
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 38,
+                            child: TextField(
+                              controller: manualPriceController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'R\$ 0,00',
+                                isDense: true,
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton.filledTonal(
+                          tooltip: 'Adicionar item à nota',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () {
+                            final name = manualNameController.text.trim();
+                            final price = AppFormatters.parsePrice(
+                              manualPriceController.text,
+                            );
+                            if (name.isEmpty || price == null || price <= 0) {
+                              return;
+                            }
+                            setModalState(() {
+                              scannedItems.insert(
+                                0,
+                                ScannedReceiptItem(name: name, price: price),
+                              );
+                              manualNameController.clear();
+                              manualPriceController.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Extracted Items List
+                    if (scannedItems.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Itens identificados (${scannedItems.length}):',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                          Text(
+                            'Total: ${AppFormatters.formatCurrency(totalScannedValue)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Flexible(
+                        child: Material(
+                          color: Colors.white,
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: scannedItems.length,
+                            separatorBuilder: (_, _) => const Divider(
+                              height: 1,
+                              color: Color(0xFFF1F5F9),
+                            ),
+                            itemBuilder: (context, idx) {
+                              final item = scannedItems[idx];
+                              final cat =
+                                  widget.controller.predictCategory(item.name);
+                              return ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(
+                                  cat.icon,
+                                  color: cat.color,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  item.name,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      AppFormatters.formatCurrency(item.price),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(
+                                        Icons.close_rounded,
+                                        size: 16,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                      onPressed: () {
+                                        setModalState(() {
+                                          scannedItems.removeAt(idx);
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: scannedItems.isEmpty
+                          ? null
+                          : () {
+                              String targetMarketId = selectedMarketId;
+                              if (isCreatingNewMarket &&
+                                  newMarketController.text.trim().isNotEmpty) {
+                                final created = widget.controller.addMarket(
+                                  newMarketController.text.trim(),
+                                );
+                                targetMarketId = created.id;
+                              }
+
+                              final historyItems = scannedItems.map((s) {
+                                return PurchaseHistoryItem(
+                                  name: s.name,
+                                  category: widget.controller
+                                      .predictCategory(s.name),
+                                  price: s.price,
+                                );
+                              }).toList();
+
+                              final record =
+                                  widget.controller.addPurchaseFromItems(
+                                marketId: targetMarketId,
+                                items: historyItems,
+                              );
+                              Navigator.of(modalContext).pop();
+                              if (mounted && record != null) {
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Nota Fiscal salva em ${record.marketName} (${record.items.length} itens)!',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: Text(
+                        scannedItems.isEmpty
+                            ? 'Fotografe ou selecione a Nota Fiscal'
+                            : 'Salvar Compra (${scannedItems.length} itens)',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -319,14 +819,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return true;
     }).toList();
 
-    final totalSpentInFilter = filteredRecords.fold<double>(
-      0.0,
-      (sum, r) => sum + r.totalAmount,
-    );
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Gastos'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: _showAddReceiptPurchaseModal,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.document_scanner_outlined, size: 16),
+              label: const Text(
+                'Adicionar Compra',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -448,39 +965,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ),
-          if (allRecords.isNotEmpty && _viewMode == _HistoryViewMode.byMarket)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF8FAFC),
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Total nas compras: ${AppFormatters.formatCurrency(totalSpentInFilter)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: Color(0xFF1E293B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${filteredRecords.length} ${filteredRecords.length == 1 ? 'compra' : 'compras'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           Expanded(
             child: allRecords.isEmpty
                 ? _buildEmptyHistoryState()

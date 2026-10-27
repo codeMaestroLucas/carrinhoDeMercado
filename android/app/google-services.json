@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "123154169081",
+    "project_id": "carrinho-de-compras-35ded",
+    "storage_bucket": "carrinho-de-compras-35ded.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123154169081:android:95e53dde8fa1dcfc47f628",
+        "android_client_info": {
+          "package_name": "com.example.carrinhocompras"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIYnU_4dW56K3xjJ_2DAw0UpMn2h8sJvE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
