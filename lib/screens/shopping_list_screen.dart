@@ -655,6 +655,29 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         }
                       },
                     ),
+                    if (selectedCategory != item.category) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 14,
+                            color: AppColors.accentGreen,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Este produto será salvo automaticamente na categoria "${selectedCategory.label}".',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.accentGreen,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     FilledButton(
                       style: FilledButton.styleFrom(
@@ -669,6 +692,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                             AppFormatters.parsePrice(priceController.text);
                         final shouldClearPrice =
                             priceController.text.trim().isEmpty;
+                        final categoryChanged =
+                            selectedCategory != item.category;
 
                         final success = widget.controller.updateItem(
                           item.id,
@@ -686,6 +711,17 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           return;
                         }
                         Navigator.of(modalContext).pop();
+                        if (categoryChanged && this.mounted) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '"$newName" registrado na categoria ${selectedCategory.label}!',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       },
                       child: const Text(
                         'Salvar',
@@ -927,9 +963,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
 
-    final listTitle = controller.filterBySelectedMarket
-        ? activeMarket.name
-        : 'Lista de Compras';
+    final listTitle = 'Lista • ${activeMarket.name}';
 
     // Compute intuitive market bargain groups for the items currently in the list
     final bargainGroups = _computeMarketBargainGroups(controller.allItems);
@@ -962,57 +996,31 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Market Selector Pills
+                        // Market Selector Pills (switches active market & reorganizes all items by its category order)
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: [
-                              ChoiceChip(
-                                visualDensity: VisualDensity.compact,
-                                avatar: Icon(
-                                  Icons.layers_outlined,
-                                  size: 15,
-                                  color: !controller.filterBySelectedMarket
-                                      ? AppColors.primaryGreen
-                                      : textSecondary,
-                                ),
-                                label: Text(
-                                  'Todos Mercados (${controller.totalItemsCount})',
-                                ),
-                                selected: !controller.filterBySelectedMarket,
-                                onSelected: (_) =>
-                                    controller.setFilterBySelectedMarket(false),
-                              ),
-                              const SizedBox(width: 6),
-                              ...controller.markets.map((market) {
-                                final count =
-                                    controller.itemCountForMarket(market.id);
-                                final isSelected =
-                                    controller.filterBySelectedMarket &&
-                                        activeMarket.id == market.id;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: ChoiceChip(
-                                    visualDensity: VisualDensity.compact,
-                                    avatar: Icon(
-                                      Icons.storefront_outlined,
-                                      size: 15,
-                                      color: isSelected
-                                          ? AppColors.primaryGreen
-                                          : textSecondary,
-                                    ),
-                                    label: Text('${market.name} ($count)'),
-                                    selected: isSelected,
-                                    onSelected: (_) {
-                                      controller.setFilterBySelectedMarket(
-                                        true,
-                                        marketId: market.id,
-                                      );
-                                    },
+                            children: controller.markets.map((market) {
+                              final isSelected = activeMarket.id == market.id;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  visualDensity: VisualDensity.compact,
+                                  avatar: Icon(
+                                    Icons.storefront_outlined,
+                                    size: 15,
+                                    color: isSelected
+                                        ? AppColors.primaryGreen
+                                        : textSecondary,
                                   ),
-                                );
-                              }),
-                            ],
+                                  label: Text(market.name),
+                                  selected: isSelected,
+                                  onSelected: (_) {
+                                    controller.selectMarket(market.id);
+                                  },
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
 
@@ -1022,9 +1030,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           _buildMarketBargainBanner(
                             context,
                             bargainGroups: bargainGroups,
-                            activeMarketGroup: controller.filterBySelectedMarket
-                                ? activeMarketBargainGroup
-                                : null,
+                            activeMarketGroup: activeMarketBargainGroup,
                           ),
                         ],
 
@@ -1034,16 +1040,30 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                listTitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.4,
-                                  color: textPrimary,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    listTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.4,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Itens organizados na ordem de setores de ${activeMarket.name}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             if (controller.categoryFilter != null ||
@@ -1137,9 +1157,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         final item = items[index];
                         final bestRec = controller
                             .recommendCheapestMarketForProduct(item.name);
-                        final isCheaperHere = bestRec != null &&
-                            (!controller.filterBySelectedMarket ||
-                                bestRec.market.id == activeMarket.id);
+                        final isCheaperHere = bestRec != null;
 
                         return _buildStylizedRow(
                           context,
@@ -1527,11 +1545,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       onDismissed: (_) => widget.controller.removeItem(item.id),
       child: Row(
         children: [
-          // Left 75%: Tapping toggles checked (ticado) state of the item
+          // Left 75%: Tapping toggles checked (ticado) state; long-pressing opens item configuration
           Expanded(
             flex: 3,
             child: InkWell(
               onTap: () => widget.controller.toggleItemChecked(item.id),
+              onLongPress: () => _showEditItemModal(item, focusPrice: true),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),

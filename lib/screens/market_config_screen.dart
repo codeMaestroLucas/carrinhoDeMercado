@@ -397,18 +397,40 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     final activeMarket = controller.selectedMarket;
     final categories = activeMarket.categoryOrder;
     final surfaceColor = AppColors.surface(context);
+    final bgColor = AppColors.background(context);
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
+    final borderColor = AppColors.border(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           color: surfaceColor,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Market Selector Row
+              Row(
+                children: [
+                  Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                    color: textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Selecione o mercado:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -418,6 +440,13 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         visualDensity: VisualDensity.compact,
+                        avatar: Icon(
+                          Icons.storefront_outlined,
+                          size: 15,
+                          color: isSelected
+                              ? AppColors.primaryGreen
+                              : textSecondary,
+                        ),
                         label: Text(market.name),
                         selected: isSelected,
                         onSelected: (_) => controller.selectMarket(market.id),
@@ -426,55 +455,128 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Arraste para definir a ordem dos produtos no mercado "${activeMarket.name}":',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: textSecondary,
-                      ),
-                    ),
+              const SizedBox(height: 10),
+
+              // 2. Visual Route Explanation Banner for the Active Market
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.30),
                   ),
-                  TextButton(
-                    onPressed: () => _showAddOrEditMarketDialog(
-                      existingMarket: activeMarket,
-                    ),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: const Text(
-                      'Renomear',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  if (controller.markets.length > 1)
-                    TextButton(
-                      onPressed: () => _confirmDeleteMarket(activeMarket),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: const Text(
-                        'Excluir',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFEF4444),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGreen.withValues(
+                              alpha: 0.18,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.route_rounded,
+                            size: 18,
+                            color: AppColors.primaryGreen,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ordem dos Corredores • ${activeMarket.name}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Organize a sequência em que os setores estão dispostos neste mercado (do 1º corredor até o caixa).',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: textSecondary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _showAddOrEditMarketDialog(
+                            existingMarket: activeMarket,
+                          ),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          icon: const Icon(Icons.edit_outlined, size: 14),
+                          label: const Text(
+                            'Renomear mercado',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        if (controller.markets.length > 1) ...[
+                          const SizedBox(width: 4),
+                          TextButton.icon(
+                            onPressed: () => _confirmDeleteMarket(activeMarket),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              size: 14,
+                              color: Color(0xFFEF4444),
+                            ),
+                            label: const Text(
+                              'Excluir',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFEF4444),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        Divider(height: 1, color: AppColors.border(context)),
+        Divider(height: 1, color: borderColor),
         Expanded(
-          child: Material(
-            color: surfaceColor,
+          child: Container(
+            color: bgColor,
             child: ReorderableListView.builder(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               itemCount: categories.length,
               onReorderItem: (oldIndex, newIndex) {
                 controller.moveMarketCategory(
@@ -485,107 +587,146 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
               },
               itemBuilder: (context, index) {
                 final category = categories[index];
-                final keywordCount =
-                    controller.keywordsForCategory(category).length;
+                final isFirst = index == 0;
+                final isLast = index == categories.length - 1;
 
-                return Material(
+                return Padding(
                   key: ValueKey('${activeMarket.id}_${category.id}'),
-                  color: surfaceColor,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.divider(context)),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
                       ),
-                    ),
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 2,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isFirst
+                              ? AppColors.primaryGreen.withValues(alpha: 0.45)
+                              : borderColor,
+                        ),
                       ),
-                      leading: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Row(
                         children: [
-                          SizedBox(
-                            width: 24,
+                          // Step Number Badge in the Market Route
+                          Container(
+                            width: 34,
+                            height: 34,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isFirst
+                                  ? AppColors.primaryGreen
+                                  : AppColors.subtleSurface(context),
+                              borderRadius: BorderRadius.circular(10),
+                              border: isFirst
+                                  ? null
+                                  : Border.all(color: borderColor),
+                            ),
                             child: Text(
                               '${index + 1}º',
                               style: TextStyle(
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w800,
                                 fontSize: 13,
-                                color: textSecondary,
+                                color: isFirst ? Colors.white : textPrimary,
                               ),
                             ),
                           ),
-                          Icon(category.icon, color: category.color, size: 20),
-                        ],
-                      ),
-                      title: Text(
-                        category.label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '$keywordCount palavras configuradas',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: textSecondary,
-                        ),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _selectedCategoryForKeywords = category;
-                          _selectedTab = _ConfigTab.categoryKeywords;
-                        });
-                      },
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Subir',
-                            visualDensity: VisualDensity.compact,
-                            icon: Icon(
-                              Icons.keyboard_arrow_up_rounded,
-                              size: 20,
-                              color: textSecondary,
+                          const SizedBox(width: 10),
+
+                          // Category Icon Circle
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: category.color.withValues(alpha: 0.14),
+                              shape: BoxShape.circle,
                             ),
-                            onPressed: index > 0
-                                ? () => controller.moveMarketCategory(
-                                      activeMarket.id,
-                                      index,
-                                      index - 1,
-                                    )
-                                : null,
-                          ),
-                          IconButton(
-                            tooltip: 'Descer',
-                            visualDensity: VisualDensity.compact,
-                            icon: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 20,
-                              color: textSecondary,
+                            child: Icon(
+                              category.icon,
+                              color: category.color,
+                              size: 19,
                             ),
-                            onPressed: index < categories.length - 1
-                                ? () => controller.moveMarketCategory(
-                                      activeMarket.id,
-                                      index,
-                                      index + 1,
-                                    )
-                                : null,
                           ),
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Icon(
-                                Icons.drag_handle_rounded,
-                                size: 20,
-                                color: textSecondary,
+                          const SizedBox(width: 12),
+
+                          // Category Name & Route Position Subtitle
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  category.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Up / Down / Drag Controls
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Mover para antes no percurso',
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.arrow_upward_rounded,
+                                  size: 18,
+                                  color: index > 0
+                                      ? textPrimary
+                                      : textSecondary.withValues(alpha: 0.3),
+                                ),
+                                onPressed: index > 0
+                                    ? () => controller.moveMarketCategory(
+                                          activeMarket.id,
+                                          index,
+                                          index - 1,
+                                        )
+                                    : null,
                               ),
-                            ),
+                              IconButton(
+                                tooltip: 'Mover para depois no percurso',
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.arrow_downward_rounded,
+                                  size: 18,
+                                  color: index < categories.length - 1
+                                      ? textPrimary
+                                      : textSecondary.withValues(alpha: 0.3),
+                                ),
+                                onPressed: index < categories.length - 1
+                                    ? () => controller.moveMarketCategory(
+                                          activeMarket.id,
+                                          index,
+                                          index + 1,
+                                        )
+                                    : null,
+                              ),
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.subtleSurface(context),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.drag_indicator_rounded,
+                                    size: 18,
+                                    color: textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

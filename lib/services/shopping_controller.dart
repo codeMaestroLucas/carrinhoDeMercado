@@ -174,12 +174,6 @@ class ShoppingController extends ChangeNotifier {
     };
 
     final filtered = _items.where((item) {
-      if (_filterBySelectedMarket) {
-        final itemMarketId = item.marketId ?? _selectedMarketId;
-        if (itemMarketId != _selectedMarketId) {
-          return false;
-        }
-      }
       if (!_showCheckedItems && item.isChecked) {
         return false;
       }
@@ -217,10 +211,6 @@ class ShoppingController extends ChangeNotifier {
 
   int countForCategory(ProductCategory category) {
     return _items.where((item) {
-      if (_filterBySelectedMarket &&
-          (item.marketId ?? _selectedMarketId) != _selectedMarketId) {
-        return false;
-      }
       if (!_showCheckedItems && item.isChecked) return false;
       return item.category == category;
     }).length;
@@ -464,8 +454,23 @@ class ShoppingController extends ChangeNotifier {
     final updatedCategory = category ?? current.category;
 
     if (category != null) {
-      _learnedCategories[CategoryClassifier.normalize(updatedName)] =
-          updatedCategory;
+      final cleanKeyword = updatedName.trim().toLowerCase();
+      final normalizedNew = CategoryClassifier.normalize(cleanKeyword);
+      if (normalizedNew.isNotEmpty) {
+        for (final cat in ProductCategory.values) {
+          final list = List<String>.from(_categoryDictionary[cat] ?? []);
+          list.removeWhere(
+            (existing) =>
+                CategoryClassifier.normalize(existing) == normalizedNew,
+          );
+          _categoryDictionary[cat] = list;
+        }
+        final targetList =
+            List<String>.from(_categoryDictionary[updatedCategory] ?? []);
+        targetList.insert(0, cleanKeyword);
+        _categoryDictionary[updatedCategory] = targetList;
+        _learnedCategories[normalizedNew] = updatedCategory;
+      }
     }
 
     _items[index] = current.copyWith(
