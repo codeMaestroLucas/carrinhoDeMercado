@@ -1,4 +1,4 @@
-package com.example.carrinhocompras
+package com.lucasrajao.carrinhoDecompras
 
 import io.flutter.embedding.android.FlutterActivity
 

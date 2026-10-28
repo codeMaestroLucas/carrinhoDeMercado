@@ -1,5 +1,5 @@
 name: carrinhocompras
-description: "A new Flutter project."
+description: "Aplicativo inteligente de lista e carrinho de compras com leitura de cupom fiscal e sincronização em nuvem."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -98,5 +98,5 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icons/cart.png"
+  image_path: "assets/icons/grocery-cart.png"
   remove_alpha_ios: true

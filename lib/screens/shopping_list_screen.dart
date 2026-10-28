@@ -576,55 +576,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedMarketId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: 'Mercado para compra (Lista)',
-                        filled: true,
-                        fillColor: subtleBg,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      items: widget.controller.markets.map((market) {
-                        final rec = recByMarketId[market.id];
-                        final isCheapest = market.id == cheapestMarketId &&
-                            recommendations.isNotEmpty;
-                        String label = market.name;
-                        if (rec != null) {
-                          label +=
-                              ' • média ${AppFormatters.formatCurrency(rec.averagePrice)}';
-                          if (isCheapest) {
-                            label += ' (Mais barato)';
-                          }
-                        }
-                        return DropdownMenuItem<String>(
-                          value: market.id,
-                          child: Text(
-                            label,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: isCheapest
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                              color: isCheapest
-                                  ? AppColors.accentGreen
-                                  : textPrimary,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setModalState(() {
-                            selectedMarketId = val;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
                     DropdownButtonFormField<ProductCategory>(
                       initialValue: selectedCategory,
                       decoration: InputDecoration(
