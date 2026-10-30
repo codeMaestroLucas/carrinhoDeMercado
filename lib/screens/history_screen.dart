@@ -268,6 +268,139 @@ class _HistoryScreenState extends State<HistoryScreen> {
             final textSecondary = AppColors.textSecondary(context);
             final subtleBg = AppColors.subtleSurface(context);
 
+            Future<void> showEditScannedItemDialog(int idx) async {
+              final item = scannedItems[idx];
+              final editNameController = TextEditingController(text: item.name);
+              final editPriceController = TextEditingController(
+                text: item.price.toStringAsFixed(2).replaceAll('.', ','),
+              );
+              ProductCategory currentCategory = item.category ??
+                  widget.controller.predictCategory(item.name);
+
+              await showDialog<void>(
+                context: context,
+                builder: (dialogCtx) {
+                  return StatefulBuilder(
+                    builder: (context, setDialogState) {
+                      return AlertDialog(
+                        backgroundColor: AppColors.surface(context),
+                        title: const Text('Editar Item Identificado'),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: editNameController,
+                                textCapitalization: TextCapitalization.sentences,
+                                decoration: InputDecoration(
+                                  labelText: 'Nome do produto',
+                                  filled: true,
+                                  fillColor: subtleBg,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onChanged: (val) {
+                                  // Update category prediction dynamically if user changes product name
+                                  if (item.category == null && val.trim().isNotEmpty) {
+                                    setDialogState(() {
+                                      currentCategory = widget.controller
+                                          .predictCategory(val.trim());
+                                    });
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: editPriceController,
+                                keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: 'Valor pago (R\$)',
+                                  prefixIcon: const Icon(
+                                    Icons.attach_money_rounded,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                  filled: true,
+                                  fillColor: subtleBg,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<ProductCategory>(
+                                initialValue: currentCategory,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Categoria',
+                                  filled: true,
+                                  fillColor: subtleBg,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                items: ProductCategory.values.map((cat) {
+                                  return DropdownMenuItem<ProductCategory>(
+                                    value: cat,
+                                    child: Row(
+                                      children: [
+                                        Icon(cat.icon, color: cat.color, size: 18),
+                                        const SizedBox(width: 10),
+                                        Text(cat.label),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() {
+                                      currentCategory = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primaryGreen,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () {
+                              final newName = editNameController.text.trim();
+                              final newPrice = AppFormatters.parsePrice(
+                                editPriceController.text,
+                              );
+                              if (newName.isEmpty || newPrice == null || newPrice <= 0) {
+                                return;
+                              }
+                              setModalState(() {
+                                scannedItems[idx] = ScannedReceiptItem(
+                                  name: newName,
+                                  price: newPrice,
+                                  category: currentCategory,
+                                );
+                              });
+                              Navigator.of(dialogCtx).pop();
+                            },
+                            child: const Text('Salvar'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
+            }
+
             Future<void> pickAndScanImage(ImageSource source) async {
               try {
                 final pickedFile = await imagePicker.pickImage(
@@ -634,7 +767,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                             itemBuilder: (context, idx) {
                               final item = scannedItems[idx];
-                              final cat =
+                              final cat = item.category ??
                                   widget.controller.predictCategory(item.name);
                               return ListTile(
                                 dense: true,
@@ -652,6 +785,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     color: textPrimary,
                                   ),
                                 ),
+                                subtitle: Text(
+                                  cat.label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cat.color,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                onTap: () => showEditScannedItemDialog(idx),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -663,8 +805,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         color: textPrimary,
                                       ),
                                     ),
+                                    const SizedBox(width: 4),
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
+                                      tooltip: 'Remover',
                                       icon: Icon(
                                         Icons.close_rounded,
                                         size: 16,
@@ -702,8 +846,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               final historyItems = scannedItems.map((s) {
                                 return PurchaseHistoryItem(
                                   name: s.name,
-                                  category: widget.controller
-                                      .predictCategory(s.name),
+                                  category: s.category ??
+                                      widget.controller.predictCategory(s.name),
                                   price: s.price,
                                 );
                               }).toList();

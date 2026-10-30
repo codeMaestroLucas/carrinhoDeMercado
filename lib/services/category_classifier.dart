@@ -35,7 +35,68 @@ class CategoryClassifier {
       final char = lower[i];
       buffer.write(diacriticsMap[char] ?? char);
     }
-    return buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    final rawNorm = buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    return singularize(rawNorm);
+  }
+
+  /// Converts common Portuguese plural words to their singular form.
+  /// Examples: "leites" -> "leite", "sabonetes" -> "sabonete", "matoes" -> "tomate",
+  /// "pães" -> "pao", "bananas" -> "banana", "ovos" -> "ovo".
+  static String singularize(String text) {
+    if (text.isEmpty) return text;
+    final words = text.split(' ');
+    final resultWords = <String>[];
+
+    for (final word in words) {
+      if (word.length <= 3) {
+        resultWords.add(word);
+        continue;
+      }
+
+      // Words ending in 's'
+      if (word.endsWith('s')) {
+        // Words ending in 'oes' -> 'ao' (e.g. limoes -> limao, feijoes -> feijao)
+        if (word.endsWith('oes') && word.length > 4) {
+          resultWords.add('${word.substring(0, word.length - 3)}ao');
+          continue;
+        }
+        // Words ending in 'aes' -> 'ao' (e.g. paes -> pao)
+        if (word.endsWith('aes') && word.length > 4) {
+          resultWords.add('${word.substring(0, word.length - 3)}ao');
+          continue;
+        }
+        // Words ending in 'res' -> 'r' (e.g. bombons, hambúrgueres -> hamburguer)
+        if (word.endsWith('res') && word.length > 4) {
+          resultWords.add('${word.substring(0, word.length - 2)}');
+          continue;
+        }
+        // Words ending in 'is' (e.g. pasteis -> pastel, pinceis -> pincel)
+        if (word.endsWith('eis') && word.length > 4) {
+          resultWords.add('${word.substring(0, word.length - 3)}el');
+          continue;
+        }
+        // Words ending in 'ns' -> 'm' (e.g. bombons -> bombom)
+        if (word.endsWith('ns') && word.length > 3) {
+          resultWords.add('${word.substring(0, word.length - 2)}m');
+          continue;
+        }
+        // Standard regular plural ending in vowel + s:
+        // "leites" -> "leite", "bananas" -> "banana", "ovos" -> "ovo", "mangas" -> "manga"
+        // Avoid stripping if word ends in 'is' or 'os' where base ends with s like "lapis", "pires", "onibus"
+        final nonPluralWords = {'onibus', 'lapis', 'pires', 'virus', 'status', 'tenis', 'ouro', 'arroz', 'noz'};
+        if (nonPluralWords.contains(word)) {
+          resultWords.add(word);
+          continue;
+        }
+
+        resultWords.add(word.substring(0, word.length - 1));
+        continue;
+      }
+
+      resultWords.add(word);
+    }
+
+    return resultWords.join(' ');
   }
 
   static final Map<ProductCategory, List<String>> defaultKeywordDictionary = {
@@ -508,6 +569,151 @@ class CategoryClassifier {
     return false;
   }
 
+  /// Parsed item with extracted name, quantity, and unit.
+  static ({String name, int quantity, String unit, bool isPriceTotalByDefault}) extractQuantityAndName(String rawText) {
+    var text = rawText.trim();
+    if (text.isEmpty) {
+      return (name: '', quantity: 1, unit: 'un', isPriceTotalByDefault: false);
+    }
+
+    // Helper to normalize unit string to canonical keys: 'un', 'kg', 'g', 'dz', 'cx', 'L'
+    String normalizeUnit(String rawUnit) {
+      final u = rawUnit.toLowerCase().trim();
+      if (u == 'kg' || u == 'kilo' || u == 'kilos' || u == 'quilo' || u == 'quilos') {
+        return 'kg';
+      }
+      if (u == 'g' || u == 'gr' || u == 'grama' || u == 'gramas') {
+        return 'g';
+      }
+      if (u == 'dz' || u == 'duzia' || u == 'dúzia' || u == 'duzias' || u == 'dúzias') {
+        return 'dz';
+      }
+      if (u == 'cx' || u == 'cxa' || u == 'caixa' || u == 'caixas' || u == 'pct' || u == 'pacote' || u == 'pacotes') {
+        return 'cx';
+      }
+      if (u == 'l' || u == 'lt' || u == 'litro' || u == 'litros' || u == 'ml') {
+        return 'L';
+      }
+      return 'un';
+    }
+
+    // 1. Suffix pattern with unit:
+    // e.g.: "batata (2kg)", "leite [3cx]", "ovos (1dz)", "batata 2kg", "queijo 300g"
+    final parenUnitSuffixRegex = RegExp(
+      r'[\(\[]\s*(\d{1,4})\s*([a-zA-ZÀ-ÿ]{1,10})\s*[\)\]]\s*$',
+      caseSensitive: false,
+    );
+    var match = parenUnitSuffixRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final unit = normalizeUnit(match.group(2) ?? 'un');
+      final cleanedName = text.substring(0, match.start).trim();
+      if (cleanedName.isNotEmpty) {
+        final isWeightOrDoz = unit == 'kg' || unit == 'g' || unit == 'dz';
+        return (
+          name: cleanedName,
+          quantity: qty > 0 ? qty : 1,
+          unit: unit,
+          isPriceTotalByDefault: isWeightOrDoz,
+        );
+      }
+    }
+
+    // Plain suffix with unit: e.g.: "batata 2kg", "leite 3cx", "ovos 1dz", "arroz 5kg", "suco 2L"
+    final suffixUnitRegex = RegExp(
+      r'(?:[-–—:]\s*)?(\d{1,4})\s*(kg|kilos?|quilos?|g|gr|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|l|litros?|un|und|unid|unidades?|[xX])\s*$',
+      caseSensitive: false,
+    );
+    match = suffixUnitRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final rawU = match.group(2) ?? 'un';
+      final unit = rawU.toLowerCase() == 'x' ? 'un' : normalizeUnit(rawU);
+      final cleanedName = text.substring(0, match.start).trim();
+      if (cleanedName.isNotEmpty) {
+        final isWeightOrDoz = unit == 'kg' || unit == 'g' || unit == 'dz';
+        return (
+          name: cleanedName,
+          quantity: qty > 0 ? qty : 1,
+          unit: unit,
+          isPriceTotalByDefault: isWeightOrDoz,
+        );
+      }
+    }
+
+    // 2. Prefix pattern with multi-letter unit:
+    // e.g.: "2kg batata", "1dz ovos", "3cx leite", "5kg de arroz", "2x leite", "2un leite"
+    // (Note: Require multi-letter units or explicit space after single letter units like 'L' or 'g'
+    // so words starting with L or G like "leite", "goiaba", "garrafa" are NOT misparsed!)
+    final prefixMultiUnitRegex = RegExp(
+      r'^(\d{1,4})\s*(kg|kilos?|quilos?|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|litros?|un|und|unid|unidades?|[xX])\s*(?:de\s+)?(?:[-–—:]\s*)?',
+      caseSensitive: false,
+    );
+    match = prefixMultiUnitRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final rawU = match.group(2) ?? 'un';
+      final unit = rawU.toLowerCase() == 'x' ? 'un' : normalizeUnit(rawU);
+      final cleanedName = text.substring(match.end).trim();
+      if (cleanedName.isNotEmpty) {
+        final isWeightOrDoz = unit == 'kg' || unit == 'g' || unit == 'dz';
+        return (
+          name: cleanedName,
+          quantity: qty > 0 ? qty : 1,
+          unit: unit,
+          isPriceTotalByDefault: isWeightOrDoz,
+        );
+      }
+    }
+
+    // Prefix with single letter unit ('L' or 'g') REQUIRES whitespace before product name:
+    // e.g. "2L leite", "2 L de leite", "500g queijo"
+    final prefixSingleLetterUnitRegex = RegExp(
+      r'^(\d{1,4})\s*([lLgG])\s+(?:de\s+)?(?:[-–—:]\s*)?',
+      caseSensitive: false,
+    );
+    match = prefixSingleLetterUnitRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final rawU = match.group(2) ?? 'un';
+      final unit = normalizeUnit(rawU);
+      final cleanedName = text.substring(match.end).trim();
+      if (cleanedName.isNotEmpty) {
+        final isWeightOrDoz = unit == 'kg' || unit == 'g' || unit == 'dz';
+        return (
+          name: cleanedName,
+          quantity: qty > 0 ? qty : 1,
+          unit: unit,
+          isPriceTotalByDefault: isWeightOrDoz,
+        );
+      }
+    }
+
+    // 3. Simple Parenthetical without unit: e.g.: "Leite (2)", "Leite [3]"
+    final parenSuffixRegex = RegExp(r'[\(\[]\s*(\d{1,4})\s*[\)\]]\s*$');
+    match = parenSuffixRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final cleanedName = text.substring(0, match.start).trim();
+      if (cleanedName.isNotEmpty) {
+        return (name: cleanedName, quantity: qty > 0 ? qty : 1, unit: 'un', isPriceTotalByDefault: false);
+      }
+    }
+
+    // 4. "2 Leite" (digits at the start followed by space and letters, e.g. "3 Sabonetes")
+    final simpleDigitPrefixRegex = RegExp(r'^(\d{1,4})\s+(?=[a-zA-ZÀ-ÿ])');
+    match = simpleDigitPrefixRegex.firstMatch(text);
+    if (match != null) {
+      final qty = int.tryParse(match.group(1) ?? '1') ?? 1;
+      final cleanedName = text.substring(match.end).trim();
+      if (cleanedName.isNotEmpty) {
+        return (name: cleanedName, quantity: qty > 0 ? qty : 1, unit: 'un', isPriceTotalByDefault: false);
+      }
+    }
+
+    return (name: text, quantity: 1, unit: 'un', isPriceTotalByDefault: false);
+  }
+
   /// Splits a pasted multi-line or comma/semicolon-separated text into clean, deduplicated item names.
   static List<String> parsePastedList(String rawText) {
     if (rawText.trim().isEmpty) return [];
@@ -526,7 +732,9 @@ class CategoryClassifier {
     for (final segment in rawSegments) {
       var cleaned = segment.replaceFirst(prefixRegex, '').trim();
       if (cleaned.isNotEmpty) {
-        final norm = normalize(cleaned);
+        final parsed = extractQuantityAndName(cleaned);
+        final baseName = parsed.name.isNotEmpty ? parsed.name : cleaned;
+        final norm = normalize(baseName);
         if (norm.isNotEmpty && seenNormalized.add(norm)) {
           cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
           cleanedItems.add(cleaned);

@@ -86,6 +86,9 @@ class ShoppingItem {
     required this.category,
     this.marketId,
     this.price,
+    this.quantity = 1,
+    this.unit = 'un',
+    this.isPriceTotal = false,
     this.isChecked = false,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -95,8 +98,18 @@ class ShoppingItem {
   final ProductCategory category;
   final String? marketId;
   final double? price;
+  final int quantity;
+  final String unit; // 'un', 'kg', 'g', 'dz', 'cx', 'L'
+  final bool isPriceTotal; // true: price is the total for all items; false: price is unit price (default)
   final bool isChecked;
   final DateTime createdAt;
+
+  /// Effective total amount calculated for this item
+  double get effectiveTotalAmount {
+    if (price == null || price! <= 0) return 0.0;
+    if (isPriceTotal) return price!;
+    return price! * (quantity > 0 ? quantity : 1);
+  }
 
   ShoppingItem copyWith({
     String? id,
@@ -105,6 +118,9 @@ class ShoppingItem {
     String? marketId,
     double? price,
     bool clearPrice = false,
+    int? quantity,
+    String? unit,
+    bool? isPriceTotal,
     bool? isChecked,
     DateTime? createdAt,
   }) {
@@ -114,6 +130,9 @@ class ShoppingItem {
       category: category ?? this.category,
       marketId: marketId ?? this.marketId,
       price: clearPrice ? null : (price ?? this.price),
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      isPriceTotal: isPriceTotal ?? this.isPriceTotal,
       isChecked: isChecked ?? this.isChecked,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -126,6 +145,9 @@ class ShoppingItem {
       'category': category.id,
       'marketId': marketId,
       'price': price,
+      'quantity': quantity,
+      'unit': unit,
+      'isPriceTotal': isPriceTotal,
       'isChecked': isChecked,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -138,6 +160,11 @@ class ShoppingItem {
       category: ProductCategory.fromId(json['category'] as String?),
       marketId: json['marketId'] as String?,
       price: (json['price'] as num?)?.toDouble(),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      unit: (json['unit'] as String?)?.trim().isNotEmpty == true
+          ? (json['unit'] as String).trim()
+          : 'un',
+      isPriceTotal: json['isPriceTotal'] as bool? ?? false,
       isChecked: json['isChecked'] as bool? ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()

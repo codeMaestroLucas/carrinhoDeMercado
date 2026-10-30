@@ -394,7 +394,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
   Future<void> _showEditItemModal(
     ShoppingItem item, {
-    bool focusPrice = true,
+    bool focusPrice = false,
   }) async {
     final nameController = TextEditingController(text: item.name);
     final priceController = TextEditingController(
@@ -402,6 +402,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
           ? item.price!.toStringAsFixed(2).replaceAll('.', ',')
           : '',
     );
+    int currentQuantity = item.quantity > 0 ? item.quantity : 1;
+    String currentUnit = item.unit.isNotEmpty ? item.unit : 'un';
+    bool currentIsPriceTotal = item.isPriceTotal;
     ProductCategory selectedCategory = item.category;
     String selectedMarketId =
         item.marketId ?? widget.controller.selectedMarket.id;
@@ -496,7 +499,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     // Primary field: Price configuration right at the top
                     TextField(
                       controller: priceController,
-                      autofocus: focusPrice,
+                      autofocus: false,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -555,9 +558,210 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       ),
                     ],
                     const SizedBox(height: 12),
+                    // Quantity and Unit selector control
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: subtleBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border(context)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.shopping_basket_outlined, size: 18, color: textSecondary),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Quantidade',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ),
+                              // Minus button
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Diminuir quantidade',
+                                icon: Icon(
+                                  Icons.remove_circle_outline_rounded,
+                                  size: 22,
+                                  color: currentQuantity > 1 ? AppColors.primaryGreen : textSecondary.withValues(alpha: 0.35),
+                                ),
+                                onPressed: currentQuantity > 1
+                                    ? () {
+                                        setModalState(() {
+                                          currentQuantity--;
+                                        });
+                                      }
+                                    : null,
+                              ),
+                              Container(
+                                constraints: const BoxConstraints(minWidth: 32),
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$currentQuantity',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                ),
+                              ),
+                              // Plus button
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Aumentar quantidade',
+                                icon: const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                  size: 22,
+                                  color: AppColors.primaryGreen,
+                                ),
+                                onPressed: () {
+                                  setModalState(() {
+                                    currentQuantity++;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Unit chips: un, kg, g, dz, cx, L
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'Unidade: ',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(width: 4),
+                                ...['un', 'kg', 'g', 'dz', 'cx', 'L'].map((u) {
+                                  final isSel = currentUnit == u;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      visualDensity: VisualDensity.compact,
+                                      label: Text(u),
+                                      selected: isSel,
+                                      onSelected: (val) {
+                                        if (val) {
+                                          setModalState(() {
+                                            currentUnit = u;
+                                            if (u == 'kg' || u == 'g' || u == 'dz') {
+                                              currentIsPriceTotal = true;
+                                            }
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Price mode selector: Unit price (default) vs Total price
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: subtleBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border(context)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.payments_outlined, size: 18, color: textSecondary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Tipo do preço digitado',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ChoiceChip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: const Center(
+                                    child: Text('Preço Unitário'),
+                                  ),
+                                  selected: !currentIsPriceTotal,
+                                  onSelected: (val) {
+                                    if (val) {
+                                      setModalState(() {
+                                        currentIsPriceTotal = false;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ChoiceChip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: const Center(
+                                    child: Text('Preço Total'),
+                                  ),
+                                  selected: currentIsPriceTotal,
+                                  onSelected: (val) {
+                                    if (val) {
+                                      setModalState(() {
+                                        currentIsPriceTotal = true;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (priceController.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Builder(builder: (ctx) {
+                              final p = AppFormatters.parsePrice(priceController.text) ?? 0.0;
+                              final total = currentIsPriceTotal ? p : (p * currentQuantity);
+                              return Text(
+                                currentIsPriceTotal
+                                    ? 'Total final da compra: ${AppFormatters.formatCurrency(total)} (valor fechado de todos juntos)'
+                                    : 'Total final da compra: ${AppFormatters.formatCurrency(total)} ($currentQuantity x ${AppFormatters.formatCurrency(p)})',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.primaryGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: nameController,
-                      autofocus: !focusPrice,
+                      autofocus: false,
                       textCapitalization: TextCapitalization.sentences,
                       style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
@@ -652,6 +856,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           category: selectedCategory,
                           marketId: selectedMarketId,
                           price: parsedPrice,
+                          quantity: currentQuantity,
+                          unit: currentUnit,
+                          isPriceTotal: currentIsPriceTotal,
                           clearPrice: shouldClearPrice,
                         );
                         if (!success) {
@@ -707,7 +914,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 : widget.controller.allItems;
             final totalValue = itemsToSave.fold<double>(
               0.0,
-              (sum, e) => sum + (e.price ?? 0.0),
+              (sum, e) => sum + e.effectiveTotalAmount,
             );
 
             return AlertDialog(
@@ -1501,7 +1708,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             flex: 3,
             child: InkWell(
               onTap: () => widget.controller.toggleItemChecked(item.id),
-              onLongPress: () => _showEditItemModal(item, focusPrice: true),
+              onLongPress: () => _showEditItemModal(item),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1527,23 +1734,57 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     ),
                     const SizedBox(width: 12),
 
-                    // Product Name + subtle bargain badge if cheaper in a known market
+                    // Product Name + quantity badge + subtle bargain badge if cheaper in a known market
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: isChecked ? textSecondary : textPrimary,
-                              decoration: isChecked
-                                  ? TextDecoration.lineThrough
-                                  : TextDecoration.none,
-                              decorationColor: textSecondary,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  item.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: isChecked ? textSecondary : textPrimary,
+                                    decoration: isChecked
+                                        ? TextDecoration.lineThrough
+                                        : TextDecoration.none,
+                                    decorationColor: textSecondary,
+                                  ),
+                                ),
+                              ),
+                              if (item.quantity > 1 || (item.unit != 'un' && item.unit.isNotEmpty)) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isChecked
+                                        ? textSecondary.withValues(alpha: 0.15)
+                                        : AppColors.primaryGreen.withValues(alpha: 0.13),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    item.unit != 'un'
+                                        ? '${item.quantity}${item.unit}'
+                                        : '${item.quantity}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: isChecked
+                                          ? textSecondary
+                                          : AppColors.primaryGreen,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           if (isCheaperHighlight && cheapestMarketName != null)
                             Padding(
@@ -1593,7 +1834,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                         hasPrice ? 'Produto precificado' : 'Sem preço definido',
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () => _showEditItemModal(item, focusPrice: true),
+                      onTap: () => _showEditItemModal(item),
                       child: Container(
                         width: 28,
                         height: 28,
@@ -1626,7 +1867,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     message: 'Configurar item',
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () => _showEditItemModal(item, focusPrice: true),
+                      onTap: () => _showEditItemModal(item),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: Icon(

@@ -1,14 +1,17 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import '../models/shopping_models.dart';
 import '../utils/formatters.dart';
 
 class ScannedReceiptItem {
   ScannedReceiptItem({
     required this.name,
     required this.price,
+    this.category,
   });
 
   String name;
   double price;
+  ProductCategory? category;
 }
 
 class ReceiptScannerService {
@@ -220,33 +223,81 @@ class ReceiptScannerService {
 
   static String _cleanReceiptProductName(String raw) {
     var s = raw;
-    // Remove leading item index + barcode (e.g. "001 7891000100103 " or "01 12345 ")
+    // 1. Remove leading item index and barcode (e.g. "001 08871124 ", "01 12345 ")
     s = s.replaceFirst(RegExp(r'^\s*\d{1,4}\s+\d{4,14}\s+'), '');
-    // Remove leading item index or barcode alone (e.g. "001 " or "7891000100103 ")
+    // Remove leading numbers/codes alone (e.g. "001 ", "08871124 ")
     s = s.replaceFirst(RegExp(r'^\s*\d{1,14}[\s\.\-]+'), '');
-    // Remove trailing quantity/unit markers like "1 UN X", "1,000 KG", "UN", "R$"
+
+    // 2. Remove trailing tax tags, fiscal flags and unit markers:
+    // e.g.: "1un F1 10,39", "1un T19,00% 6,99", "1 UN X", "F1", "T19,00%", "T18%", "I1", "N1", "II", "FF", "NN"
     s = s.replaceAll(
-      RegExp(
-        r'\b\d+(?:[,\.]\d+)?\s*(?:UN|KG|G|L|LT|ML|PC|PCT|CX|EMB)\s*[xX*]?\s*$',
-        caseSensitive: false,
-      ),
+      RegExp(r'\b\d+(?:[,\.]\d+)?\s*(?:UN|KG|G|L|LT|ML|PC|PCT|CX|EMB)\b.*$', caseSensitive: false),
+      '',
+    );
+    s = s.replaceAll(
+      RegExp(r'\b(?:F\d+|T\d+(?:[,\.]\d+)?%?|I\d+|N\d+|II|FF|NN)\b.*$', caseSensitive: false),
       '',
     );
     s = s.replaceAll(
       RegExp(r'\s+(?:UN|KG|LT|PC|R\$)\s*$', caseSensitive: false),
       '',
     );
+
+    // 3. Expand common supermarket receipt abbreviations into clean words:
+    final words = s.split(RegExp(r'\s+'));
+    final cleanedWords = <String>[];
+    final abbrevMap = <String, String>{
+      'CHOC': 'Chocolate',
+      'HIDRAT': 'Hidratante',
+      'ESPONJA': 'Esponja',
+      'REFRIG': 'Refrigerante',
+      'SAB': 'Sabonete',
+      'SHAMP': 'Shampoo',
+      'COND': 'Condicionador',
+      'DESOD': 'Desodorante',
+      'DET': 'Detergente',
+      'AMAC': 'Amaciante',
+      'LIMP': 'Limpador',
+      'BISC': 'Biscoito',
+      'BOL': 'Bolacha',
+      'MARG': 'Margarina',
+      'MANTEIG': 'Manteiga',
+      'IORG': 'Iogurte',
+      'LEIT': 'Leite',
+      'QUEIJ': 'Queijo',
+      'PRES': 'Presunto',
+      'PANO': 'Pano',
+      'GOMA': 'Goma',
+      'MASCAR': 'Mascar',
+    };
+
+    for (var w in words) {
+      final upper = w.toUpperCase();
+      // Drop meaningless single-letter codes or noise tokens left at the edges like "F1", "SC", "M"
+      if (abbrevMap.containsKey(upper)) {
+        cleanedWords.add(abbrevMap[upper]!);
+      } else {
+        cleanedWords.add(w);
+      }
+    }
+    s = cleanedWords.join(' ');
+
+    // 4. Remove dangling isolated noise tokens at the end like " M ", " S SC ", " A "
+    s = s.replaceFirst(RegExp(r'\s+[A-Za-z0-9]{1,2}(?:\s+[A-Za-z0-9]{1,2})*\s*$'), '');
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     if (s.isEmpty || !RegExp(r'[a-zA-ZÀ-ÿ]').hasMatch(s)) {
       return '';
     }
 
-    // Format nicely: Capitalize first letter, lowercase rest if ALL CAPS
-    if (s == s.toUpperCase() && s.length > 1) {
-      final lower = s.toLowerCase();
+    // Format nicely: Capitalize each word nicely
+    final parts = s.split(' ');
+    final formatted = parts.map((p) {
+      if (p.isEmpty) return '';
+      final lower = p.toLowerCase();
       return lower[0].toUpperCase() + lower.substring(1);
-    }
-    return s[0].toUpperCase() + s.substring(1);
+    }).join(' ');
+
+    return formatted;
   }
 }

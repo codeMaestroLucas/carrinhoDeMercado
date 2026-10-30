@@ -202,12 +202,15 @@ class ShoppingController extends ChangeNotifier {
   int get checkedItemsCount => _items.where((e) => e.isChecked).length;
   int get pendingItemsCount => _items.where((e) => !e.isChecked).length;
 
-  double get totalEstimatedAmount =>
-      _items.fold(0.0, (acc, item) => acc + (item.price ?? 0.0));
+  double get totalEstimatedAmount => _items.fold(
+      0.0,
+      (acc, item) => acc + item.effectiveTotalAmount,
+    );
 
-  double get checkedTotalAmount => _items
-      .where((e) => e.isChecked)
-      .fold(0.0, (acc, item) => acc + (item.price ?? 0.0));
+  double get checkedTotalAmount => _items.where((e) => e.isChecked).fold(
+      0.0,
+      (acc, item) => acc + item.effectiveTotalAmount,
+    );
 
   int countForCategory(ProductCategory category) {
     return _items.where((item) {
@@ -336,9 +339,25 @@ class ShoppingController extends ChangeNotifier {
     ProductCategory? category,
     String? marketId,
     double? price,
+    int? quantity,
+    String? unit,
+    bool? isPriceTotal,
   }) {
-    final cleanName = name.trim();
-    if (cleanName.isEmpty) return null;
+    final cleanInput = name.trim();
+    if (cleanInput.isEmpty) return null;
+
+    final parsed = CategoryClassifier.extractQuantityAndName(cleanInput);
+    var cleanName = parsed.name.isNotEmpty ? parsed.name : cleanInput;
+    cleanName = CategoryClassifier.singularize(cleanName.toLowerCase());
+    if (cleanName.isNotEmpty) {
+      cleanName = cleanName[0].toUpperCase() + cleanName.substring(1);
+    }
+    final assignedQuantity = (quantity != null && quantity > 0)
+        ? quantity
+        : (parsed.quantity > 0 ? parsed.quantity : 1);
+    final assignedUnit = (unit != null && unit.isNotEmpty) ? unit : parsed.unit;
+    final assignedIsPriceTotal = isPriceTotal ?? parsed.isPriceTotalByDefault;
+
     if (isDuplicateItemName(cleanName)) {
       return null;
     }
@@ -359,6 +378,9 @@ class ShoppingController extends ChangeNotifier {
       category: assignedCategory,
       marketId: assignedMarketId,
       price: price,
+      quantity: assignedQuantity,
+      unit: assignedUnit,
+      isPriceTotal: assignedIsPriceTotal,
     );
     _items.add(item);
     _saveToDisk();
@@ -385,7 +407,18 @@ class ShoppingController extends ChangeNotifier {
     final now = DateTime.now().microsecondsSinceEpoch;
 
     for (var i = 0; i < candidateSegments.length; i++) {
-      var cleaned = candidateSegments[i].replaceFirst(prefixRegex, '').trim();
+      var rawCandidate = candidateSegments[i].replaceFirst(prefixRegex, '').trim();
+      if (rawCandidate.isEmpty) continue;
+
+      final parsed = CategoryClassifier.extractQuantityAndName(rawCandidate);
+      var cleaned = parsed.name.isNotEmpty ? parsed.name : rawCandidate;
+      cleaned = CategoryClassifier.singularize(cleaned.toLowerCase());
+      if (cleaned.isNotEmpty) {
+        cleaned = cleaned[0].toUpperCase() + cleaned.substring(1);
+      }
+      final quantity = parsed.quantity > 0 ? parsed.quantity : 1;
+      final unit = parsed.unit;
+      final isPriceTotal = parsed.isPriceTotalByDefault;
       if (cleaned.isEmpty) continue;
 
       if (isDuplicateItemName(cleaned)) {
@@ -405,6 +438,9 @@ class ShoppingController extends ChangeNotifier {
           name: cleaned,
           category: category,
           marketId: assignedMarketId,
+          quantity: quantity,
+          unit: unit,
+          isPriceTotal: isPriceTotal,
         ),
       );
       addedCount++;
@@ -439,6 +475,9 @@ class ShoppingController extends ChangeNotifier {
     ProductCategory? category,
     String? marketId,
     double? price,
+    int? quantity,
+    String? unit,
+    bool? isPriceTotal,
     bool clearPrice = false,
   }) {
     final index = _items.indexWhere((e) => e.id == id);
@@ -478,11 +517,25 @@ class ShoppingController extends ChangeNotifier {
       category: updatedCategory,
       marketId: marketId ?? current.marketId,
       price: price,
+      quantity: (quantity != null && quantity > 0) ? quantity : current.quantity,
+      unit: (unit != null && unit.isNotEmpty) ? unit : current.unit,
+      isPriceTotal: isPriceTotal ?? current.isPriceTotal,
       clearPrice: clearPrice,
     );
     _saveToDisk();
     notifyListeners();
     return true;
+  }
+
+  void updateItemQuantity(String id, int quantity) {
+    if (quantity < 1) return;
+    final index = _items.indexWhere((e) => e.id == id);
+    if (index == -1) return;
+    final current = _items[index];
+    if (current.quantity == quantity) return;
+    _items[index] = current.copyWith(quantity: quantity);
+    _saveToDisk();
+    notifyListeners();
   }
 
   void removeItem(String id) {
@@ -615,7 +668,7 @@ class ShoppingController extends ChangeNotifier {
             (e) => PurchaseHistoryItem(
               name: e.name,
               category: e.category,
-              price: e.price ?? 0.0,
+              price: e.effectiveTotalAmount,
             ),
           )
           .toList(),
