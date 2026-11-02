@@ -5,6 +5,7 @@ import '../services/shopping_controller.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import 'history_screen.dart';
+import 'pantry_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -21,6 +22,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedMarketNameFilter;
+  int _priceIndexDays = 60;
+  String _variationTab = 'up'; // 'up' or 'down'
 
   @override
   void dispose() {
@@ -223,6 +226,12 @@ class _HomeScreenState extends State<HomeScreen> {
             .compareTo(a.variationPercentFromLastTime!.abs()),
       );
 
+    final priceIndex =
+        controller.calculatePriceIndex(daysWindow: _priceIndexDays);
+    final categorySpending = controller.calculateCategorySpending(
+      startDate: now.subtract(Duration(days: _priceIndexDays)),
+    );
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textPrimary = AppColors.textPrimary(context);
     final textSecondary = AppColors.textSecondary(context);
@@ -233,6 +242,22 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Início & Análises'),
         actions: [
+          IconButton(
+            tooltip: 'Minha Despensa',
+            icon: Badge(
+              isLabelVisible: controller.lowStockPantryCount > 0,
+              backgroundColor: const Color(0xFFD97706),
+              label: Text('${controller.lowStockPantryCount}'),
+              child: const Icon(Icons.kitchen_outlined, size: 21),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PantryScreen(controller: controller),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
             onPressed: controller.toggleDarkMode,
@@ -267,7 +292,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           allTimePurchasesCount: allRecords.length,
                         ),
 
-                        // Card 2: Maiores Variações de Preço Recentes
+                        // Card 2: Atalho da Despensa Inteligente
+                        _buildPantryShortcutCard(context),
+
+                        // Card 3: Índice de Preços e Inflação da Cesta
+                        _buildPriceIndexCard(context, priceIndex),
+
+                        // Card 4: Gastos por Categoria
+                        _buildCategorySpendingCard(context, categorySpending),
+
+                        // Card 5: Maiores Variações de Preço Recentes
                         if (productsWithVariation.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Row(
@@ -318,16 +352,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         // Seção: Análise por Produto
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Análise por Produto',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: textPrimary,
+                            Expanded(
+                              child: Text(
+                                'Análise por Produto',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: textPrimary,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               '${filteredProducts.length} ${filteredProducts.length == 1 ? 'produto' : 'produtos'}',
                               style: TextStyle(
@@ -563,6 +601,539 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPantryShortcutCard(BuildContext context) {
+    final controller = widget.controller;
+    final pantryCount = controller.pantryItems.length;
+    final lowStock = controller.lowStockPantryCount;
+    final surfaceColor = AppColors.surface(context);
+    final borderColor = AppColors.border(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PantryScreen(controller: controller),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(top: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.kitchen_outlined,
+                color: AppColors.primaryGreen,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 2,
+                    children: [
+                      Text(
+                        'Minha Despensa',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
+                        ),
+                      ),
+                      if (lowStock > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$lowStock acabando',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    pantryCount == 0
+                        ? 'Controle o que você tem em casa e evite comprar repetido'
+                        : '$pantryCount produtos cadastrados em estoque',
+                    style: TextStyle(fontSize: 12, color: textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: textSecondary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceIndexCard(
+    BuildContext context,
+    PriceIndexSummary indexSummary,
+  ) {
+    final surfaceColor = AppColors.surface(context);
+    final borderColor = AppColors.border(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final overall = indexSummary.overallVariationPercent;
+    final isInflation = overall > 0.05;
+    final isDeflation = overall < -0.05;
+
+    final badgeColor = isInflation
+        ? const Color(0xFFDC2626)
+        : (isDeflation
+            ? const Color(0xFF15803D)
+            : textSecondary);
+    final badgeBg = isInflation
+        ? const Color(0xFFFEE2E2)
+        : (isDeflation
+            ? const Color(0xFFDCFCE7)
+            : AppColors.subtleSurface(context));
+
+    final activeList = _variationTab == 'up'
+        ? indexSummary.topIncreases
+        : indexSummary.topDecreases;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.trending_up_rounded,
+                  size: 18,
+                  color: AppColors.accentGreen,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Índice de Preços da Cesta',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [30, 60, 90].map((days) {
+                  final isSelected = _priceIndexDays == days;
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: () => setState(() => _priceIndexDays = days),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primaryGreen
+                              : (isDark
+                                  ? const Color(0xFF232832)
+                                  : const Color(0xFFF3F4F6)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${days}d',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? Colors.white : textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (indexSummary.totalComparedItems == 0) ...[
+            Text(
+              'Ainda não há dados suficientes para calcular a inflação da sua cesta nos últimos $_priceIndexDays dias. Conforme você cadastrar mais compras com produtos recomprados, o índice será gerado automaticamente.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: textSecondary,
+                height: 1.35,
+              ),
+            ),
+          ] else ...[
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Text(
+                  '${overall > 0 ? '+' : ''}${overall.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: badgeColor,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isInflation
+                        ? 'Inflação Pessoal ↗'
+                        : (isDeflation
+                            ? 'Economia / Queda ↘'
+                            : 'Preços Estáveis'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Baseado em ${indexSummary.totalComparedItems} produtos recomprados nos últimos $_priceIndexDays dias',
+              style: TextStyle(fontSize: 12, color: textSecondary),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 8,
+                child: Row(
+                  children: [
+                    if (indexSummary.decreasedCount > 0)
+                      Expanded(
+                        flex: indexSummary.decreasedCount,
+                        child: Container(color: const Color(0xFF22C55E)),
+                      ),
+                    if (indexSummary.stableCount > 0)
+                      Expanded(
+                        flex: indexSummary.stableCount,
+                        child: Container(
+                          color: isDark
+                              ? const Color(0xFF4B5563)
+                              : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                    if (indexSummary.increasedCount > 0)
+                      Expanded(
+                        flex: indexSummary.increasedCount,
+                        child: Container(color: const Color(0xFFEF4444)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                Text(
+                  '🟢 ${indexSummary.decreasedCount} mais baratos',
+                  style: TextStyle(fontSize: 11, color: textSecondary),
+                ),
+                Text(
+                  '⚪ ${indexSummary.stableCount} estáveis',
+                  style: TextStyle(fontSize: 11, color: textSecondary),
+                ),
+                Text(
+                  '🔴 ${indexSummary.increasedCount} subiram',
+                  style: TextStyle(fontSize: 11, color: textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Divider(height: 1, color: AppColors.divider(context)),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(
+                      'Maiores Altas ↗ (${indexSummary.topIncreases.length})',
+                    ),
+                    selected: _variationTab == 'up',
+                    selectedColor: const Color(0xFFFEE2E2),
+                    labelStyle: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _variationTab == 'up'
+                          ? const Color(0xFFB91C1C)
+                          : textSecondary,
+                    ),
+                    onSelected: (_) => setState(() => _variationTab = 'up'),
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(
+                      'Maiores Quedas ↘ (${indexSummary.topDecreases.length})',
+                    ),
+                    selected: _variationTab == 'down',
+                    selectedColor: const Color(0xFFDCFCE7),
+                    labelStyle: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: _variationTab == 'down'
+                          ? const Color(0xFF15803D)
+                          : textSecondary,
+                    ),
+                    onSelected: (_) => setState(() => _variationTab = 'down'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (activeList.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  _variationTab == 'up'
+                      ? 'Nenhum produto teve aumento significativo no período.'
+                      : 'Nenhum produto teve queda de preço no período.',
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+              )
+            else
+              ...activeList.map((item) {
+                final isUp = item.variationPercent > 0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Icon(item.category.icon,
+                          size: 16, color: item.category.color),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.productName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '${AppFormatters.formatCurrency(item.previousPrice)} ➔ ${AppFormatters.formatCurrency(item.currentPrice)} (${item.marketName})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isUp
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${isUp ? '+' : ''}${item.variationPercent.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isUp
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF15803D),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategorySpendingCard(
+    BuildContext context,
+    List<CategorySpendingSummary> spendingList,
+  ) {
+    if (spendingList.isEmpty) return const SizedBox.shrink();
+
+    final surfaceColor = AppColors.surface(context);
+    final borderColor = AppColors.border(context);
+    final textPrimary = AppColors.textPrimary(context);
+    final textSecondary = AppColors.textSecondary(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.pie_chart_outline_rounded,
+                  size: 18,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Gastos por Categoria',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...spendingList.take(6).map((cat) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(cat.category.icon,
+                          size: 15, color: cat.category.color),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          cat.category.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${cat.percentage.toStringAsFixed(0)}% • ${AppFormatters.formatCurrency(cat.totalSpent)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (cat.percentage / 100.0).clamp(0.01, 1.0),
+                      minHeight: 5,
+                      backgroundColor: isDark
+                          ? const Color(0xFF282D37)
+                          : const Color(0xFFF3F4F6),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(cat.category.color),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMonthlySpendingCard(
     BuildContext context, {
     required String monthName,
@@ -790,7 +1361,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => _openProductAnalytics(context, product.displayName),
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 165,
+        width: 195,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: surfaceColor,
@@ -827,42 +1398,51 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Último',
-                      style: TextStyle(fontSize: 10, color: textSecondary),
-                    ),
-                    Text(
-                      AppFormatters.formatCurrency(product.lastPrice),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: textPrimary,
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Último',
+                        style: TextStyle(fontSize: 10, color: textSecondary),
                       ),
-                    ),
-                  ],
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          AppFormatters.formatCurrency(product.lastPrice),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isUp
-                        ? const Color(0xFFFEE2E2)
-                        : const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${isUp ? '+' : ''}${variation.toStringAsFixed(0)}% ${isUp ? '↗' : '↘'}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                const SizedBox(width: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
                       color: isUp
-                          ? const Color(0xFFDC2626)
-                          : const Color(0xFF15803D),
+                          ? const Color(0xFFFEE2E2)
+                          : const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${isUp ? '+' : ''}${variation.toStringAsFixed(0)}% ${isUp ? '↗' : '↘'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isUp
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF15803D),
+                      ),
                     ),
                   ),
                 ),

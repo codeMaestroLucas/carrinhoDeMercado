@@ -251,17 +251,23 @@ class PurchaseHistoryItem {
     required this.name,
     required this.category,
     required this.price,
+    this.quantity = 1.0,
+    this.unit = 'un',
   });
 
   final String name;
   final ProductCategory category;
   final double price;
+  final double quantity;
+  final String unit;
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
       'category': category.id,
       'price': price,
+      'quantity': quantity,
+      'unit': unit,
     };
   }
 
@@ -270,6 +276,8 @@ class PurchaseHistoryItem {
       name: json['name'] as String,
       category: ProductCategory.fromId(json['category'] as String?),
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
+      unit: (json['unit'] as String?) ?? 'un',
     );
   }
 }
@@ -316,3 +324,238 @@ class PurchaseRecord {
     );
   }
 }
+
+enum PantryItemStatus {
+  ok,
+  low,
+  expired,
+}
+
+class PantryItem {
+  PantryItem({
+    required this.id,
+    required this.name,
+    required this.category,
+    this.quantity = 1.0,
+    this.unit = 'un',
+    this.estimatedDaysToConsume = 14,
+    this.marketName,
+    this.price,
+    this.expiryDate,
+    DateTime? addedAt,
+  }) : addedAt = addedAt ?? DateTime.now();
+
+  final String id;
+  final String name;
+  final ProductCategory category;
+  final double quantity;
+  final String unit;
+  final int estimatedDaysToConsume;
+  final String? marketName;
+  final double? price;
+  final DateTime? expiryDate;
+  final DateTime addedAt;
+
+  int get daysSinceAdded => DateTime.now().difference(addedAt).inDays;
+
+  int get daysRemaining =>
+      (estimatedDaysToConsume - daysSinceAdded).clamp(0, 999);
+
+  bool get isExpired {
+    if (expiryDate == null) return false;
+    final now = DateTime.now();
+    return expiryDate!.isBefore(DateTime(now.year, now.month, now.day));
+  }
+
+  bool get isNearExpiry {
+    if (expiryDate == null) return false;
+    final now = DateTime.now();
+    final diff = expiryDate!.difference(now).inDays;
+    return diff >= 0 && diff <= 3;
+  }
+
+  PantryItemStatus get status {
+    if (isExpired) return PantryItemStatus.expired;
+    if (quantity <= 0.25 || daysRemaining <= 2) return PantryItemStatus.low;
+    return PantryItemStatus.ok;
+  }
+
+  PantryItem copyWith({
+    String? id,
+    String? name,
+    ProductCategory? category,
+    double? quantity,
+    String? unit,
+    int? estimatedDaysToConsume,
+    String? marketName,
+    double? price,
+    DateTime? expiryDate,
+    bool clearExpiry = false,
+    DateTime? addedAt,
+  }) {
+    return PantryItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      estimatedDaysToConsume:
+          estimatedDaysToConsume ?? this.estimatedDaysToConsume,
+      marketName: marketName ?? this.marketName,
+      price: price ?? this.price,
+      expiryDate: clearExpiry ? null : (expiryDate ?? this.expiryDate),
+      addedAt: addedAt ?? this.addedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'category': category.id,
+      'quantity': quantity,
+      'unit': unit,
+      'estimatedDaysToConsume': estimatedDaysToConsume,
+      'marketName': marketName,
+      'price': price,
+      'expiryDate': expiryDate?.toIso8601String(),
+      'addedAt': addedAt.toIso8601String(),
+    };
+  }
+
+  factory PantryItem.fromJson(Map<String, dynamic> json) {
+    return PantryItem(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      category: ProductCategory.fromId(json['category'] as String?),
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
+      unit: (json['unit'] as String?)?.trim().isNotEmpty == true
+          ? (json['unit'] as String).trim()
+          : 'un',
+      estimatedDaysToConsume:
+          (json['estimatedDaysToConsume'] as num?)?.toInt() ?? 14,
+      marketName: json['marketName'] as String?,
+      price: (json['price'] as num?)?.toDouble(),
+      expiryDate: json['expiryDate'] != null
+          ? DateTime.tryParse(json['expiryDate'] as String)
+          : null,
+      addedAt: json['addedAt'] != null
+          ? DateTime.tryParse(json['addedAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+}
+
+enum RepurchaseUrgency {
+  urgent, // Jogo rápido: já passou do ciclo estimado
+  moderate, // Na janela: faltam poucos dias
+  low, // Apenas sugestão
+}
+
+class ReplenishmentSuggestion {
+  const ReplenishmentSuggestion({
+    required this.productName,
+    required this.category,
+    required this.averageIntervalDays,
+    required this.daysSinceLastPurchase,
+    required this.lastPrice,
+    required this.lastMarket,
+    required this.urgency,
+  });
+
+  final String productName;
+  final ProductCategory category;
+  final int averageIntervalDays;
+  final int daysSinceLastPurchase;
+  final double lastPrice;
+  final String lastMarket;
+  final RepurchaseUrgency urgency;
+}
+
+class ProductVariationItem {
+  const ProductVariationItem({
+    required this.productName,
+    required this.category,
+    required this.currentPrice,
+    required this.previousPrice,
+    required this.variationPercent,
+    required this.marketName,
+  });
+
+  final String productName;
+  final ProductCategory category;
+  final double currentPrice;
+  final double previousPrice;
+  final double variationPercent;
+  final String marketName;
+}
+
+class PriceIndexSummary {
+  const PriceIndexSummary({
+    required this.periodLabel,
+    required this.overallVariationPercent,
+    required this.totalComparedItems,
+    required this.increasedCount,
+    required this.decreasedCount,
+    required this.stableCount,
+    required this.topIncreases,
+    required this.topDecreases,
+  });
+
+  final String periodLabel;
+  final double overallVariationPercent;
+  final int totalComparedItems;
+  final int increasedCount;
+  final int decreasedCount;
+  final int stableCount;
+  final List<ProductVariationItem> topIncreases;
+  final List<ProductVariationItem> topDecreases;
+}
+
+class CategorySpendingSummary {
+  const CategorySpendingSummary({
+    required this.category,
+    required this.totalSpent,
+    required this.percentage,
+    required this.itemCount,
+  });
+
+  final ProductCategory category;
+  final double totalSpent;
+  final double percentage;
+  final int itemCount;
+}
+
+class ProductHistoryOccurrence {
+  const ProductHistoryOccurrence({
+    required this.productName,
+    required this.category,
+    required this.price,
+    required this.marketName,
+    required this.date,
+  });
+
+  final String productName;
+  final ProductCategory category;
+  final double price;
+  final String marketName;
+  final DateTime date;
+}
+
+class MarketProductStats {
+  const MarketProductStats({
+    required this.marketName,
+    required this.averagePrice,
+    required this.lastPrice,
+    required this.lastDate,
+    required this.purchaseCount,
+  });
+
+  final String marketName;
+  final double averagePrice;
+  final double lastPrice;
+  final DateTime lastDate;
+  final int purchaseCount;
+}
+
+

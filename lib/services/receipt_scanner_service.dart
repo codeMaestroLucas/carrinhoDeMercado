@@ -7,11 +7,15 @@ class ScannedReceiptItem {
     required this.name,
     required this.price,
     this.category,
+    this.quantity = 1.0,
+    this.unit = 'un',
   });
 
   String name;
   double price;
   ProductCategory? category;
+  double quantity;
+  String unit;
 }
 
 class ReceiptScannerService {
@@ -214,9 +218,11 @@ class ReceiptScannerService {
     for (final keyword in _ignoredReceiptKeywords) {
       if (lower.contains(keyword)) return true;
     }
-    // Ignore lines that are just dates/times or long numeric keys (44-digit NFC-e access key)
+    // Ignore lines that are purely long numeric keys (44-digit NFC-e access key) without product words
     final digitsOnly = line.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length >= 18) return true;
+    if (digitsOnly.length >= 35 && !RegExp(r'[a-zA-ZÀ-ÿ]{3,}').hasMatch(line)) {
+      return true;
+    }
     if (RegExp(r'^\d{2}/\d{2}/\d{2,4}').hasMatch(line)) return true;
     return false;
   }

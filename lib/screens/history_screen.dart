@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
+import '../services/nfce_scanner_service.dart';
 import '../services/receipt_scanner_service.dart';
 import '../services/shopping_controller.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
+import 'nfce_qr_scanner_screen.dart';
+import 'nfce_webview_screen.dart';
+import 'pantry_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({
@@ -18,38 +22,6 @@ class HistoryScreen extends StatefulWidget {
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
-}
-
-class ProductHistoryOccurrence {
-  const ProductHistoryOccurrence({
-    required this.productName,
-    required this.category,
-    required this.price,
-    required this.marketName,
-    required this.date,
-  });
-
-  final String productName;
-  final ProductCategory category;
-  final double price;
-  final String marketName;
-  final DateTime date;
-}
-
-class MarketProductStats {
-  const MarketProductStats({
-    required this.marketName,
-    required this.averagePrice,
-    required this.lastPrice,
-    required this.lastDate,
-    required this.purchaseCount,
-  });
-
-  final String marketName;
-  final double averagePrice;
-  final double lastPrice;
-  final DateTime lastDate;
-  final int purchaseCount;
 }
 
 class ProductHistoryAggregate {
@@ -241,6 +213,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  void _promptAddToPantry(PurchaseRecord record) {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface(context),
+          title: const Row(
+            children: [
+              Icon(Icons.kitchen_outlined, color: AppColors.primaryGreen),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Enviar para a Despensa?'),
+              ),
+            ],
+          ),
+          content: Text(
+            'Deseja adicionar os ${record.items.length} itens desta compra à sua Despensa para acompanhar o consumo e evitar compras duplicadas?',
+            style: TextStyle(color: AppColors.textPrimary(context)),
+          ),
+          actionsOverflowDirection: VerticalDirection.down,
+          actionsOverflowButtonSpacing: 8,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Agora Não'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                widget.controller.addPurchaseItemsToPantry(
+                  record.items,
+                  marketName: record.marketName,
+                );
+                Navigator.of(dialogCtx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${record.items.length} itens enviados para sua Despensa!',
+                    ),
+                    backgroundColor: AppColors.primaryGreen,
+                    action: SnackBarAction(
+                      label: 'Ver Despensa',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PantryScreen(
+                              controller: widget.controller,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Adicionar à Despensa'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _showAddReceiptPurchaseModal() async {
     final imagePicker = ImagePicker();
     String selectedMarketId = widget.controller.selectedMarket.id;
@@ -401,6 +441,135 @@ class _HistoryScreenState extends State<HistoryScreen> {
               );
             }
 
+            Future<void> handleNfceQrOrUrl(String rawInput) async {
+              final targetUrl =
+                  NfceScannerService.resolveUrlFromInput(rawInput);
+              final accessKey = NfceScannerService.extractAccessKey(rawInput);
+
+              if (targetUrl == null) {
+                setModalState(() {
+                  scanError =
+                      'Não foi possível extrair um link válido de NFC-e ou chave de acesso de 44 dígitos.';
+                });
+                return;
+              }
+
+              // Abre o In-App WebView com monitoramento de Captcha e extração automática de DOM
+              final result = await Navigator.of(context).push<NfceParsedResult>(
+                MaterialPageRoute(
+                  builder: (_) => NfceWebViewScreen(
+                    url: targetUrl,
+                    accessKey: accessKey,
+                  ),
+                ),
+              );
+
+              if (result != null && result.isSuccess) {
+                setModalState(() {
+                  scannedItems
+                    ..clear()
+                    ..addAll(result.items);
+
+                  if (result.marketName != null &&
+                      result.marketName!.isNotEmpty) {
+                    final normalizedName =
+                        CategoryClassifier.normalize(result.marketName!);
+                    final existingMarket = widget.controller.markets.firstWhere(
+                      (m) =>
+                          CategoryClassifier.normalize(m.name) ==
+                          normalizedName,
+                      orElse: () =>
+                          MarketProfile(id: '', name: '', categoryOrder: []),
+                    );
+                    if (existingMarket.id.isNotEmpty) {
+                      selectedMarketId = existingMarket.id;
+                      isCreatingNewMarket = false;
+                    } else {
+                      newMarketController.text = result.marketName!;
+                      isCreatingNewMarket = true;
+                    }
+                  }
+                });
+              }
+            }
+
+            Future<void> openLiveQrScanner() async {
+              final scannedValue = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (_) => const NfceQrScannerScreen(),
+                ),
+              );
+
+              if (scannedValue != null && scannedValue.trim().isNotEmpty) {
+                await handleNfceQrOrUrl(scannedValue.trim());
+              }
+            }
+
+            Future<void> showPasteNfceDialog() async {
+              final linkController = TextEditingController();
+              await showDialog<void>(
+                context: context,
+                builder: (dialogCtx) {
+                  return AlertDialog(
+                    backgroundColor: AppColors.surface(context),
+                    title: const Row(
+                      children: [
+                        Icon(Icons.qr_code_2_rounded,
+                            color: AppColors.primaryGreen),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Link ou Chave NFC-e'),
+                        ),
+                      ],
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Cole a URL do QR Code da NFC-e ou os 44 dígitos da Chave de Acesso da nota fiscal:',
+                          style: TextStyle(fontSize: 13, color: textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: linkController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'https://... ou 3524 0112 3456...',
+                            filled: true,
+                            fillColor: subtleBg,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    actionsOverflowDirection: VerticalDirection.down,
+                    actionsOverflowButtonSpacing: 8,
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
+                        child: const Text('Cancelar'),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                        ),
+                        onPressed: () {
+                          final text = linkController.text.trim();
+                          if (text.isNotEmpty) {
+                            Navigator.of(dialogCtx).pop();
+                            handleNfceQrOrUrl(text);
+                          }
+                        },
+                        child: const Text('Abrir SEFAZ'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
+
             Future<void> pickAndScanImage(ImageSource source) async {
               try {
                 final pickedFile = await imagePicker.pickImage(
@@ -414,10 +583,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   scanError = null;
                 });
 
+                // Leitura 100% offline via OCR do Google ML Kit
                 final rawText =
                     await ReceiptScannerService.recognizeTextFromImage(
                   pickedFile.path,
                 );
+
                 final extracted =
                     ReceiptScannerService.parseReceiptText(rawText);
 
@@ -425,7 +596,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   isScanning = false;
                   if (extracted.isEmpty) {
                     scanError =
-                        'Não foi possível identificar produtos e preços automaticamente nesta imagem. Tente tirar uma foto mais próxima dos itens da nota ou adicione abaixo.';
+                        'Não foi possível identificar produtos e preços no texto da foto. Tente uma imagem mais nítida e bem iluminada ou adicione manualmente abaixo.';
                   } else {
                     scannedItems
                       ..clear()
@@ -457,10 +628,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.85,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     Row(
                       children: [
                         const Icon(
@@ -563,7 +735,133 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     const SizedBox(height: 12),
 
-                    // Step 2: Camera / Gallery buttons to scan the Nota Fiscal image
+                    // Card: Leitura de QR Code NFC-e com In-App WebView anti-Captcha
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGreen.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.primaryGreen.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.qr_code_scanner_rounded,
+                                color: AppColors.primaryGreen,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Importar via QR Code da NFC-e',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.accentGreen,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGreen,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'OFICIAL SEFAZ',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Lê os produtos direto da SEFAZ com validação de Captcha integrada no app:',
+                            style:
+                                TextStyle(fontSize: 11.5, color: textSecondary),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.primaryGreen,
+                                    foregroundColor: Colors.white,
+                                    visualDensity: VisualDensity.compact,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed:
+                                      isScanning ? null : openLiveQrScanner,
+                                  icon: const Icon(Icons.qr_code_scanner,
+                                      size: 16),
+                                  label: const Text(
+                                    'Escanear QR',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  onPressed:
+                                      isScanning ? null : showPasteNfceDialog,
+                                  icon: const Icon(Icons.paste_rounded,
+                                      size: 16),
+                                  label: const Text(
+                                    'Colar Link/Chave',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Camera / Gallery buttons to scan the Nota Fiscal image via Offline OCR
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Ou fotografar cupom impresso (OCR offline):',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
@@ -755,76 +1053,75 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Flexible(
-                        child: Material(
-                          color: AppColors.surface(context),
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            itemCount: scannedItems.length,
-                            separatorBuilder: (_, _) => Divider(
-                              height: 1,
-                              color: AppColors.divider(context),
-                            ),
-                            itemBuilder: (context, idx) {
-                              final item = scannedItems[idx];
-                              final cat = item.category ??
-                                  widget.controller.predictCategory(item.name);
-                              return ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: Icon(
-                                  cat.icon,
-                                  color: cat.color,
-                                  size: 18,
-                                ),
-                                title: Text(
-                                  item.name,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: textPrimary,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  cat.label,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: cat.color,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                onTap: () => showEditScannedItemDialog(idx),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      AppFormatters.formatCurrency(item.price),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: 'Remover',
-                                      icon: Icon(
-                                        Icons.close_rounded,
-                                        size: 16,
-                                        color: textSecondary,
-                                      ),
-                                      onPressed: () {
-                                        setModalState(() {
-                                          scannedItems.removeAt(idx);
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                      Material(
+                        color: AppColors.surface(context),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: scannedItems.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            color: AppColors.divider(context),
                           ),
+                          itemBuilder: (context, idx) {
+                            final item = scannedItems[idx];
+                            final cat = item.category ??
+                                widget.controller.predictCategory(item.name);
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                cat.icon,
+                                color: cat.color,
+                                size: 18,
+                              ),
+                              title: Text(
+                                item.name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              subtitle: Text(
+                                cat.label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cat.color,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onTap: () => showEditScannedItemDialog(idx),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    AppFormatters.formatCurrency(item.price),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'Remover',
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: textSecondary,
+                                    ),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        scannedItems.removeAt(idx);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -849,6 +1146,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   category: s.category ??
                                       widget.controller.predictCategory(s.name),
                                   price: s.price,
+                                  quantity: s.quantity > 0 ? s.quantity : 1.0,
+                                  unit: s.unit.isNotEmpty ? s.unit : 'un',
                                 );
                               }).toList();
 
@@ -859,14 +1158,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               );
                               Navigator.of(modalContext).pop();
                               if (mounted && record != null) {
-                                ScaffoldMessenger.of(this.context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Nota Fiscal salva em ${record.marketName} (${record.items.length} itens)!',
-                                    ),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                _promptAddToPantry(record);
                               }
                             },
                       style: FilledButton.styleFrom(
@@ -884,7 +1176,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ],
                 ),
               ),
-            );
+            ),
+          );
           },
         );
       },
@@ -943,7 +1236,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
             ),
           ),
-          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Minha Despensa',
+            icon: Badge(
+              isLabelVisible: controller.lowStockPantryCount > 0,
+              backgroundColor: const Color(0xFFD97706),
+              label: Text('${controller.lowStockPantryCount}'),
+              child: const Icon(Icons.kitchen_outlined, size: 21),
+            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PantryScreen(controller: controller),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
             onPressed: controller.toggleDarkMode,

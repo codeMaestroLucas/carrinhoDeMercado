@@ -286,16 +286,9 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
                             ),
                             label: 'Lista',
                           ),
-                          NavigationDestination(
-                            icon: Badge(
-                              isLabelVisible: _controller.history.isNotEmpty,
-                              backgroundColor: AppColors.accentGreen,
-                              textColor: Colors.white,
-                              label: Text('${_controller.history.length}'),
-                              child: const Icon(Icons.receipt_long_outlined),
-                            ),
-                            selectedIcon:
-                                const Icon(Icons.receipt_long_rounded),
+                          const NavigationDestination(
+                            icon: Icon(Icons.receipt_long_outlined),
+                            selectedIcon: Icon(Icons.receipt_long_rounded),
                             label: 'Histórico',
                           ),
                           const NavigationDestination(

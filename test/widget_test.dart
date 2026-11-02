@@ -63,11 +63,11 @@ CARTAO DE CREDITO 42,29
 ''';
       final extracted = ReceiptScannerService.parseReceiptText(sampleReceipt);
       expect(extracted.length, 3);
-      expect(extracted[0].name, 'Arroz t1 camil 5kg');
+      expect(extracted[0].name, 'Arroz');
       expect(extracted[0].price.toStringAsFixed(2), '24.90');
-      expect(extracted[1].name, 'Feijao carioca 1kg');
+      expect(extracted[1].name, 'Feijao Carioca');
       expect(extracted[1].price.toStringAsFixed(2), '15.00');
-      expect(extracted[2].name, 'Detergente ype 500ml');
+      expect(extracted[2].name, 'Detergente Ype');
       expect(extracted[2].price.toStringAsFixed(2), '2.39');
     });
   });
@@ -103,9 +103,9 @@ CARTAO DE CREDITO 42,29
         expect(find.text('Feijão'), findsOneWidget);
         expect(find.text('Detergente'), findsOneWidget);
 
-        // Verify Checkbox was removed and tapping the item opens the price configuration panel
+        // Verify Checkbox was removed and long-pressing opens the price configuration panel
         expect(find.byType(Checkbox), findsNothing);
-        await tester.tap(find.text('Arroz'));
+        await tester.longPress(find.text('Arroz'));
         await tester.pumpAndSettle();
         expect(find.text('Configurar Preço e Produto'), findsOneWidget);
         await tester.tap(find.byIcon(Icons.close).first);

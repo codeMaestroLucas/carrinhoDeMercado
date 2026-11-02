@@ -5,6 +5,7 @@ import '../services/category_classifier.dart';
 import '../services/shopping_controller.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
+import 'pantry_screen.dart';
 
 class ShoppingListScreen extends StatefulWidget {
   const ShoppingListScreen({
@@ -392,10 +393,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     );
   }
 
-  Future<void> _showEditItemModal(
-    ShoppingItem item, {
-    bool focusPrice = false,
-  }) async {
+  Future<void> _showEditItemModal(ShoppingItem item) async {
     final nameController = TextEditingController(text: item.name);
     final priceController = TextEditingController(
       text: item.price != null && item.price! > 0
@@ -413,13 +411,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     }
 
     String? errorText;
-    final recommendations =
-        widget.controller.marketRecommendationsForProduct(item.name);
-    final recByMarketId = {
-      for (final r in recommendations) r.market.id: r,
-    };
-    final cheapestMarketId =
-        recommendations.isNotEmpty ? recommendations.first.market.id : null;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -869,8 +860,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           return;
                         }
                         Navigator.of(modalContext).pop();
-                        if (categoryChanged && this.mounted) {
-                          ScaffoldMessenger.of(this.context).showSnackBar(
+                        if (categoryChanged && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
                                 '"$newName" registrado na categoria ${selectedCategory.label}!',
@@ -891,6 +882,74 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  void _promptAddToPantry(PurchaseRecord record) {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface(context),
+          title: const Row(
+            children: [
+              Icon(Icons.kitchen_outlined, color: AppColors.primaryGreen),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Enviar para a Despensa?'),
+              ),
+            ],
+          ),
+          content: Text(
+            'Compra finalizada com sucesso! Deseja enviar estes ${record.items.length} itens para a sua Despensa?',
+            style: TextStyle(color: AppColors.textPrimary(context)),
+          ),
+          actionsOverflowDirection: VerticalDirection.down,
+          actionsOverflowButtonSpacing: 8,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Agora Não'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                widget.controller.addPurchaseItemsToPantry(
+                  record.items,
+                  marketName: record.marketName,
+                );
+                Navigator.of(dialogCtx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${record.items.length} itens enviados para a Despensa!',
+                    ),
+                    backgroundColor: AppColors.primaryGreen,
+                    action: SnackBarAction(
+                      label: 'Ver Despensa',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PantryScreen(
+                              controller: widget.controller,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Adicionar à Despensa'),
+            ),
+          ],
         );
       },
     );
@@ -969,6 +1028,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   ),
                 ],
               ),
+              actionsOverflowDirection: VerticalDirection.down,
+              actionsOverflowButtonSpacing: 8,
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
@@ -988,14 +1049,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           );
                           Navigator.of(dialogContext).pop();
                           if (mounted && record != null) {
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Compra salva no histórico (${record.marketName})!',
-                                ),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            _promptAddToPantry(record);
                           }
                         },
                   child: const Text('Salvar no Histórico'),
@@ -1182,6 +1236,15 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           ),
                         ),
 
+                        // Smart Replenishment Suggestion Card ("Itens que costumam acabar por agora")
+                        if (controller.replenishmentSuggestions.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildSmartReplenishmentCard(
+                            context,
+                            controller.replenishmentSuggestions,
+                          ),
+                        ],
+
                         // Intuitive Market Savings Guide ("Quais itens podem ser comprados mais baratos em tal mercado")
                         if (bargainGroups.isNotEmpty) ...[
                           const SizedBox(height: 10),
@@ -1346,6 +1409,91 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildSmartReplenishmentCard(
+    BuildContext context,
+    List<ReplenishmentSuggestion> suggestions,
+  ) {
+    final textSecondary = AppColors.textSecondary(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF2C2416)
+            : const Color(0xFFFEF3C7).withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF523D1E) : const Color(0xFFFCD34D),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline_rounded,
+                size: 18,
+                color: Color(0xFFD97706),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '💡 Sugestões de Recompra (${suggestions.length})',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? const Color(0xFFFBBF24)
+                        : const Color(0xFF92400E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Costumam acabar por agora segundo sua frequência:',
+            style: TextStyle(fontSize: 11.5, color: textSecondary),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: suggestions.take(6).map((sugg) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: Icon(sugg.category.icon,
+                        size: 14, color: sugg.category.color),
+                    label: Text('+ ${sugg.productName}'),
+                    onPressed: () {
+                      widget.controller.addSingleItem(
+                        sugg.productName,
+                        category: sugg.category,
+                        price: sugg.lastPrice > 0 ? sugg.lastPrice : null,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content:
+                              Text('${sugg.productName} adicionado à lista!'),
+                          backgroundColor: AppColors.primaryGreen,
+                        ),
+                      );
+                      setState(() {});
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1528,6 +1676,19 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                _GlassCircleIconButton(
+                  tooltip: 'Minha Despensa',
+                  icon: Icons.kitchen_outlined,
+                  badgeCount: controller.lowStockPantryCount,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => PantryScreen(controller: controller),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
                 _GlassCircleIconButton(
                   tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
                   icon: isDark
@@ -1991,19 +2152,30 @@ class _GlassCircleIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.tooltip,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
+    Widget iconWidget = _GlassCircleIcon(icon: icon);
+    if (badgeCount > 0) {
+      iconWidget = Badge(
+        backgroundColor: const Color(0xFFD97706),
+        label: Text('$badgeCount'),
+        child: iconWidget,
+      );
+    }
+
     return Tooltip(
       message: tooltip ?? '',
       child: GestureDetector(
         onTap: onTap,
-        child: _GlassCircleIcon(icon: icon),
+        child: iconWidget,
       ),
     );
   }

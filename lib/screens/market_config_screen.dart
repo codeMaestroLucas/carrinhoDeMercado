@@ -588,7 +588,6 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
               itemBuilder: (context, index) {
                 final category = categories[index];
                 final isFirst = index == 0;
-                final isLast = index == categories.length - 1;
 
                 return Padding(
                   key: ValueKey('${activeMarket.id}_${category.id}'),

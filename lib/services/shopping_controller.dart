@@ -34,6 +34,7 @@ class ShoppingController extends ChangeNotifier {
   String _selectedMarketId = 'mercado_padrao';
   bool _filterBySelectedMarket = false;
   List<PurchaseRecord> _history = [];
+  List<PantryItem> _pantryItems = [];
   Map<String, ProductCategory> _learnedCategories = {};
   Map<ProductCategory, List<String>> _categoryDictionary = {};
 
@@ -49,6 +50,12 @@ class ShoppingController extends ChangeNotifier {
   List<ShoppingItem> get allItems => List.unmodifiable(_items);
   List<MarketProfile> get markets => List.unmodifiable(_markets);
   List<PurchaseRecord> get history => List.unmodifiable(_history);
+  List<PantryItem> get pantryItems => List.unmodifiable(_pantryItems);
+  int get lowStockPantryCount => _pantryItems
+      .where((p) =>
+          p.status == PantryItemStatus.low ||
+          p.status == PantryItemStatus.expired)
+      .length;
   ProductCategory? get categoryFilter => _categoryFilter;
   bool get showCheckedItems => _showCheckedItems;
   bool get isDarkMode => _isDarkMode;
@@ -669,6 +676,8 @@ class ShoppingController extends ChangeNotifier {
               name: e.name,
               category: e.category,
               price: e.effectiveTotalAmount,
+              quantity: e.quantity > 0 ? e.quantity.toDouble() : 1.0,
+              unit: e.unit.isNotEmpty ? e.unit : 'un',
             ),
           )
           .toList(),
@@ -717,6 +726,376 @@ class ShoppingController extends ChangeNotifier {
     _history.removeWhere((r) => r.id == recordId);
     _saveToDisk();
     notifyListeners();
+  }
+
+  // ==========================================
+  // Despensa Inteligente (Pantry) Methods
+  // ==========================================
+
+  void addToPantry(List<PantryItem> newItems) {
+    if (newItems.isEmpty) return;
+    for (final item in newItems) {
+      final normalized = CategoryClassifier.normalize(item.name);
+      final index = _pantryItems.indexWhere(
+        (p) => CategoryClassifier.normalize(p.name) == normalized,
+      );
+      if (index != -1) {
+        final existing = _pantryItems[index];
+        _pantryItems[index] = existing.copyWith(
+          quantity: existing.quantity + item.quantity,
+          unit: item.unit.isNotEmpty ? item.unit : existing.unit,
+          price: item.price ?? existing.price,
+          marketName: item.marketName ?? existing.marketName,
+          addedAt: DateTime.now(),
+        );
+      } else {
+        _pantryItems.add(item);
+      }
+    }
+    _saveToDisk();
+    notifyListeners();
+  }
+
+  void addPurchaseItemsToPantry(
+    List<PurchaseHistoryItem> items, {
+    String? marketName,
+  }) {
+    if (items.isEmpty) return;
+    final now = DateTime.now();
+    final pantryToAdd = <PantryItem>[];
+
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      int days = 14;
+      switch (item.category) {
+        case ProductCategory.alimentos:
+          days = 15;
+          break;
+        case ProductCategory.bebidas:
+          days = 10;
+          break;
+        case ProductCategory.limpeza:
+          days = 30;
+          break;
+        case ProductCategory.perfumariaHigiene:
+          days = 25;
+          break;
+        case ProductCategory.bebeCrianca:
+          days = 15;
+          break;
+        case ProductCategory.descartaveis:
+          days = 30;
+          break;
+        case ProductCategory.petShop:
+          days = 20;
+          break;
+        case ProductCategory.bazar:
+        case ProductCategory.diversos:
+          days = 40;
+          break;
+      }
+
+      pantryToAdd.add(
+        PantryItem(
+          id: 'pantry_${now.microsecondsSinceEpoch}_$i',
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity > 0 ? item.quantity : 1.0,
+          unit: item.unit.isNotEmpty ? item.unit : 'un',
+          estimatedDaysToConsume: days,
+          marketName: marketName,
+          price: item.price,
+          addedAt: now,
+        ),
+      );
+    }
+
+    addToPantry(pantryToAdd);
+  }
+
+  void updatePantryItem(PantryItem item) {
+    final index = _pantryItems.indexWhere((p) => p.id == item.id);
+    if (index == -1) return;
+    _pantryItems[index] = item;
+    _saveToDisk();
+    notifyListeners();
+  }
+
+  void updatePantryItemQuantity(String id, double delta) {
+    final index = _pantryItems.indexWhere((p) => p.id == id);
+    if (index == -1) return;
+    final current = _pantryItems[index];
+    final rawQty = (current.quantity + delta).clamp(0.0, 999.0);
+    final newQty = double.parse(rawQty.toStringAsFixed(2));
+    _pantryItems[index] = current.copyWith(quantity: newQty);
+    _saveToDisk();
+    notifyListeners();
+  }
+
+  void removePantryItem(String id) {
+    _pantryItems.removeWhere((p) => p.id == id);
+    _saveToDisk();
+    notifyListeners();
+  }
+
+  void clearPantry() {
+    _pantryItems.clear();
+    _saveToDisk();
+    notifyListeners();
+  }
+
+  double getQuantityOnShoppingList(String productName) {
+    final norm = CategoryClassifier.normalize(productName);
+    if (norm.isEmpty) return 0.0;
+    double total = 0.0;
+    for (final item in _items) {
+      if (CategoryClassifier.normalize(item.name) == norm) {
+        total += item.quantity;
+      }
+    }
+    return total;
+  }
+
+  bool addPantryItemToShoppingList(PantryItem pantryItem) {
+    if (isDuplicateItemName(pantryItem.name)) return false;
+    final bestMarket = recommendCheapestMarketForProduct(pantryItem.name);
+    final targetQty = pantryItem.quantity > 0
+        ? (pantryItem.quantity % 1 == 0
+            ? pantryItem.quantity.toInt()
+            : pantryItem.quantity.ceil())
+        : 1;
+    _items.add(
+      ShoppingItem(
+        id: '${DateTime.now().microsecondsSinceEpoch}_${_items.length}',
+        name: pantryItem.name,
+        category: pantryItem.category,
+        marketId: bestMarket?.market.id ?? _selectedMarketId,
+        quantity: targetQty > 0 ? targetQty : 1,
+        unit: pantryItem.unit,
+        price: pantryItem.price,
+      ),
+    );
+    _saveToDisk();
+    notifyListeners();
+    return true;
+  }
+
+  // ==========================================
+  // Sugestões de Recompra Inteligente
+  // ==========================================
+
+  List<ReplenishmentSuggestion> get replenishmentSuggestions {
+    final suggestions = <ReplenishmentSuggestion>[];
+    final occurrencesByProduct = <String, List<ProductHistoryOccurrence>>{};
+    final displayNames = <String, String>{};
+    final categories = <String, ProductCategory>{};
+
+    for (final record in _history) {
+      for (final item in record.items) {
+        final key = CategoryClassifier.normalize(item.name);
+        if (key.isEmpty) continue;
+        displayNames.putIfAbsent(key, () => item.name);
+        categories.putIfAbsent(key, () => item.category);
+        occurrencesByProduct.putIfAbsent(key, () => []).add(
+              ProductHistoryOccurrence(
+                productName: item.name,
+                category: item.category,
+                price: item.price,
+                marketName: record.marketName,
+                date: record.date,
+              ),
+            );
+      }
+    }
+
+    final now = DateTime.now();
+
+    for (final entry in occurrencesByProduct.entries) {
+      final key = entry.key;
+      final alreadyInList = _items.any((i) =>
+          CategoryClassifier.normalize(i.name) == key && !i.isChecked);
+      if (alreadyInList) continue;
+
+      final list = entry.value..sort((a, b) => a.date.compareTo(b.date));
+      if (list.length < 2) continue;
+
+      int totalIntervalDays = 0;
+      for (var i = 1; i < list.length; i++) {
+        final int diff = list[i].date.difference(list[i - 1].date).inDays;
+        totalIntervalDays += diff > 0 ? diff : 1;
+      }
+      final avgInterval = (totalIntervalDays / (list.length - 1)).round();
+      if (avgInterval <= 0) continue;
+
+      final lastPurchase = list.last;
+      final daysSinceLast = now.difference(lastPurchase.date).inDays;
+
+      if (daysSinceLast >= (avgInterval * 0.75).round()) {
+        final RepurchaseUrgency urgency;
+        if (daysSinceLast >= avgInterval) {
+          urgency = RepurchaseUrgency.urgent;
+        } else {
+          urgency = RepurchaseUrgency.moderate;
+        }
+
+        suggestions.add(
+          ReplenishmentSuggestion(
+            productName: displayNames[key]!,
+            category: categories[key]!,
+            averageIntervalDays: avgInterval,
+            daysSinceLastPurchase: daysSinceLast,
+            lastPrice: lastPurchase.price,
+            lastMarket: lastPurchase.marketName,
+            urgency: urgency,
+          ),
+        );
+      }
+    }
+
+    suggestions.sort((a, b) {
+      if (a.urgency != b.urgency) {
+        return a.urgency == RepurchaseUrgency.urgent ? -1 : 1;
+      }
+      final ratioA = a.daysSinceLastPurchase /
+          (a.averageIntervalDays > 0 ? a.averageIntervalDays : 1);
+      final ratioB = b.daysSinceLastPurchase /
+          (b.averageIntervalDays > 0 ? b.averageIntervalDays : 1);
+      return ratioB.compareTo(ratioA);
+    });
+
+    return suggestions;
+  }
+
+  // ==========================================
+  // Índice de Preços e Análise de Inflação
+  // ==========================================
+
+  PriceIndexSummary calculatePriceIndex({int daysWindow = 60}) {
+    final now = DateTime.now();
+    final cutoffDate = now.subtract(Duration(days: daysWindow));
+
+    final productsMap = <String, List<ProductHistoryOccurrence>>{};
+    for (final record in _history) {
+      for (final item in record.items) {
+        if (item.price <= 0) continue;
+        final key = CategoryClassifier.normalize(item.name);
+        if (key.isEmpty) continue;
+        productsMap.putIfAbsent(key, () => []).add(
+              ProductHistoryOccurrence(
+                productName: item.name,
+                category: item.category,
+                price: item.price,
+                marketName: record.marketName,
+                date: record.date,
+              ),
+            );
+      }
+    }
+
+    final variations = <ProductVariationItem>[];
+    var increasedCount = 0;
+    var decreasedCount = 0;
+    var stableCount = 0;
+    var totalVariationSum = 0.0;
+
+    for (final entry in productsMap.entries) {
+      final list = entry.value..sort((a, b) => b.date.compareTo(a.date));
+      if (list.length < 2) continue;
+
+      final latest = list[0];
+      if (latest.date.isBefore(cutoffDate)) continue;
+
+      final previous = list[1];
+      if (previous.price <= 0) continue;
+
+      final diffPercent =
+          ((latest.price - previous.price) / previous.price) * 100.0;
+      totalVariationSum += diffPercent;
+
+      if (diffPercent > 0.5) {
+        increasedCount++;
+      } else if (diffPercent < -0.5) {
+        decreasedCount++;
+      } else {
+        stableCount++;
+      }
+
+      variations.add(
+        ProductVariationItem(
+          productName: latest.productName,
+          category: latest.category,
+          currentPrice: latest.price,
+          previousPrice: previous.price,
+          variationPercent: diffPercent,
+          marketName: latest.marketName,
+        ),
+      );
+    }
+
+    final overallVariation =
+        variations.isNotEmpty ? totalVariationSum / variations.length : 0.0;
+
+    final topIncreases =
+        variations.where((v) => v.variationPercent > 0.5).toList()
+          ..sort((a, b) => b.variationPercent.compareTo(a.variationPercent));
+
+    final topDecreases =
+        variations.where((v) => v.variationPercent < -0.5).toList()
+          ..sort((a, b) => a.variationPercent.compareTo(b.variationPercent));
+
+    return PriceIndexSummary(
+      periodLabel: 'Últimos $daysWindow dias',
+      overallVariationPercent: overallVariation,
+      totalComparedItems: variations.length,
+      increasedCount: increasedCount,
+      decreasedCount: decreasedCount,
+      stableCount: stableCount,
+      topIncreases: topIncreases.take(6).toList(),
+      topDecreases: topDecreases.take(6).toList(),
+    );
+  }
+
+  // ==========================================
+  // Gastos por Categoria
+  // ==========================================
+
+  List<CategorySpendingSummary> calculateCategorySpending({
+    DateTime? startDate,
+  }) {
+    final spendingMap = <ProductCategory, double>{};
+    final countMap = <ProductCategory, int>{};
+    var total = 0.0;
+
+    for (final record in _history) {
+      if (startDate != null && record.date.isBefore(startDate)) continue;
+      for (final item in record.items) {
+        if (item.price <= 0) continue;
+        spendingMap[item.category] =
+            (spendingMap[item.category] ?? 0.0) + item.price;
+        countMap[item.category] = (countMap[item.category] ?? 0) + 1;
+        total += item.price;
+      }
+    }
+
+    if (total <= 0) return const [];
+
+    final result = <CategorySpendingSummary>[];
+    for (final cat in ProductCategory.values) {
+      final amount = spendingMap[cat] ?? 0.0;
+      if (amount > 0) {
+        result.add(
+          CategorySpendingSummary(
+            category: cat,
+            totalSpent: amount,
+            percentage: (amount / total) * 100.0,
+            itemCount: countMap[cat] ?? 0,
+          ),
+        );
+      }
+    }
+
+    result.sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
+    return result;
   }
 
   void selectMarket(String marketId) {
@@ -871,6 +1250,7 @@ class ShoppingController extends ChangeNotifier {
       'markets': _markets.map((m) => m.toJson()).toList(),
       'selectedMarketId': _selectedMarketId,
       'history': _history.map((h) => h.toJson()).toList(),
+      'pantry': _pantryItems.map((p) => p.toJson()).toList(),
       'learnedCategories': {
         for (final entry in _learnedCategories.entries)
           entry.key: entry.value.id,
@@ -892,6 +1272,13 @@ class ShoppingController extends ChangeNotifier {
       final seen = <String>{};
       _items = loaded
           .where((item) => seen.add(CategoryClassifier.normalize(item.name)))
+          .toList();
+    }
+
+    if (data['pantry'] is List) {
+      _pantryItems = (data['pantry'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(PantryItem.fromJson)
           .toList();
     }
 

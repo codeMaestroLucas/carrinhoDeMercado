@@ -67,7 +67,7 @@ class CategoryClassifier {
         }
         // Words ending in 'res' -> 'r' (e.g. bombons, hambúrgueres -> hamburguer)
         if (word.endsWith('res') && word.length > 4) {
-          resultWords.add('${word.substring(0, word.length - 2)}');
+          resultWords.add(word.substring(0, word.length - 2));
           continue;
         }
         // Words ending in 'is' (e.g. pasteis -> pastel, pinceis -> pincel)
