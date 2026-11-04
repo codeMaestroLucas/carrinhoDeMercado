@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_card_bg"
+    android:padding="22dp"
+    android:layout_gravity="center">
+
+    <!-- Topo: Ícone + Título + Subtítulo + Botão Fechar (X) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/badge_quantity_bg"
+            android:padding="9dp"
+            android:src="@drawable/ic_shopping_cart"
+            android:contentDescription="Carrinho" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Adicionar ao Carrinho"
+                android:textColor="#FFFFFF"
+                android:textSize="18.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Digite um ou mais itens (ou cole uma lista)"
+                android:textColor="#9CA3AF"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/quick_add_btn_close"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:padding="8dp"
+            android:background="@drawable/chip_suggestion_bg"
+            android:src="@drawable/ic_close"
+            android:tint="#9CA3AF"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Fechar" />
+
+    </LinearLayout>
+
+    <!-- Banner de Confirmação Rápida (Exibido ao adicionar um item sem fechar) -->
+    <LinearLayout
+        android:id="@+id/quick_add_feedback_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/feedback_banner_bg"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_check_circle"
+            android:tint="#00C853"
+            android:contentDescription="Sucesso" />
+
+        <TextView
+            android:id="@+id/quick_add_feedback_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Item adicionado com sucesso!"
+            android:textColor="#69F0AE"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- Campo de Entrada de Texto (Multi-linha / Lista) -->
+    <EditText
+        android:id="@+id/quick_add_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="54dp"
+        android:maxHeight="120dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bottom_input_bg_dark"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp"
+        android:textColor="#FFFFFF"
+        android:textSize="15.5sp"
+        android:textColorHint="#6B7280"
+        android:hint="Ex: 2kg maçã, arroz, feijão, 3cx leite..."
+        android:inputType="textCapSentences|textMultiLine"
+        android:imeOptions="actionSend" />
+
+    <!-- Botão de Ação: Adicionar à Lista (Ocupando largura total) -->
+    <TextView
+        android:id="@+id/quick_add_btn_save"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/btn_primary_green"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="+ Adicionar à Lista"
+        android:textColor="#FFFFFF"
+        android:textSize="15.5sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

@@ -5,7 +5,6 @@ import '../services/shopping_controller.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
 import 'history_screen.dart';
-import 'pantry_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -24,6 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedMarketNameFilter;
   int _priceIndexDays = 60;
   String _variationTab = 'up'; // 'up' or 'down'
+  bool _isCompareSelectionMode = false;
+  ProductHistoryAggregate? _firstSelectedForCompare;
 
   @override
   void dispose() {
@@ -136,6 +137,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openProductAnalytics(BuildContext context, String productName) {
+    final allAggregates = _buildProductAggregates(
+      widget.controller.history,
+      '',
+    );
     final aggregate = _buildAggregateForProduct(
       productName,
       sourceRecords: widget.controller.history,
@@ -144,7 +149,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ProductAnalyticsScreen(aggregate: aggregate),
+        builder: (_) => ProductAnalyticsScreen(
+          aggregate: aggregate,
+          allAggregates: allAggregates,
+        ),
+      ),
+    );
+  }
+
+  void _openProductComparison(
+    BuildContext context, {
+    ProductHistoryAggregate? itemA,
+    ProductHistoryAggregate? itemB,
+  }) {
+    final allAggregates = _buildProductAggregates(
+      widget.controller.history,
+      '',
+    );
+    if (allAggregates.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductComparisonScreen(
+          allAggregates: allAggregates,
+          initialItemA: itemA,
+          initialItemB: itemB,
+        ),
       ),
     );
   }
@@ -243,22 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Início & Análises'),
         actions: [
           IconButton(
-            tooltip: 'Minha Despensa',
-            icon: Badge(
-              isLabelVisible: controller.lowStockPantryCount > 0,
-              backgroundColor: const Color(0xFFD97706),
-              label: Text('${controller.lowStockPantryCount}'),
-              child: const Icon(Icons.kitchen_outlined, size: 21),
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => PantryScreen(controller: controller),
-                ),
-              );
-            },
-          ),
-          IconButton(
             tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
             onPressed: controller.toggleDarkMode,
             icon: Icon(
@@ -292,10 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           allTimePurchasesCount: allRecords.length,
                         ),
 
-                        // Card 2: Atalho da Despensa Inteligente
-                        _buildPantryShortcutCard(context),
-
-                        // Card 3: Índice de Preços e Inflação da Cesta
+                        // Card 2: Índice de Preços e Inflação da Cesta
                         _buildPriceIndexCard(context, priceIndex),
 
                         // Card 4: Gastos por Categoria
@@ -354,28 +365,135 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                'Análise por Produto',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: textPrimary,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Análise por Produto',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${filteredProducts.length} ${filteredProducts.length == 1 ? 'produto registrado' : 'produtos registrados'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              '${filteredProducts.length} ${filteredProducts.length == 1 ? 'produto' : 'produtos'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: textSecondary,
+                            if (allProductAggregates.length >= 2)
+                              FilledButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _isCompareSelectionMode =
+                                        !_isCompareSelectionMode;
+                                    if (!_isCompareSelectionMode) {
+                                      _firstSelectedForCompare = null;
+                                    }
+                                  });
+                                },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _isCompareSelectionMode
+                                      ? const Color(0xFF2563EB)
+                                      : AppColors.primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                icon: Icon(
+                                  _isCompareSelectionMode
+                                      ? Icons.close_rounded
+                                      : Icons.compare_arrows_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  _isCompareSelectionMode
+                                      ? 'Cancelar'
+                                      : 'Comparar Itens',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            ),
                           ],
                         ),
+                        if (_isCompareSelectionMode) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (_firstSelectedForCompare == null
+                                      ? AppColors.primaryGreen
+                                      : const Color(0xFF2563EB))
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: (_firstSelectedForCompare == null
+                                        ? AppColors.primaryGreen
+                                        : const Color(0xFF2563EB))
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.compare_arrows_rounded,
+                                  size: 19,
+                                  color: _firstSelectedForCompare == null
+                                      ? AppColors.accentGreen
+                                      : const Color(0xFF2563EB),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _firstSelectedForCompare == null
+                                        ? 'Passo 1: Toque no 1º item da lista abaixo (ex.: Papel Higiênico Marca X)'
+                                        : '1º: ${_firstSelectedForCompare!.displayName} • Agora toque no 2º item para comparar!',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (_firstSelectedForCompare != null)
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _firstSelectedForCompare = null;
+                                      });
+                                    },
+                                    child: const Text(
+                                      'Trocar 1º',
+                                      style: TextStyle(fontSize: 11.5),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
 
                         // Barra de busca de produtos
@@ -500,9 +618,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, index) {
                         final product = filteredProducts[index];
                         final variation = product.variationPercentFromLastTime;
+                        final isSelectedAsFirst =
+                            _firstSelectedForCompare != null &&
+                                _firstSelectedForCompare!.normalizedKey ==
+                                    product.normalizedKey;
 
                         return Material(
-                          color: surfaceColor,
+                          color: isSelectedAsFirst
+                              ? AppColors.primaryGreen.withValues(alpha: 0.12)
+                              : surfaceColor,
                           borderRadius: BorderRadius.vertical(
                             top: index == 0
                                 ? const Radius.circular(14)
@@ -526,22 +650,55 @@ class _HomeScreenState extends State<HomeScreen> {
                               horizontal: 14,
                               vertical: 4,
                             ),
-                            onTap: () => _openProductAnalytics(
-                              context,
-                              product.displayName,
-                            ),
+                            onTap: () {
+                              if (_isCompareSelectionMode) {
+                                if (_firstSelectedForCompare == null) {
+                                  setState(() {
+                                    _firstSelectedForCompare = product;
+                                  });
+                                } else if (_firstSelectedForCompare!
+                                        .normalizedKey ==
+                                    product.normalizedKey) {
+                                  setState(() {
+                                    _firstSelectedForCompare = null;
+                                  });
+                                } else {
+                                  final first = _firstSelectedForCompare!;
+                                  setState(() {
+                                    _isCompareSelectionMode = false;
+                                    _firstSelectedForCompare = null;
+                                  });
+                                  _openProductComparison(
+                                    context,
+                                    itemA: first,
+                                    itemB: product,
+                                  );
+                                }
+                              } else {
+                                _openProductAnalytics(
+                                  context,
+                                  product.displayName,
+                                );
+                              }
+                            },
                             leading: Container(
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: product.category.color.withValues(
-                                  alpha: 0.14,
-                                ),
+                                color: isSelectedAsFirst
+                                    ? AppColors.primaryGreen
+                                    : product.category.color.withValues(
+                                        alpha: 0.14,
+                                      ),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                product.category.icon,
-                                color: product.category.color,
+                                isSelectedAsFirst
+                                    ? Icons.check_rounded
+                                    : product.category.icon,
+                                color: isSelectedAsFirst
+                                    ? Colors.white
+                                    : product.category.color,
                                 size: 18,
                               ),
                             ),
@@ -554,12 +711,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             subtitle: Text(
-                              'Média: ${AppFormatters.formatCurrency(product.averagePrice)} • ${product.lastMarket}',
+                              isSelectedAsFirst
+                                  ? '1º item selecionado • Toque no 2º item para comparar'
+                                  : 'Média: ${AppFormatters.formatCurrency(product.averagePrice)} • ${product.lastMarket}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: textSecondary,
+                                color: isSelectedAsFirst
+                                    ? AppColors.accentGreen
+                                    : textSecondary,
+                                fontWeight: isSelectedAsFirst
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                             trailing: Row(
@@ -584,11 +748,33 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ],
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 18,
-                                  color: textSecondary,
-                                ),
+                                if (!_isCompareSelectionMode &&
+                                    allProductAggregates.length >= 2)
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'Comparar com outro item',
+                                    icon: const Icon(
+                                      Icons.compare_arrows_rounded,
+                                      size: 18,
+                                      color: AppColors.accentGreen,
+                                    ),
+                                    onPressed: () => _openProductComparison(
+                                      context,
+                                      itemA: product,
+                                    ),
+                                  )
+                                else
+                                  Icon(
+                                    _isCompareSelectionMode
+                                        ? (isSelectedAsFirst
+                                            ? Icons.check_circle_rounded
+                                            : Icons.add_circle_outline_rounded)
+                                        : Icons.chevron_right_rounded,
+                                    size: 18,
+                                    color: isSelectedAsFirst
+                                        ? AppColors.primaryGreen
+                                        : textSecondary,
+                                  ),
                               ],
                             ),
                           ),
@@ -598,102 +784,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
               ],
             ),
-    );
-  }
-
-  Widget _buildPantryShortcutCard(BuildContext context) {
-    final controller = widget.controller;
-    final pantryCount = controller.pantryItems.length;
-    final lowStock = controller.lowStockPantryCount;
-    final surfaceColor = AppColors.surface(context);
-    final borderColor = AppColors.border(context);
-    final textPrimary = AppColors.textPrimary(context);
-    final textSecondary = AppColors.textSecondary(context);
-
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PantryScreen(controller: controller),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(top: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGreen.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.kitchen_outlined,
-                color: AppColors.primaryGreen,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 2,
-                    children: [
-                      Text(
-                        'Minha Despensa',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: textPrimary,
-                        ),
-                      ),
-                      if (lowStock > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$lowStock acabando',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFB45309),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    pantryCount == 0
-                        ? 'Controle o que você tem em casa e evite comprar repetido'
-                        : '$pantryCount produtos cadastrados em estoque',
-                    style: TextStyle(fontSize: 12, color: textSecondary),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: textSecondary, size: 20),
-          ],
-        ),
-      ),
     );
   }
 
@@ -917,12 +1007,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Maiores Altas ↗ (${indexSummary.topIncreases.length})',
                     ),
                     selected: _variationTab == 'up',
-                    selectedColor: const Color(0xFFFEE2E2),
+                    selectedColor: isDark
+                        ? const Color(0xFF5A1A1A)
+                        : const Color(0xFFFEE2E2),
+                    checkmarkColor: isDark
+                        ? const Color(0xFFFCA5A5)
+                        : const Color(0xFFB91C1C),
                     labelStyle: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       color: _variationTab == 'up'
-                          ? const Color(0xFFB91C1C)
+                          ? (isDark
+                              ? const Color(0xFFFCA5A5)
+                              : const Color(0xFFB91C1C))
                           : textSecondary,
                     ),
                     onSelected: (_) => setState(() => _variationTab = 'up'),
@@ -934,12 +1031,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Maiores Quedas ↘ (${indexSummary.topDecreases.length})',
                     ),
                     selected: _variationTab == 'down',
-                    selectedColor: const Color(0xFFDCFCE7),
+                    selectedColor: isDark
+                        ? const Color(0xFF144D29)
+                        : const Color(0xFFDCFCE7),
+                    checkmarkColor: isDark
+                        ? const Color(0xFF86EFAC)
+                        : const Color(0xFF15803D),
                     labelStyle: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       color: _variationTab == 'down'
-                          ? const Color(0xFF15803D)
+                          ? (isDark
+                              ? const Color(0xFF86EFAC)
+                              : const Color(0xFF15803D))
                           : textSecondary,
                     ),
                     onSelected: (_) => setState(() => _variationTab = 'down'),

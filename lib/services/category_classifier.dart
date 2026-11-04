@@ -1,3 +1,4 @@
+import 'dart:math';
 import '../models/shopping_models.dart';
 
 class CategoryClassifier {
@@ -35,7 +36,12 @@ class CategoryClassifier {
       final char = lower[i];
       buffer.write(diacriticsMap[char] ?? char);
     }
-    final rawNorm = buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    // Replace hyphens, slashes and underscores with spaces so 'coca-cola' matches 'coca cola'
+    final rawNorm = buffer
+        .toString()
+        .replaceAll(RegExp(r'[-_/]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     return singularize(rawNorm);
   }
 
@@ -81,8 +87,6 @@ class CategoryClassifier {
           continue;
         }
         // Standard regular plural ending in vowel + s:
-        // "leites" -> "leite", "bananas" -> "banana", "ovos" -> "ovo", "mangas" -> "manga"
-        // Avoid stripping if word ends in 'is' or 'os' where base ends with s like "lapis", "pires", "onibus"
         final nonPluralWords = {'onibus', 'lapis', 'pires', 'virus', 'status', 'tenis', 'ouro', 'arroz', 'noz'};
         if (nonPluralWords.contains(word)) {
           resultWords.add(word);
@@ -99,6 +103,80 @@ class CategoryClassifier {
     return resultWords.join(' ');
   }
 
+  /// Dictionary of common abbreviations found on supermarket receipts and NFC-e
+  static const Map<String, String> commonAbbreviations = {
+    'refri': 'refrigerante',
+    'refrig': 'refrigerante',
+    'bisc': 'biscoito',
+    'bol': 'bolacha',
+    'prot': 'protetor',
+    'liq': 'liquido',
+    'conc': 'concentrado',
+    'choc': 'chocolate',
+    'achoc': 'achocolatado',
+    'manteig': 'manteiga',
+    'margar': 'margarina',
+    'iog': 'iogurte',
+    'iorg': 'iogurte',
+    'sab': 'sabonete',
+    'desod': 'desodorante',
+    'cond': 'condicionador',
+    'shamp': 'shampoo',
+    'desinf': 'desinfetante',
+    'deterg': 'detergente',
+    'amaciant': 'amaciante',
+    'amac': 'amaciante',
+    'alcatr': 'alcatra',
+    'mussar': 'mussarela',
+    'parmes': 'parmesao',
+    'presun': 'presunto',
+    'far': 'farinha',
+    'farin': 'farinha',
+    'torrad': 'torrada',
+    'gelat': 'gelatina',
+    'hamb': 'hamburguer',
+    'rechead': 'recheado',
+    'rech': 'recheado',
+    'int': 'integral',
+    'trad': 'tradicional',
+  };
+
+  /// Expands abbreviations in a normalized string.
+  static String expandAbbreviations(String normalizedText) {
+    final words = normalizedText.split(RegExp(r'\s+'));
+    final expanded = words.map((w) => commonAbbreviations[w] ?? w);
+    return expanded.join(' ');
+  }
+
+  /// Computes the Levenshtein distance between two strings.
+  static int levenshteinDistance(String s1, String s2) {
+    if (s1 == s2) return 0;
+    if (s1.isEmpty) return s2.length;
+    if (s2.isEmpty) return s1.length;
+
+    List<int> v0 = List<int>.generate(s2.length + 1, (i) => i);
+    List<int> v1 = List<int>.filled(s2.length + 1, 0);
+
+    for (int i = 0; i < s1.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < s2.length; j++) {
+        final cost = (s1[i] == s2[j]) ? 0 : 1;
+        v1[j + 1] = min(v1[j] + 1, min(v0[j + 1] + 1, v0[j] + cost));
+      }
+      for (int j = 0; j <= s2.length; j++) {
+        v0[j] = v1[j];
+      }
+    }
+    return v0[s2.length];
+  }
+
+  /// Returns string similarity ratio between 0.0 and 1.0 based on Levenshtein distance.
+  static double stringSimilarity(String s1, String s2) {
+    final maxLen = max(s1.length, s2.length);
+    if (maxLen == 0) return 1.0;
+    return 1.0 - (levenshteinDistance(s1, s2) / maxLen);
+  }
+
   static final Map<ProductCategory, List<String>> defaultKeywordDictionary = {
     ProductCategory.bebeCrianca: [
       'fralda',
@@ -109,6 +187,7 @@ class CategoryClassifier {
       'pomada assadura',
       'hipoglós',
       'bepantol baby',
+      'bepantol',
       'shampoo infantil',
       'sabonete infantil',
       'leite nan',
@@ -118,6 +197,8 @@ class CategoryClassifier {
       'farinha láctea',
       'bebê',
       'infantil',
+      'pampers',
+      'huggies',
     ],
     ProductCategory.petShop: [
       'ração',
@@ -130,6 +211,12 @@ class CategoryClassifier {
       'antipulga',
       'coleira',
       'shampoo pet',
+      'pedigree',
+      'whiskas',
+      'friskies',
+      'golden',
+      'premier',
+      'purina',
       'osso',
       'petshop',
       'cachorro',
@@ -151,6 +238,7 @@ class CategoryClassifier {
       'palito de dente',
       'espetinho',
       'saco de lixo',
+      'saco lixo',
       'sacola plástica',
       'saco freezer',
       'embalagem descartável',
@@ -176,12 +264,18 @@ class CategoryClassifier {
       'colgate',
       'sorriso',
       'oral-b',
+      'oral b',
+      'sensodyne',
       'desodorante',
       'rexona',
       'dove',
       'nivea',
+      'carefree',
+      'sempre livre',
+      'intimus',
       'absorvente',
       'protetor diário',
+      'protetor diario',
       'cotonete',
       'hastes flexíveis',
       'algodão',
@@ -197,27 +291,48 @@ class CategoryClassifier {
       'lixa de unha',
       'tintura',
       'gel de cabelo',
+      'seda',
+      'pantene',
+      'palmolive',
+      'lux',
     ],
     ProductCategory.limpeza: [
       'detergente',
       'sabão em pó',
+      'sabao em po',
       'sabão líquido',
+      'sabao liquido',
       'sabão em barra',
+      'sabao em barra',
       'sabão de coco',
+      'sabão',
+      'sabao',
+      'lava roupas',
+      'omo',
+      'brilhante',
+      'ariel',
       'amaciante',
+      'downy',
+      'comfort',
       'água sanitária',
+      'agua sanitaria',
       'cândida',
       'cloro',
+      'qboa',
       'desinfetante',
+      'pinho sol',
       'multiuso',
       'veja',
       'ypê',
+      'ype',
       'limpa vidro',
       'limpa alumínio',
       'desengordurante',
       'esponja',
       'bucha',
       'bombril',
+      'assolan',
+      'scotch brite',
       'lã de aço',
       'palha de aço',
       'pano de chão',
@@ -238,66 +353,88 @@ class CategoryClassifier {
       'sbp',
       'raid',
       'álcool',
+      'alcool',
       'limpeza',
       'luva de borracha',
       'prendedor de roupa',
     ],
     ProductCategory.bebidas: [
       'água mineral',
+      'agua mineral',
       'água com gás',
+      'agua com gas',
       'água de coco',
+      'agua de coco',
       'refrigerante',
+      'refri',
       'coca-cola',
-      'guaraná',
+      'coca cola',
+      'coca',
       'pepsi',
+      'guaraná',
+      'guarana',
       'fanta',
       'sprite',
+      'schweppes',
       'suco',
       'néctar',
       'del valle',
       'tang',
       'clight',
+      'maguary',
       'cerveja',
       'heineken',
+      'amstel',
       'brahma',
       'skol',
       'stella',
       'corona',
+      'budweiser',
+      'spaten',
       'vinho',
       'espumante',
       'whisky',
       'vodka',
       'gin',
       'cachaça',
+      'cachaca',
       'energético',
+      'energetico',
       'red bull',
       'monster',
       'isotônico',
+      'isotonico',
       'gatorade',
       'chá mate',
+      'cha mate',
       'chá gelado',
+      'cha gelado',
       'achocolatado líquido',
       'toddynho',
       'chamyto',
       'yakult',
       'bebida láctea',
+      'bebida lactea',
     ],
     ProductCategory.bazar: [
       'pilha',
       'bateria',
       'lâmpada',
+      'lampada',
       'vela',
       'fósforo',
+      'fosforo',
       'isqueiro',
       'pote',
       'tupperware',
       'vasilha',
-      'forma',
+      'forma de bolo',
       'assadeira',
       'panela',
       'frigideira',
       'copo de vidro',
       'xícara',
+      'xicara',
       'caneca',
       'prato',
       'talher',
@@ -306,15 +443,19 @@ class CategoryClassifier {
       'colher',
       'abridor',
       'tábua',
+      'tabua',
       'jarra',
       'garrafa térmica',
+      'garrafa termica',
       'pano de prato',
       'toalha',
       'cabide',
       'fita adesiva',
       'super bonder',
-      'cola',
+      'cola escolar',
+      'cola bastão',
       'extensão',
+      'extensao',
       'adaptador',
       'caderno',
       'caneta',
@@ -322,44 +463,57 @@ class CategoryClassifier {
     ProductCategory.alimentos: [
       'arroz',
       'feijão',
+      'feijao',
       'macarrão',
+      'macarrao',
       'massa',
       'espaguete',
       'lasanha',
       'miojo',
       'óleo',
+      'oleo',
       'azeite',
       'vinagre',
       'sal',
       'açúcar',
+      'acucar',
       'adoçante',
+      'adocante',
       'café',
+      'cafe',
       'chá',
+      'cha',
       'leite',
       'leite condensado',
       'creme de leite',
       'manteiga',
       'margarina',
       'requeijão',
+      'requeijao',
       'queijo',
       'mussarela',
+      'mozzarella',
       'parmesão',
+      'parmesao',
       'ricota',
       'presunto',
       'peito de peru',
       'mortadela',
       'salame',
       'linguiça',
+      'linguica',
       'salsicha',
       'bacon',
       'carne',
       'bife',
       'patinho',
       'acém',
+      'acem',
       'alcatra',
       'picanha',
       'costela',
       'carne moída',
+      'carne moida',
       'frango',
       'peito de frango',
       'coxa',
@@ -367,24 +521,40 @@ class CategoryClassifier {
       'asa',
       'peixe',
       'tilápia',
+      'tilapia',
       'salmão',
+      'salmao',
       'atum',
       'sardinha',
       'camarão',
+      'camarao',
       'ovo',
       'ovos',
       'pão',
+      'pao',
+      'pão de forma',
+      'pao de forma',
+      'pao forma',
+      'bauducco',
+      'pullman',
+      'wickbold',
+      'visconti',
       'torrada',
       'bisnaguinha',
       'bolo',
       'biscoito',
       'bolacha',
+      'passatempo',
+      'trakinas',
+      'oreo',
+      'bono',
       'wafer',
       'cream cracker',
       'maizena',
       'amido de milho',
       'farinha',
       'fubá',
+      'fuba',
       'aveia',
       'granola',
       'cereal',
@@ -405,6 +575,7 @@ class CategoryClassifier {
       'sorvete',
       'iogurte',
       'danone',
+      'nestle',
       'molho de tomate',
       'extrato de tomate',
       'pomarola',
@@ -418,6 +589,7 @@ class CategoryClassifier {
       'ervilha',
       'seleta',
       'batata',
+      'chips',
       'batata palha',
       'batata frita',
       'cebola',
@@ -425,10 +597,14 @@ class CategoryClassifier {
       'tomate',
       'alface',
       'rúcula',
+      'rucula',
       'agrião',
+      'agriao',
       'couve',
       'brócolis',
+      'brocolis',
       'couve-flor',
+      'couve flor',
       'cenoura',
       'beterraba',
       'abobrinha',
@@ -436,30 +612,39 @@ class CategoryClassifier {
       'chuchu',
       'pepino',
       'pimentão',
+      'pimentao',
       'mandioca',
       'aipim',
       'inhame',
       'abóbora',
+      'abobora',
       'cheiro verde',
       'coentro',
       'salsinha',
       'cebolinha',
       'manjericão',
+      'manjericao',
       'orégano',
+      'oregano',
       'pimenta',
       'cominho',
       'colorau',
       'páprica',
+      'paprica',
       'caldo knorr',
       'tempero',
       'sazon',
       'banana',
       'maçã',
+      'maca',
       'laranja',
       'limão',
+      'limao',
       'mamão',
+      'mamao',
       'melancia',
       'melão',
+      'melao',
       'uva',
       'morango',
       'abacaxi',
@@ -468,20 +653,31 @@ class CategoryClassifier {
       'abacate',
       'kiwi',
       'maracujá',
+      'maracuja',
       'goiaba',
       'pêssego',
+      'pessego',
       'ameixa',
       'castanha',
       'amendoim',
       'nozes',
       'pipoca',
       'salgadinho',
+      'doritos',
+      'ruffles',
+      'cheetos',
+      'pringles',
+      'lays',
+      'fandangos',
       'pizza',
       'hambúrguer',
+      'hamburguer',
       'nuggets',
       'pão de queijo',
+      'pao de queijo',
       'lentilha',
       'grão de bico',
+      'grao de bico',
     ],
     ProductCategory.diversos: [],
   };
@@ -495,6 +691,12 @@ class CategoryClassifier {
     };
   }
 
+  /// Classifies a product name into a [ProductCategory] using:
+  /// 1. Exact match in user memory
+  /// 2. Exact match in keyword dictionary
+  /// 3. Partial match in user memory
+  /// 4. Substring / multi-word keyword matching (with abbreviation expansion)
+  /// 5. Word-level similarity & fuzzy approximation (prefix matching & Levenshtein)
   static ProductCategory classify(
     String itemName, {
     Map<String, ProductCategory> customMemory = const {},
@@ -529,44 +731,78 @@ class CategoryClassifier {
       }
     }
 
-    // 4. Keyword / phrase match in dictionary
+    // 4. Multi-word phrase & word match with abbreviation expansion and scoring
+    final expanded = expandAbbreviations(normalized);
+    final itemWords = normalized.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final expandedWords = expanded.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+
     ProductCategory? bestMatch;
-    var bestMatchLength = 0;
+    int bestScore = 0;
 
     for (final entry in dictionary.entries) {
       for (final rawKeyword in entry.value) {
         final keyword = normalize(rawKeyword);
         if (keyword.isEmpty) continue;
-        if (_matchesKeyword(normalized, keyword)) {
-          if (keyword.length > bestMatchLength) {
-            bestMatchLength = keyword.length;
-            bestMatch = entry.key;
+
+        int score = 0;
+
+        // Exact match against expanded name
+        if (keyword == expanded || keyword == normalized) {
+          score = keyword.length * 10;
+        }
+        // Multi-word phrase match (e.g. "pao de forma", "coca cola", "saco de lixo")
+        else if (keyword.contains(' ')) {
+          if (expanded.contains(keyword) || normalized.contains(keyword)) {
+            score = keyword.length * 6;
           }
+        }
+        // Single word matching & fuzzy approximation
+        else {
+          for (final word in expandedWords) {
+            if (word == keyword) {
+              score = max(score, keyword.length * 4);
+            }
+            // Prefix matching for abbreviations (e.g. "refri" -> "refrigerante", "prot" -> "protetor")
+            else if (word.length >= 3 && keyword.length >= 4 && keyword.startsWith(word)) {
+              score = max(score, word.length * 3);
+            }
+            else if (keyword.length >= 4 && word.length >= 4 && word.startsWith(keyword)) {
+              score = max(score, keyword.length * 3);
+            }
+            // Fuzzy string similarity (Levenshtein distance)
+            else if (word.length >= 4 && keyword.length >= 4) {
+              final sim = stringSimilarity(word, keyword);
+              if (sim >= 0.78) {
+                score = max(score, (keyword.length * sim * 2.5).round());
+              }
+            }
+          }
+
+          // Check original item words too if they differ from expanded
+          if (score == 0 && expanded != normalized) {
+            for (final word in itemWords) {
+              if (word == keyword) {
+                score = max(score, keyword.length * 4);
+              } else if (word.length >= 3 && keyword.length >= 4 && keyword.startsWith(word)) {
+                score = max(score, word.length * 3);
+              } else if (word.length >= 4 && keyword.length >= 4) {
+                final sim = stringSimilarity(word, keyword);
+                if (sim >= 0.78) {
+                  score = max(score, (keyword.length * sim * 2.5).round());
+                }
+              }
+            }
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = entry.key;
         }
       }
     }
 
     return bestMatch ?? ProductCategory.diversos;
-  }
-
-  static bool _matchesKeyword(String normalizedItem, String keyword) {
-    if (normalizedItem == keyword) return true;
-    if (keyword.contains(' ')) {
-      return normalizedItem.contains(keyword);
-    }
-    final words = normalizedItem.split(RegExp(r'[^a-z0-9]+'));
-    for (final word in words) {
-      if (word == keyword) return true;
-      if (word.length > 3 &&
-          word.endsWith('s') &&
-          word.substring(0, word.length - 1) == keyword) {
-        return true;
-      }
-      if (keyword.length >= 4 && word.startsWith(keyword)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /// Parsed item with extracted name, quantity, and unit.

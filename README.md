@@ -35,7 +35,6 @@ Um aplicativo Flutter completo para gerenciamento inteligente de listas de super
   - Um canal JavaScript injetado (`MutationObserver` + `JavaScriptChannel`) monitora o carregamento da tabela de produtos no DOM. No instante em que os itens são exibidos, o app extrai automaticamente nomes, preços e mercado, fechando o navegador e preenchendo a compra sem esforço manual.
 - **Scanner de Cupom Fiscal por Foto (OCR com Google ML Kit)**:
   - Fotografe ou selecione a imagem do cupom impresso para ler produtos e preços por visão computacional direto no chip do celular (100% offline, dispensando conexão com portais da SEFAZ).
-- **Integração com a Despensa**: Envie com um clique todos os itens comprados diretamente para a sua Despensa Inteligente para controle de estoque e consumo.
 - **Reaproveitamento de Compras**: Adicione itens de compras anteriores de volta para sua lista atual com um toque.
 
 ### 🏪 4. Mercados e Família (Sincronização)

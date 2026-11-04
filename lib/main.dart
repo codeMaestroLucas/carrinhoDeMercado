@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:home_widget/home_widget.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/market_config_screen.dart';
 import 'screens/shopping_list_screen.dart';
 import 'services/shopping_controller.dart';
+import 'services/home_widget_service.dart';
+import 'services/category_classifier.dart';
 import 'theme/app_colors.dart';
 import 'widgets/lottie_cart_splash.dart';
 
@@ -31,15 +34,19 @@ class CarrinhoComprasApp extends StatefulWidget {
   State<CarrinhoComprasApp> createState() => _CarrinhoComprasAppState();
 }
 
-class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
+class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
+    with WidgetsBindingObserver {
   late final ShoppingController _controller;
   int _currentTabIndex = 1; // Opens on Lista (index 1), with Home (casinha) at index 0
   late bool _isShowingSplash;
   Timer? _splashTimer;
+  StreamSubscription<Uri?>? _widgetClickSubscription;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = widget.controller ?? ShoppingController();
     _isShowingSplash = widget.showSplashOnStart;
     if (_isShowingSplash) {
@@ -51,18 +58,152 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
         }
       });
     }
+
+    HomeWidgetService.initialize();
+    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+    _widgetClickSubscription = HomeWidget.widgetClicked.listen(_handleWidgetUri);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controller.initializeCloudSync();
+      _controller.syncFromHomeWidget();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.syncFromHomeWidget();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _widgetClickSubscription?.cancel();
     _splashTimer?.cancel();
     if (widget.controller == null) {
       _controller.dispose();
     }
     super.dispose();
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null) return;
+    if (uri.scheme == 'carrinho') {
+      if (mounted) {
+        setState(() {
+          _isShowingSplash = false;
+          _currentTabIndex = 1;
+        });
+      }
+      if (uri.host == 'add_item') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showQuickAddFromWidget();
+        });
+      }
+    }
+  }
+
+  void _showQuickAddFromWidget() {
+    final ctx = _navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    final textController = TextEditingController();
+
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        final isDark = Theme.of(modalCtx).brightness == Brightness.dark;
+
+        void handleProcessAndSave(String input) {
+          final clean = input.trim();
+          if (clean.isEmpty) return;
+
+          final detected = CategoryClassifier.parsePastedList(clean);
+          if (detected.length > 1 || clean.contains('\n') || clean.contains(';')) {
+            _controller.addItemsFromPastedTextWithReport(clean);
+          } else {
+            _controller.addSingleItem(clean);
+          }
+          Navigator.of(modalCtx).pop();
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface(modalCtx),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Adicionar ao Carrinho',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary(modalCtx),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(modalCtx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  style: TextStyle(color: AppColors.textPrimary(modalCtx)),
+                  decoration: InputDecoration(
+                    hintText: 'Ex: Leite, 2kg de maçã, 3 cx sabão...',
+                    hintStyle: TextStyle(color: AppColors.textSecondary(modalCtx)),
+                    filled: true,
+                    fillColor: isDark
+                        ? const Color(0xFF23272F)
+                        : const Color(0xFFF8F9FA),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onSubmitted: handleProcessAndSave,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => handleProcessAndSave(textController.text),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Adicionar Item',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   ThemeData _buildTheme(Brightness brightness) {
@@ -228,6 +369,7 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp> {
         ];
 
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Carrinho de Compras',
           debugShowCheckedModeBanner: false,
           themeMode: isDark ? ThemeMode.dark : ThemeMode.light,

@@ -46,6 +46,36 @@ void main() {
         CategoryClassifier.classify('Item desconhecido xyz'),
         ProductCategory.diversos,
       );
+
+      // Test fuzzy / abbreviation approximation from typical NFC-e invoices
+      expect(
+        CategoryClassifier.classify('REFRI COCA COLA 2L TRAD'),
+        ProductCategory.bebidas,
+      );
+      expect(
+        CategoryClassifier.classify('PROT DIARIO CAREFREE 40X1 TODO DIA'),
+        ProductCategory.perfumariaHigiene,
+      );
+      expect(
+        CategoryClassifier.classify('CHIPS BATATA JUJU 100G'),
+        ProductCategory.alimentos,
+      );
+      expect(
+        CategoryClassifier.classify('PAO FORMA BAUDUCCO INT 390G'),
+        ProductCategory.alimentos,
+      );
+      expect(
+        CategoryClassifier.classify('AMACIANTE CONC DOW 500ML'),
+        ProductCategory.limpeza,
+      );
+      expect(
+        CategoryClassifier.classify('BISC RECH PASSATEMPO 130G'),
+        ProductCategory.alimentos,
+      );
+      expect(
+        CategoryClassifier.classify('SACO LIXO 50L REFORCADO'),
+        ProductCategory.descartaveis,
+      );
     });
 
     test('Parses Brazilian receipt (NFC-e / Cupom Fiscal) lines into items and prices', () {

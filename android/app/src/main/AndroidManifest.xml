@@ -33,7 +33,47 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Intent filter para deep links do Widget da tela inicial -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="carrinho" />
+            </intent-filter>
         </activity>
+
+        <!-- Receiver do Widget da Tela Inicial -->
+        <receiver
+            android:name=".ShoppingListWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.lucasrajao.carrinhoDecompras.ACTION_ITEM_CLICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/shopping_list_widget_info" />
+        </receiver>
+
+        <!-- Service do ListView do Widget (deve ser exported=true com BIND_REMOTEVIEWS para o launcher se conectar) -->
+        <service
+            android:name=".ShoppingListRemoteViewsService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="true" />
+
+        <!-- Activity Rápida Flutuante para Adicionar Item -->
+        <activity
+            android:name=".QuickAddActivity"
+            android:theme="@style/Theme.TransparentDialog"
+            android:exported="false"
+            android:windowSoftInputMode="stateVisible" />
+
+        <!-- Activity Rápida Flutuante para Editar Quantidade / Remover Item -->
+        <activity
+            android:name=".EditItemActivity"
+            android:theme="@style/Theme.TransparentDialog"
+            android:exported="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

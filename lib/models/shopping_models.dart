@@ -300,6 +300,22 @@ class PurchaseRecord {
   double get totalAmount =>
       items.fold(0.0, (sum, item) => sum + item.price);
 
+  PurchaseRecord copyWith({
+    String? id,
+    String? marketId,
+    String? marketName,
+    DateTime? date,
+    List<PurchaseHistoryItem>? items,
+  }) {
+    return PurchaseRecord(
+      id: id ?? this.id,
+      marketId: marketId ?? this.marketId,
+      marketName: marketName ?? this.marketName,
+      date: date ?? this.date,
+      items: items ?? this.items,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -323,153 +339,6 @@ class PurchaseRecord {
       items: itemsList,
     );
   }
-}
-
-enum PantryItemStatus {
-  ok,
-  low,
-  expired,
-}
-
-class PantryItem {
-  PantryItem({
-    required this.id,
-    required this.name,
-    required this.category,
-    this.quantity = 1.0,
-    this.unit = 'un',
-    this.estimatedDaysToConsume = 14,
-    this.marketName,
-    this.price,
-    this.expiryDate,
-    DateTime? addedAt,
-  }) : addedAt = addedAt ?? DateTime.now();
-
-  final String id;
-  final String name;
-  final ProductCategory category;
-  final double quantity;
-  final String unit;
-  final int estimatedDaysToConsume;
-  final String? marketName;
-  final double? price;
-  final DateTime? expiryDate;
-  final DateTime addedAt;
-
-  int get daysSinceAdded => DateTime.now().difference(addedAt).inDays;
-
-  int get daysRemaining =>
-      (estimatedDaysToConsume - daysSinceAdded).clamp(0, 999);
-
-  bool get isExpired {
-    if (expiryDate == null) return false;
-    final now = DateTime.now();
-    return expiryDate!.isBefore(DateTime(now.year, now.month, now.day));
-  }
-
-  bool get isNearExpiry {
-    if (expiryDate == null) return false;
-    final now = DateTime.now();
-    final diff = expiryDate!.difference(now).inDays;
-    return diff >= 0 && diff <= 3;
-  }
-
-  PantryItemStatus get status {
-    if (isExpired) return PantryItemStatus.expired;
-    if (quantity <= 0.25 || daysRemaining <= 2) return PantryItemStatus.low;
-    return PantryItemStatus.ok;
-  }
-
-  PantryItem copyWith({
-    String? id,
-    String? name,
-    ProductCategory? category,
-    double? quantity,
-    String? unit,
-    int? estimatedDaysToConsume,
-    String? marketName,
-    double? price,
-    DateTime? expiryDate,
-    bool clearExpiry = false,
-    DateTime? addedAt,
-  }) {
-    return PantryItem(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      category: category ?? this.category,
-      quantity: quantity ?? this.quantity,
-      unit: unit ?? this.unit,
-      estimatedDaysToConsume:
-          estimatedDaysToConsume ?? this.estimatedDaysToConsume,
-      marketName: marketName ?? this.marketName,
-      price: price ?? this.price,
-      expiryDate: clearExpiry ? null : (expiryDate ?? this.expiryDate),
-      addedAt: addedAt ?? this.addedAt,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'category': category.id,
-      'quantity': quantity,
-      'unit': unit,
-      'estimatedDaysToConsume': estimatedDaysToConsume,
-      'marketName': marketName,
-      'price': price,
-      'expiryDate': expiryDate?.toIso8601String(),
-      'addedAt': addedAt.toIso8601String(),
-    };
-  }
-
-  factory PantryItem.fromJson(Map<String, dynamic> json) {
-    return PantryItem(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      category: ProductCategory.fromId(json['category'] as String?),
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
-      unit: (json['unit'] as String?)?.trim().isNotEmpty == true
-          ? (json['unit'] as String).trim()
-          : 'un',
-      estimatedDaysToConsume:
-          (json['estimatedDaysToConsume'] as num?)?.toInt() ?? 14,
-      marketName: json['marketName'] as String?,
-      price: (json['price'] as num?)?.toDouble(),
-      expiryDate: json['expiryDate'] != null
-          ? DateTime.tryParse(json['expiryDate'] as String)
-          : null,
-      addedAt: json['addedAt'] != null
-          ? DateTime.tryParse(json['addedAt'] as String) ?? DateTime.now()
-          : DateTime.now(),
-    );
-  }
-}
-
-enum RepurchaseUrgency {
-  urgent, // Jogo rápido: já passou do ciclo estimado
-  moderate, // Na janela: faltam poucos dias
-  low, // Apenas sugestão
-}
-
-class ReplenishmentSuggestion {
-  const ReplenishmentSuggestion({
-    required this.productName,
-    required this.category,
-    required this.averageIntervalDays,
-    required this.daysSinceLastPurchase,
-    required this.lastPrice,
-    required this.lastMarket,
-    required this.urgency,
-  });
-
-  final String productName;
-  final ProductCategory category;
-  final int averageIntervalDays;
-  final int daysSinceLastPurchase;
-  final double lastPrice;
-  final String lastMarket;
-  final RepurchaseUrgency urgency;
 }
 
 class ProductVariationItem {

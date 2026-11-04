@@ -412,11 +412,12 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
                 final name = it['name']?.toString() ?? '';
                 final price = (it['price'] as num?)?.toDouble() ?? 0.0;
                 if (name.isNotEmpty && price > 0) {
+                  final formattedName = _formatItemName(name);
                   items.add(
                     ScannedReceiptItem(
-                      name: _formatItemName(name),
+                      name: formattedName,
                       price: price,
-                      category: CategoryClassifier.classify(name),
+                      category: CategoryClassifier.classify(formattedName),
                     ),
                   );
                 }
