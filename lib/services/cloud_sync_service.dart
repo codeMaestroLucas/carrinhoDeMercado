@@ -135,6 +135,7 @@ class CloudSyncService {
       'spaceCode': normalizeSpaceCode(spaceCode),
       'updatedByClientId': clientId,
       'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
       'updatedAtIso': DateTime.now().toIso8601String(),
     };
 

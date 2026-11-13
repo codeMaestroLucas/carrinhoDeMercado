@@ -46,6 +46,8 @@ class ShoppingController extends ChangeNotifier {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
       _cloudSubscription;
   bool _isApplyingRemoteUpdate = false;
+  int _lastAppliedRemoteTimestampMs = 0;
+  Timer? _saveDebounceTimer;
 
   List<ShoppingItem> get allItems => List.unmodifiable(_items);
   List<MarketProfile> get markets => List.unmodifiable(_markets);
@@ -961,7 +963,7 @@ class ShoppingController extends ChangeNotifier {
     );
     _sharedSpaceCode = code;
     _startCloudListener(code);
-    await _saveToDisk(pushCloud: false);
+    await _executeSaveToDisk(pushCloud: false);
     notifyListeners();
     return code;
   }
@@ -985,7 +987,7 @@ class ShoppingController extends ChangeNotifier {
 
     _sharedSpaceCode = code;
     _startCloudListener(code);
-    await _saveToDisk(pushCloud: false);
+    await _executeSaveToDisk(pushCloud: false);
     notifyListeners();
   }
 
@@ -993,7 +995,7 @@ class ShoppingController extends ChangeNotifier {
     await _cloudSubscription?.cancel();
     _cloudSubscription = null;
     _sharedSpaceCode = null;
-    await _saveToDisk(pushCloud: false);
+    await _executeSaveToDisk(pushCloud: false);
     notifyListeners();
   }
 
@@ -1008,6 +1010,16 @@ class ShoppingController extends ChangeNotifier {
         if (data['updatedByClientId'] == _clientId) {
           return;
         }
+
+        // Idempotency & monotonic ordering check: reject outdated remote updates
+        final remoteTimestamp = data['updatedAtMs'];
+        if (remoteTimestamp is int && remoteTimestamp < _lastAppliedRemoteTimestampMs) {
+          return;
+        }
+        if (remoteTimestamp is int) {
+          _lastAppliedRemoteTimestampMs = remoteTimestamp;
+        }
+
         _isApplyingRemoteUpdate = true;
         try {
           _applyStateFromMap(data);
@@ -1174,7 +1186,15 @@ class ShoppingController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> _saveToDisk({bool pushCloud = true}) async {
+  void _saveToDisk({bool pushCloud = true}) {
+    if (!enablePersistence) return;
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      await _executeSaveToDisk(pushCloud: pushCloud);
+    });
+  }
+
+  Future<void> _executeSaveToDisk({bool pushCloud = true}) async {
     if (!enablePersistence) return;
     try {
       final stateMap = _buildStateMap();
@@ -1208,6 +1228,7 @@ class ShoppingController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _saveDebounceTimer?.cancel();
     _cloudSubscription?.cancel();
     super.dispose();
   }

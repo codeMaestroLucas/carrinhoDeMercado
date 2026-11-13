@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Espaços compartilhados de carrinho de compras
+    match /shared_spaces/{spaceCode} {
+      // Leitura permitida para quem tem o código do espaço compartilhado
+      allow read: if true;
+
+      // Escrita controlada: exige identificador do cliente e valida tamanho e formato
+      allow create, update: if request.resource.data.keys().hasAll(['spaceCode', 'updatedByClientId'])
+                           && request.resource.data.spaceCode is string
+                           && request.resource.data.updatedByClientId is string
+                           // Garante que o payload não exceda tamanhos razoáveis para evitar abusos
+                           && request.resource.data.size() < 50;
+
+      // Exclusão protegida
+      allow delete: if false;
+    }
+  }
+}

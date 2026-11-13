@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
+import '../services/product_history_service.dart';
 import '../services/shopping_controller.dart';
 import '../theme/app_colors.dart';
 import '../utils/formatters.dart';
