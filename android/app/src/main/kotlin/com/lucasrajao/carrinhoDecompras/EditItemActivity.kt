@@ -128,17 +128,31 @@ class EditItemActivity : Activity() {
         val jsonStr = prefs.getString("shopping_items_json", "[]") ?: "[]"
         try {
             val jsonArray = JSONArray(jsonStr)
+            var pendingCount = 0
+            var checkedCount = 0
+
             for (i in 0 until jsonArray.length()) {
                 val item = jsonArray.getJSONObject(i)
                 if (item.optString("id") == itemId) {
                     item.put("quantity", currentQuantity)
                     item.put("isChecked", currentChecked)
-                    break
+                }
+                if (item.optBoolean("isChecked", false)) {
+                    checkedCount++
+                } else {
+                    pendingCount++
                 }
             }
-            prefs.edit().putString("shopping_items_json", jsonArray.toString()).commit()
+            prefs.edit()
+                .putString("shopping_items_json", jsonArray.toString())
+                .putInt("total_items", jsonArray.length())
+                .putInt("pending_count", pendingCount)
+                .putInt("checked_count", checkedCount)
+                .commit()
+
             syncWithFlutter(jsonArray)
             ShoppingListWidgetProvider.notifyUpdate(this)
+            MainActivity.notifyWidgetDataChanged()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -150,15 +164,30 @@ class EditItemActivity : Activity() {
         try {
             val originalArray = JSONArray(jsonStr)
             val newArray = JSONArray()
+            var pendingCount = 0
+            var checkedCount = 0
+
             for (i in 0 until originalArray.length()) {
                 val item = originalArray.getJSONObject(i)
                 if (item.optString("id") != itemId) {
                     newArray.put(item)
+                    if (item.optBoolean("isChecked", false)) {
+                        checkedCount++
+                    } else {
+                        pendingCount++
+                    }
                 }
             }
-            prefs.edit().putString("shopping_items_json", newArray.toString()).commit()
+            prefs.edit()
+                .putString("shopping_items_json", newArray.toString())
+                .putInt("total_items", newArray.length())
+                .putInt("pending_count", pendingCount)
+                .putInt("checked_count", checkedCount)
+                .commit()
+
             syncWithFlutter(newArray)
             ShoppingListWidgetProvider.notifyUpdate(this)
+            MainActivity.notifyWidgetDataChanged()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -166,21 +195,28 @@ class EditItemActivity : Activity() {
 
     private fun syncWithFlutter(newArray: JSONArray) {
         try {
-            val filesDir = filesDir
-            val candidateDirs = listOf(
+            val candidateDirs = listOfNotNull(
                 File(filesDir, "app_flutter"),
                 filesDir,
+                filesDir.parentFile?.let { File(it, "app_flutter") },
                 cacheDir
             )
             for (dir in candidateDirs) {
-                val stateFile = File(dir, "carrinho_compras_state_v1.json")
-                if (stateFile.exists()) {
-                    val content = stateFile.readText()
-                    val rootJson = JSONObject(content)
-                    rootJson.put("items", newArray)
-                    stateFile.writeText(rootJson.toString())
-                    break
+                if (!dir.exists()) {
+                    dir.mkdirs()
                 }
+                val stateFile = File(dir, "carrinho_compras_state_v1.json")
+                val rootJson = if (stateFile.exists()) {
+                    try {
+                        JSONObject(stateFile.readText())
+                    } catch (_: Exception) {
+                        JSONObject()
+                    }
+                } else {
+                    JSONObject()
+                }
+                rootJson.put("items", newArray)
+                stateFile.writeText(rootJson.toString())
             }
         } catch (_: Exception) {}
     }

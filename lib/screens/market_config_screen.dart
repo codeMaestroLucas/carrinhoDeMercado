@@ -402,145 +402,131 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
     final textSecondary = AppColors.textSecondary(context);
     final borderColor = AppColors.border(context);
 
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          color: surfaceColor,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Market Selector Row
-              Row(
-                children: [
-                  Icon(
-                    Icons.storefront_rounded,
-                    size: 16,
-                    color: textSecondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Selecione o mercado:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+        if (!isLandscape)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            color: surfaceColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Market Selector Row
+                Row(
+                  children: [
+                    Icon(
+                      Icons.storefront_rounded,
+                      size: 16,
                       color: textSecondary,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: controller.markets.map((market) {
-                    final isSelected = market.id == activeMarket.id;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        visualDensity: VisualDensity.compact,
-                        avatar: Icon(
-                          Icons.storefront_outlined,
-                          size: 15,
-                          color: isSelected
-                              ? AppColors.primaryGreen
-                              : textSecondary,
-                        ),
-                        label: Text(market.name),
-                        selected: isSelected,
-                        onSelected: (_) => controller.selectMarket(market.id),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Selecione o mercado:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textSecondary,
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 10),
-
-              // 2. Visual Route Explanation Banner for the Active Market
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.30),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: controller.markets.map((market) {
+                      final isSelected = market.id == activeMarket.id;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          visualDensity: VisualDensity.compact,
+                          avatar: Icon(
+                            Icons.storefront_outlined,
+                            size: 15,
+                            color: isSelected
+                                ? AppColors.primaryGreen
+                                : textSecondary,
+                          ),
+                          label: Text(market.name),
+                          selected: isSelected,
+                          onSelected: (_) => controller.selectMarket(market.id),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGreen.withValues(
-                              alpha: 0.18,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.route_rounded,
-                            size: 18,
-                            color: AppColors.primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ordem dos Corredores • ${activeMarket.name}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Organize a sequência em que os setores estão dispostos neste mercado (do 1º corredor até o caixa).',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: textSecondary,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                const SizedBox(height: 10),
+
+                // 2. Visual Route Explanation Banner for the Active Market
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.30),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => _showAddOrEditMarketDialog(
-                            existingMarket: activeMarket,
-                          ),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGreen.withValues(
+                                alpha: 0.18,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            child: const Icon(
+                              Icons.route_rounded,
+                              size: 18,
+                              color: AppColors.primaryGreen,
+                            ),
                           ),
-                          icon: const Icon(Icons.edit_outlined, size: 14),
-                          label: const Text(
-                            'Renomear mercado',
-                            style: TextStyle(fontSize: 12),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Ordem dos Corredores • ${activeMarket.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Organize a sequência em que os setores estão dispostos neste mercado (do 1º corredor até o caixa).',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: textSecondary,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        if (controller.markets.length > 1) ...[
-                          const SizedBox(width: 4),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
                           TextButton.icon(
-                            onPressed: () => _confirmDeleteMarket(activeMarket),
+                            onPressed: () => _showAddOrEditMarketDialog(
+                              existingMarket: activeMarket,
+                            ),
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(
@@ -549,28 +535,114 @@ class _MarketConfigScreenState extends State<MarketConfigScreen> {
                               ),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              size: 14,
-                              color: Color(0xFFEF4444),
-                            ),
+                            icon: const Icon(Icons.edit_outlined, size: 14),
                             label: const Text(
-                              'Excluir',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFEF4444),
-                              ),
+                              'Renomear mercado',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
+                          if (controller.markets.length > 1) ...[
+                            const SizedBox(width: 4),
+                            TextButton.icon(
+                              onPressed: () => _confirmDeleteMarket(activeMarket),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                size: 14,
+                                color: Color(0xFFEF4444),
+                              ),
+                              label: const Text(
+                                'Excluir',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFEF4444),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: surfaceColor,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                    color: textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  ...controller.markets.map((market) {
+                    final isSelected = market.id == activeMarket.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        visualDensity: VisualDensity.compact,
+                        avatar: Icon(
+                          Icons.storefront_outlined,
+                          size: 14,
+                          color: isSelected
+                              ? AppColors.primaryGreen
+                              : textSecondary,
+                        ),
+                        label: Text(market.name, style: const TextStyle(fontSize: 12)),
+                        selected: isSelected,
+                        onSelected: (_) => controller.selectMarket(market.id),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () => _showAddOrEditMarketDialog(
+                      existingMarket: activeMarket,
+                    ),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    ),
+                    icon: const Icon(Icons.edit_outlined, size: 13),
+                    label: const Text('Renomear', style: TextStyle(fontSize: 11)),
+                  ),
+                  if (controller.markets.length > 1) ...[
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: () => _confirmDeleteMarket(activeMarket),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      ),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 13,
+                        color: Color(0xFFEF4444),
+                      ),
+                      label: const Text(
+                        'Excluir',
+                        style: TextStyle(fontSize: 11, color: Color(0xFFEF4444)),
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
         Divider(height: 1, color: borderColor),
         Expanded(
           child: Container(

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
@@ -12,11 +12,33 @@ import 'services/category_classifier.dart';
 import 'theme/app_colors.dart';
 import 'widgets/lottie_cart_splash.dart';
 
-// Conecta automaticamente ao seu banco '(default)'
-final db = FirebaseFirestore.instance;
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Em celulares (tela com menor dimensão física reduzida), trava na vertical (portrait).
+  // Em tablets/iPads ou dispositivos com largura maior, mantém flexibilidade.
+  final view = WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
+  if (view != null) {
+    final physicalSize = view.physicalSize;
+    final pixelRatio = view.devicePixelRatio;
+    if (pixelRatio > 0) {
+      final logicalWidth = physicalSize.shortestSide / pixelRatio;
+      // Dispositivos com menor largura < 600dp são celulares (smartphones)
+      if (logicalWidth < 600) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+    }
+  } else {
+    // Fallback padrão para smartphones
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+
   runApp(const CarrinhoComprasApp(showSplashOnStart: true));
 }
 
@@ -40,6 +62,7 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
   int _currentTabIndex = 1; // Opens on Lista (index 1), with Home (casinha) at index 0
   late bool _isShowingSplash;
   Timer? _splashTimer;
+  Timer? _periodicSyncTimer;
   StreamSubscription<Uri?>? _widgetClickSubscription;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
@@ -50,12 +73,12 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
     _controller = widget.controller ?? ShoppingController();
     _isShowingSplash = widget.showSplashOnStart;
     if (_isShowingSplash) {
-      _splashTimer = Timer(const Duration(milliseconds: 2500), () {
-        if (mounted) {
-          setState(() {
-            _isShowingSplash = false;
-          });
-        }
+      // Desativa a splash tão logo o carregamento e sincronização terminem
+      _controller.loadFuture?.then((_) {
+        _dismissSplashFast();
+      });
+      _splashTimer = Timer(const Duration(milliseconds: 700), () {
+        _dismissSplashFast();
       });
     }
 
@@ -63,17 +86,54 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
     HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
     _widgetClickSubscription = HomeWidget.widgetClicked.listen(_handleWidgetUri);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller.initializeCloudSync();
-      _controller.syncFromHomeWidget();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _controller.syncFromHomeWidget();
+      _dismissSplashFast();
+      await _controller.initializeCloudSync();
     });
+
+    _startPeriodicSync();
+  }
+
+  void _dismissSplashFast() {
+    if (mounted && _isShowingSplash) {
+      _splashTimer?.cancel();
+      setState(() {
+        _isShowingSplash = false;
+      });
+    }
+  }
+
+  void _startPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) {
+        _controller.syncFromHomeWidget();
+      }
+    });
+  }
+
+  void _stopPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _controller.syncFromHomeWidget();
+      _startPeriodicSync();
+      _handleAppResumed();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _stopPeriodicSync();
+      _controller.flushToHomeWidget();
     }
+  }
+
+  Future<void> _handleAppResumed() async {
+    await _controller.syncFromHomeWidget();
+    await _controller.refreshCloudSync();
   }
 
   @override
@@ -81,6 +141,7 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
     WidgetsBinding.instance.removeObserver(this);
     _widgetClickSubscription?.cancel();
     _splashTimer?.cancel();
+    _stopPeriodicSync();
     if (widget.controller == null) {
       _controller.dispose();
     }
@@ -96,6 +157,7 @@ class _CarrinhoComprasAppState extends State<CarrinhoComprasApp>
           _currentTabIndex = 1;
         });
       }
+      _controller.syncFromHomeWidget();
       if (uri.host == 'add_item') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showQuickAddFromWidget();

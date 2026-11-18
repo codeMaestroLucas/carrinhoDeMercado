@@ -66,6 +66,14 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
             }
         }
         super.onReceive(context, intent)
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val thisWidget = ComponentName(context, ShoppingListWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
+            if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_list_view)
+            }
+        }
     }
 
     private fun handleDeleteAction(context: Context, itemId: String) {
@@ -74,15 +82,30 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
         try {
             val originalArray = JSONArray(jsonStr)
             val newArray = JSONArray()
+            var pendingCount = 0
+            var checkedCount = 0
+
             for (i in 0 until originalArray.length()) {
                 val item = originalArray.getJSONObject(i)
                 if (item.optString("id") != itemId) {
                     newArray.put(item)
+                    if (item.optBoolean("isChecked", false)) {
+                        checkedCount++
+                    } else {
+                        pendingCount++
+                    }
                 }
             }
-            prefs.edit().putString("shopping_items_json", newArray.toString()).commit()
+            prefs.edit()
+                .putString("shopping_items_json", newArray.toString())
+                .putInt("total_items", newArray.length())
+                .putInt("pending_count", pendingCount)
+                .putInt("checked_count", checkedCount)
+                .commit()
+
             syncWithFlutterFile(context, newArray)
             notifyUpdate(context)
+            MainActivity.notifyWidgetDataChanged()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -94,6 +117,8 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
         try {
             val jsonArray = JSONArray(jsonStr)
             var modified = false
+            var pendingCount = 0
+            var checkedCount = 0
 
             for (i in 0 until jsonArray.length()) {
                 val item = jsonArray.getJSONObject(i)
@@ -101,15 +126,26 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
                     val currentChecked = item.optBoolean("isChecked", false)
                     item.put("isChecked", !currentChecked)
                     modified = true
-                    break
+                }
+                if (item.optBoolean("isChecked", false)) {
+                    checkedCount++
+                } else {
+                    pendingCount++
                 }
             }
 
             if (modified) {
                 val updatedJson = jsonArray.toString()
-                prefs.edit().putString("shopping_items_json", updatedJson).commit()
+                prefs.edit()
+                    .putString("shopping_items_json", updatedJson)
+                    .putInt("total_items", jsonArray.length())
+                    .putInt("pending_count", pendingCount)
+                    .putInt("checked_count", checkedCount)
+                    .commit()
+
                 syncWithFlutterFile(context, jsonArray)
                 notifyUpdate(context)
+                MainActivity.notifyWidgetDataChanged()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -119,20 +155,28 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
     private fun syncWithFlutterFile(context: Context, newItemsArray: JSONArray) {
         try {
             val filesDir = context.filesDir
-            val candidateDirs = listOf(
+            val candidateDirs = listOfNotNull(
                 File(filesDir, "app_flutter"),
                 filesDir,
+                filesDir.parentFile?.let { File(it, "app_flutter") },
                 context.cacheDir
             )
             for (dir in candidateDirs) {
-                val stateFile = File(dir, "carrinho_compras_state_v1.json")
-                if (stateFile.exists()) {
-                    val content = stateFile.readText()
-                    val rootJson = JSONObject(content)
-                    rootJson.put("items", newItemsArray)
-                    stateFile.writeText(rootJson.toString())
-                    break
+                if (!dir.exists()) {
+                    dir.mkdirs()
                 }
+                val stateFile = File(dir, "carrinho_compras_state_v1.json")
+                val rootJson = if (stateFile.exists()) {
+                    try {
+                        JSONObject(stateFile.readText())
+                    } catch (_: Exception) {
+                        JSONObject()
+                    }
+                } else {
+                    JSONObject()
+                }
+                rootJson.put("items", newItemsArray)
+                stateFile.writeText(rootJson.toString())
             }
         } catch (_: Exception) {}
     }
@@ -153,22 +197,26 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
                 views.setInt(R.id.widget_container, "setBackgroundResource", R.drawable.widget_bg_dark)
                 views.setInt(R.id.widget_header_gradient, "setBackgroundResource", R.drawable.widget_header_gradient_overlay)
                 views.setTextColor(R.id.widget_title, 0xFFFFFFFF.toInt())
+                views.setInt(R.id.widget_cart_icon, "setColorFilter", 0xFFFFFFFF.toInt())
                 views.setInt(R.id.widget_divider, "setBackgroundColor", 0xFF2E3440.toInt())
                 views.setInt(R.id.widget_bottom_input_box, "setBackgroundResource", R.drawable.bottom_input_bg_dark)
                 views.setTextColor(R.id.widget_bottom_hint, 0xFF9CA3AF.toInt())
+                views.setTextColor(R.id.widget_empty_view, 0xFF9CA3AF.toInt())
             } else {
                 views.setInt(R.id.widget_container, "setBackgroundResource", R.drawable.widget_bg_light)
                 views.setInt(R.id.widget_header_gradient, "setBackgroundResource", R.drawable.widget_header_gradient_overlay_light)
                 views.setTextColor(R.id.widget_title, 0xFF111827.toInt())
+                views.setInt(R.id.widget_cart_icon, "setColorFilter", 0xFF111827.toInt())
                 views.setInt(R.id.widget_divider, "setBackgroundColor", 0xFFE5E7EB.toInt())
                 views.setInt(R.id.widget_bottom_input_box, "setBackgroundResource", R.drawable.bottom_input_bg_light)
                 views.setTextColor(R.id.widget_bottom_hint, 0xFF6B7280.toInt())
+                views.setTextColor(R.id.widget_empty_view, 0xFF6B7280.toInt())
             }
 
             // Configura o RemoteViewsService do ListView
             val serviceIntent = Intent(context, ShoppingListRemoteViewsService::class.java).apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                data = Uri.parse("content://com.lucasrajao.carrinhoDecompras/widget/$widgetId")
+                data = Uri.parse("content://com.lucasrajao.carrinhoDecompras/widget/$widgetId/${System.currentTimeMillis()}")
             }
             views.setRemoteAdapter(R.id.widget_list_view, serviceIntent)
             views.setEmptyView(R.id.widget_list_view, R.id.widget_empty_view)
@@ -202,6 +250,24 @@ class ShoppingListWidgetProvider : HomeWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_bottom_input_box, quickAddPendingIntent)
             views.setOnClickPendingIntent(R.id.widget_btn_bottom_add, quickAddPendingIntent)
+
+            // Configura o clique no cabeçalho ou empty view: abre o app direto na lista de compras
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("carrinho://open_list")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            val openAppPendingIntent = PendingIntent.getActivity(
+                context,
+                2001,
+                openAppIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            )
+            views.setOnClickPendingIntent(R.id.widget_header_container, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_header, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_title, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_cart_icon, openAppPendingIntent)
+            views.setOnClickPendingIntent(R.id.widget_empty_view, openAppPendingIntent)
 
             appWidgetManager.updateAppWidget(widgetId, views)
             appWidgetManager.notifyAppWidgetViewDataChanged(widgetId, R.id.widget_list_view)

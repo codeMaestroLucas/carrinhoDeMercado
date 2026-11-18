@@ -7,6 +7,18 @@ enum ProductCategory {
     icon: Icons.restaurant_outlined,
     color: Color(0xFF4CAF50),
   ),
+  hortifruti(
+    id: 'hortifruti',
+    label: 'Hortifruti',
+    icon: Icons.eco_outlined,
+    color: Color(0xFF689F38),
+  ),
+  congelados(
+    id: 'congelados',
+    label: 'Congelados',
+    icon: Icons.ac_unit_outlined,
+    color: Color(0xFF00ACC1),
+  ),
   bebidas(
     id: 'bebidas',
     label: 'Bebidas',
@@ -70,10 +82,27 @@ enum ProductCategory {
 
   static ProductCategory fromId(String? id) {
     if (id == null) return ProductCategory.diversos;
+    final lower = id.trim().toLowerCase();
     for (final category in ProductCategory.values) {
-      if (category.id == id || category.name == id) {
+      if (category.id == lower || category.name == lower) {
         return category;
       }
+    }
+    // Aliases for backwards compatibility
+    if (lower == 'hortifruti' ||
+        lower == 'hortifrúti' ||
+        lower == 'vegetais' ||
+        lower == 'vegetal' ||
+        lower == 'frutas' ||
+        lower == 'fruta' ||
+        lower == 'legumes' ||
+        lower == 'legume' ||
+        lower == 'verduras' ||
+        lower == 'verdura') {
+      return ProductCategory.hortifruti;
+    }
+    if (lower == 'congelados' || lower == 'congelado') {
+      return ProductCategory.congelados;
     }
     return ProductCategory.diversos;
   }
@@ -251,32 +280,44 @@ class PurchaseHistoryItem {
     required this.name,
     required this.category,
     required this.price,
+    this.unitPrice,
     this.quantity = 1.0,
     this.unit = 'un',
   });
 
   final String name;
   final ProductCategory category;
-  final double price;
+  final double price; // Valor total pago pelo conjunto deste item
+  final double? unitPrice; // Preço unitário (se quantity > 1)
   final double quantity;
   final String unit;
+
+  /// Retorna o preço unitário efetivo do item
+  double get effectiveUnitPrice =>
+      unitPrice ?? (quantity > 0 ? (price / quantity) : price);
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
       'category': category.id,
       'price': price,
+      'unitPrice': unitPrice ?? effectiveUnitPrice,
       'quantity': quantity,
       'unit': unit,
     };
   }
 
   factory PurchaseHistoryItem.fromJson(Map<String, dynamic> json) {
+    final qty = (json['quantity'] as num?)?.toDouble() ?? 1.0;
+    final pr = (json['price'] as num?)?.toDouble() ?? 0.0;
+    final uPrice = (json['unitPrice'] as num?)?.toDouble() ??
+        (qty > 0 ? (pr / qty) : pr);
     return PurchaseHistoryItem(
       name: json['name'] as String,
       category: ProductCategory.fromId(json['category'] as String?),
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 1.0,
+      price: pr,
+      unitPrice: uPrice,
+      quantity: qty,
       unit: (json['unit'] as String?) ?? 'un',
     );
   }
@@ -400,6 +441,9 @@ class ProductHistoryOccurrence {
     required this.productName,
     required this.category,
     required this.price,
+    this.unitPrice,
+    this.quantity = 1.0,
+    this.unit = 'un',
     required this.marketName,
     required this.date,
   });
@@ -407,8 +451,14 @@ class ProductHistoryOccurrence {
   final String productName;
   final ProductCategory category;
   final double price;
+  final double? unitPrice;
+  final double quantity;
+  final String unit;
   final String marketName;
   final DateTime date;
+
+  double get effectiveUnitPrice =>
+      unitPrice ?? (quantity > 0 ? (price / quantity) : price);
 }
 
 class MarketProductStats {

@@ -70,6 +70,27 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
             .trim();
   }
 
+  // Accurately parse SEFAZ quantities (1.000 == 1 und, 2.000 == 2 und, 1.0000 == 1 und, 0.450 == 0.450 kg)
+  function parseSefazQuantity(raw) {
+    if (!raw) return 1.0;
+    var s = String(raw).trim().replace(/[^0-9,\.]/g, '');
+    if (!s) return 1.0;
+
+    var dotCount = (s.match(/\./g) || []).length;
+    var commaCount = (s.match(/,/g) || []).length;
+
+    if (dotCount === 1 && commaCount === 0) {
+      var parts = s.split('.');
+      return parseFloat(parts[0]) + parseFloat('0.' + parts[1]);
+    } else if (commaCount === 1 && dotCount === 0) {
+      var parts = s.split(',');
+      return parseFloat(parts[0]) + parseFloat('0.' + parts[1]);
+    } else if (dotCount >= 1 && commaCount === 1) {
+      return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+    }
+    return parseFloat(s.replace(',', '.')) || 1.0;
+  }
+
   function processDocument(doc) {
     if (!doc || !doc.body) return;
 
@@ -119,11 +140,43 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         }
       }
 
+      var qty = 1.0;
+      var unit = 'un';
+      var unitPrice = 0.0;
+
+      var qMatch = liText.match(/qtde\.?:?\s*(\d+(?:[,\.]\d+)?)/i);
+      if (qMatch) {
+        var parsedQ = parseSefazQuantity(qMatch[1]);
+        if (parsedQ > 0) qty = parsedQ;
+      }
+
+      var uMatch = liText.match(/un:\s*([a-zA-Z]+)/i);
+      if (uMatch) {
+        unit = uMatch[1].trim().toLowerCase();
+      }
+
+      var upMatch = liText.match(/vl\.\s*unit\.?:?\s*(?:r\$\s*)?(\d{1,4},\d{2})/i);
+      if (upMatch) {
+        unitPrice = parseFloat(upMatch[1].replace('.', '').replace(',', '.'));
+      }
+
+      if (!price || price <= 0) {
+        if (unitPrice > 0) price = unitPrice * qty;
+      } else if (qty > 1 && unitPrice > 0 && price <= unitPrice) {
+        price = unitPrice * qty;
+      }
+
+      var effectiveUnitPrice = unitPrice > 0 ? unitPrice : (price > 0 && qty > 0 ? price / qty : price);
       var cleanedName = cleanName(rawName);
+
       if (cleanedName.length >= 2 && price > 0) {
-        if (!result.items.some(function(it) { return it.name === cleanedName && it.price === price; })) {
-          result.items.push({ name: cleanedName, price: price });
-        }
+        result.items.push({
+          name: cleanedName,
+          price: price,
+          unitPrice: effectiveUnitPrice,
+          quantity: qty,
+          unit: unit
+        });
       }
     });
 
@@ -134,11 +187,51 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         var row = el.closest('tr') || el.parentElement;
         var name = cleanName(el.innerText || el.textContent || '');
         var valEl = row ? row.querySelector('.valor, .fixo-prod-vl-total') : null;
+        var p = 0.0;
         if (valEl) {
-          var p = parseFloat((valEl.innerText || valEl.textContent || '').replace(/[^\d,]/g, '').replace(',', '.'));
-          if (name.length >= 2 && !isNaN(p) && p > 0) {
-            result.items.push({ name: name, price: p });
-          }
+          p = parseFloat((valEl.innerText || valEl.textContent || '').replace(/[^\d,]/g, '').replace(',', '.'));
+        }
+
+        var qty = 1.0;
+        var unit = 'un';
+        var unitPrice = 0.0;
+
+        var qEl = row ? row.querySelector('.Rqtd, .fixo-prod-qtd') : null;
+        if (qEl) {
+          var qTxt = (qEl.innerText || qEl.textContent || '').replace(/[^\d,\.]/g, '');
+          var parsedQ = parseSefazQuantity(qTxt);
+          if (parsedQ > 0) qty = parsedQ;
+        }
+
+        var uEl = row ? row.querySelector('.RUN, .fixo-prod-unidade') : null;
+        if (uEl) {
+          var uTxt = (uEl.innerText || uEl.textContent || '').replace(/UN:\s*/i, '').trim().toLowerCase();
+          if (uTxt.length > 0) unit = uTxt;
+        }
+
+        var upEl = row ? row.querySelector('.RvlUnit, .fixo-prod-vl-unit') : null;
+        if (upEl) {
+          var upTxt = (upEl.innerText || upEl.textContent || '').replace(/[^\d,\.]/g, '');
+          var parsedUp = parseFloat(upTxt.replace(',', '.'));
+          if (parsedUp > 0) unitPrice = parsedUp;
+        }
+
+        if (p <= 0 && unitPrice > 0) {
+          p = unitPrice * qty;
+        } else if (qty > 1 && unitPrice > 0 && p <= unitPrice) {
+          p = unitPrice * qty;
+        }
+
+        var effectiveUp = unitPrice > 0 ? unitPrice : (p > 0 && qty > 0 ? p / qty : p);
+
+        if (name.length >= 2 && !isNaN(p) && p > 0) {
+          result.items.push({
+            name: name,
+            price: p,
+            unitPrice: effectiveUp,
+            quantity: qty,
+            unit: unit
+          });
         }
       });
     }
@@ -166,6 +259,34 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
             }
           }
 
+          var qty = 1.0;
+          var unit = 'un';
+          var unitPrice = 0.0;
+
+          var qMatch = line.match(/qtde\.?:?\s*(\d+(?:[,\.]\d+)?)/i);
+          if (qMatch) {
+            var parsedQ = parseSefazQuantity(qMatch[1]);
+            if (parsedQ > 0) qty = parsedQ;
+          }
+
+          var uMatch = line.match(/un:\s*([a-zA-Z]+)/i);
+          if (uMatch) {
+            unit = uMatch[1].trim().toLowerCase();
+          }
+
+          var upMatch = line.match(/vl\.\s*unit\.?:?\s*(?:r\$\s*)?(\d{1,4},\d{2})/i);
+          if (upMatch) {
+            unitPrice = parseFloat(upMatch[1].replace('.', '').replace(',', '.'));
+          }
+
+          if (p <= 0 && unitPrice > 0) {
+            p = unitPrice * qty;
+          } else if (qty > 1 && unitPrice > 0 && p <= unitPrice) {
+            p = unitPrice * qty;
+          }
+
+          var effectiveUp = unitPrice > 0 ? unitPrice : (p > 0 && qty > 0 ? p / qty : p);
+
           var candidateName = '';
           if (i >= 2 && lines[i - 1].toLowerCase().indexOf('total') !== -1) {
             candidateName = cleanName(lines[i - 2]);
@@ -176,9 +297,13 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
           if (candidateName.length >= 2 && p > 0) {
             var cLow = candidateName.toLowerCase();
             if (!cLow.includes('documento') && !cLow.includes('consumidor') && !cLow.includes('cnpj')) {
-              if (!result.items.some(function(it) { return it.name === candidateName && it.price === p; })) {
-                result.items.push({ name: candidateName, price: p });
-              }
+              result.items.push({
+                name: candidateName,
+                price: p,
+                unitPrice: effectiveUp,
+                quantity: qty,
+                unit: unit
+              });
             }
           }
         }
@@ -411,20 +536,30 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
               if (it is Map) {
                 final name = it['name']?.toString() ?? '';
                 final price = (it['price'] as num?)?.toDouble() ?? 0.0;
+                final unitPrice = (it['unitPrice'] as num?)?.toDouble();
+                final quantity = (it['quantity'] as num?)?.toDouble() ?? 1.0;
+                final unit = it['unit']?.toString() ?? 'un';
+
                 if (name.isNotEmpty && price > 0) {
                   final formattedName = _formatItemName(name);
                   items.add(
                     ScannedReceiptItem(
                       name: formattedName,
                       price: price,
+                      unitPrice: unitPrice ?? (quantity > 0 ? price / quantity : price),
+                      quantity: quantity > 0 ? quantity : 1.0,
+                      unit: unit.isNotEmpty ? unit : 'un',
                       category: CategoryClassifier.classify(formattedName),
+                      itemIndex: items.length + 1,
                     ),
                   );
                 }
               }
             }
 
-            if (items.isNotEmpty) {
+            final accumulatedItems = ReceiptScannerService.accumulateScannedItems(items);
+
+            if (accumulatedItems.isNotEmpty) {
               final rawMarket = data['marketName']?.toString().trim();
               final marketName = (rawMarket != null && rawMarket.isNotEmpty)
                   ? _formatItemName(rawMarket)
@@ -437,7 +572,7 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
                   : widget.accessKey;
 
               final parsed = NfceParsedResult(
-                items: items,
+                items: accumulatedItems,
                 marketName: marketName,
                 totalAmount: totalAmount,
                 accessKey: effectiveKey,

@@ -98,6 +98,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final editPriceController = TextEditingController(
       text: item.price.toStringAsFixed(2).replaceAll('.', ','),
     );
+    final editQtyController = TextEditingController(
+      text: item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 2),
+    );
+    final editUnitController = TextEditingController(text: item.unit);
     ProductCategory currentCategory = item.category;
 
     await showDialog<void>(
@@ -160,6 +164,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: editQtyController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Quantidade',
+                              filled: true,
+                              fillColor: subtleBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: editUnitController,
+                            decoration: InputDecoration(
+                              labelText: 'Unidade (ex: un, kg)',
+                              filled: true,
+                              fillColor: subtleBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<ProductCategory>(
                       initialValue: currentCategory,
                       isExpanded: true,
@@ -220,12 +257,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return;
                     }
 
+                    final newQty = AppFormatters.parsePrice(editQtyController.text.trim()) ?? item.quantity;
+                    final newUnit = editUnitController.text.trim().isNotEmpty ? editUnitController.text.trim() : item.unit;
+                    final effectiveQty = newQty > 0 ? newQty : 1.0;
+
                     final updated = PurchaseHistoryItem(
                       name: newName,
                       category: currentCategory,
                       price: newPrice,
-                      quantity: item.quantity,
-                      unit: item.unit,
+                      unitPrice: newPrice / effectiveQty,
+                      quantity: effectiveQty,
+                      unit: newUnit,
                     );
 
                     widget.controller.updatePurchaseRecordItem(
@@ -338,6 +380,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               final editPriceController = TextEditingController(
                 text: item.price.toStringAsFixed(2).replaceAll('.', ','),
               );
+              final editQtyController = TextEditingController(
+                text: item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 2),
+              );
+              final editUnitController = TextEditingController(text: item.unit);
               ProductCategory currentCategory = item.category ??
                   widget.controller.predictCategory(item.name);
 
@@ -346,9 +392,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 builder: (dialogCtx) {
                   return StatefulBuilder(
                     builder: (context, setDialogState) {
+                      final editItemIndex = (item.itemIndex ?? (idx + 1))
+                          .toString()
+                          .padLeft(2, '0');
                       return AlertDialog(
                         backgroundColor: AppColors.surface(context),
-                        title: const Text('Editar Item Identificado'),
+                        title: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '#$editItemIndex',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Text('Editar Item da NF')),
+                          ],
+                        ),
                         content: SingleChildScrollView(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -392,6 +464,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: editQtyController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: InputDecoration(
+                                        labelText: 'Quantidade',
+                                        filled: true,
+                                        fillColor: subtleBg,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: editUnitController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Unidade (ex: un, kg)',
+                                        filled: true,
+                                        fillColor: subtleBg,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<ProductCategory>(
@@ -446,11 +551,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               if (newName.isEmpty || newPrice == null || newPrice <= 0) {
                                 return;
                               }
+                              final newQty = AppFormatters.parsePrice(editQtyController.text.trim()) ?? item.quantity;
+                              final newUnit = editUnitController.text.trim().isNotEmpty ? editUnitController.text.trim() : item.unit;
+                              final effectiveQty = newQty > 0 ? newQty : 1.0;
+
                               setModalState(() {
                                 scannedItems[idx] = ScannedReceiptItem(
                                   name: newName,
                                   price: newPrice,
+                                  unitPrice: newPrice / effectiveQty,
                                   category: currentCategory,
+                                  quantity: effectiveQty,
+                                  unit: newUnit,
+                                  itemIndex: item.itemIndex,
                                 );
                               });
                               Navigator.of(dialogCtx).pop();
@@ -517,10 +630,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               }
             }
 
-            Future<void> openLiveQrScanner() async {
+            Future<void> openLiveQrScanner({NfceScanMode mode = NfceScanMode.qrCode}) async {
               final scannedValue = await Navigator.of(context).push<String>(
                 MaterialPageRoute(
-                  builder: (_) => const NfceQrScannerScreen(),
+                  builder: (_) => NfceQrScannerScreen(initialMode: mode),
                 ),
               );
 
@@ -538,11 +651,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     backgroundColor: AppColors.surface(context),
                     title: const Row(
                       children: [
-                        Icon(Icons.qr_code_2_rounded,
+                        Icon(Icons.numbers_rounded,
                             color: AppColors.primaryGreen),
                         SizedBox(width: 8),
                         Expanded(
-                          child: Text('Link ou Chave NFC-e'),
+                          child: Text('Chave de Acesso NFC-e'),
                         ),
                       ],
                     ),
@@ -550,15 +663,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Cole a URL do QR Code da NFC-e ou os 44 dígitos da Chave de Acesso da nota fiscal:',
+                          'Digite ou cole os 11 grupos de 4 números (44 dígitos da Chave de Acesso impressa na nota):',
                           style: TextStyle(fontSize: 13, color: textSecondary),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: linkController,
-                          maxLines: 3,
+                          maxLines: 2,
+                          keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            hintText: 'https://... ou 3524 0112 3456...',
+                            hintText: '5326 1104 9720 9200 ...',
                             filled: true,
                             fillColor: subtleBg,
                             border: OutlineInputBorder(
@@ -586,7 +700,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             handleNfceQrOrUrl(text);
                           }
                         },
-                        child: const Text('Abrir SEFAZ'),
+                        child: const Text('Consultar Nota'),
                       ),
                     ],
                   );
@@ -832,19 +946,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                   ),
                                   onPressed:
-                                      isScanning ? null : openLiveQrScanner,
+                                      isScanning ? null : () => openLiveQrScanner(mode: NfceScanMode.qrCode),
                                   icon: const Icon(Icons.qr_code_scanner,
                                       size: 16),
                                   label: const Text(
-                                    'Escanear QR',
+                                    'QR Code',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
+                                child: FilledButton.tonalIcon(
+                                  style: FilledButton.styleFrom(
                                     visualDensity: VisualDensity.compact,
                                     padding:
                                         const EdgeInsets.symmetric(vertical: 8),
@@ -853,14 +967,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ),
                                   ),
                                   onPressed:
-                                      isScanning ? null : showPasteNfceDialog,
-                                  icon: const Icon(Icons.paste_rounded,
+                                      isScanning ? null : () => openLiveQrScanner(mode: NfceScanMode.linkSefaz),
+                                  icon: const Icon(Icons.link_rounded,
                                       size: 16),
                                   label: const Text(
-                                    'Colar Link/Chave',
+                                    'Link SEFAZ',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                tooltip: 'Digitar chave ou link',
+                                onPressed:
+                                    isScanning ? null : showPasteNfceDialog,
+                                icon: const Icon(Icons.edit_note_rounded,
+                                    size: 20),
                               ),
                             ],
                           ),
@@ -1030,18 +1153,49 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           tooltip: 'Adicionar item à nota',
                           visualDensity: VisualDensity.compact,
                           onPressed: () {
-                            final name = manualNameController.text.trim();
+                            final rawName = manualNameController.text.trim();
                             final price = AppFormatters.parsePrice(
                               manualPriceController.text,
                             );
-                            if (name.isEmpty || price == null || price <= 0) {
+                            if (rawName.isEmpty || price == null || price <= 0) {
                               return;
                             }
+                            final parsed = CategoryClassifier.extractQuantityAndName(rawName);
+                            final cleanName = parsed.name.isNotEmpty ? parsed.name : rawName;
+                            final normClean = CategoryClassifier.normalize(cleanName);
+
                             setModalState(() {
-                              scannedItems.insert(
-                                0,
-                                ScannedReceiptItem(name: name, price: price),
+                              final existingIdx = scannedItems.indexWhere(
+                                (it) => CategoryClassifier.normalize(it.name) == normClean,
                               );
+                              if (existingIdx != -1) {
+                                final existing = scannedItems[existingIdx];
+                                final addQty = parsed.quantity > 0 ? parsed.quantity.toDouble() : 1.0;
+                                existing.quantity += addQty;
+                                existing.price += price;
+                                existing.unitPrice = existing.price / existing.quantity;
+                                if (existing.unit == 'un' && parsed.unit != 'un') {
+                                  existing.unit = parsed.unit;
+                                }
+                              } else {
+                                final nextIndex = scannedItems.isNotEmpty
+                                    ? (scannedItems
+                                            .map((e) => e.itemIndex ?? 0)
+                                            .reduce(math.max) +
+                                        1)
+                                    : 1;
+                                final qty = parsed.quantity > 0 ? parsed.quantity.toDouble() : 1.0;
+                                scannedItems.add(
+                                  ScannedReceiptItem(
+                                    name: cleanName,
+                                    price: price,
+                                    unitPrice: price / qty,
+                                    quantity: qty,
+                                    unit: parsed.unit,
+                                    itemIndex: nextIndex,
+                                  ),
+                                );
+                              }
                               manualNameController.clear();
                               manualPriceController.clear();
                             });
@@ -1091,13 +1245,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             final item = scannedItems[idx];
                             final cat = item.category ??
                                 widget.controller.predictCategory(item.name);
+                            final displayNum = (item.itemIndex ?? (idx + 1))
+                                .toString()
+                                .padLeft(2, '0');
                             return ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                cat.icon,
-                                color: cat.color,
-                                size: 18,
+                              leading: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: subtleBg,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      '#$displayNum',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    cat.icon,
+                                    color: cat.color,
+                                    size: 18,
+                                  ),
+                                ],
                               ),
                               title: Text(
                                 item.name,
@@ -1108,7 +1289,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                cat.label,
+                                item.quantity > 1
+                                    ? '${cat.label} • ${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 2)} ${item.unit} x ${AppFormatters.formatCurrency(item.effectiveUnitPrice)}'
+                                    : cat.label,
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: cat.color,
@@ -1170,6 +1353,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   category: s.category ??
                                       widget.controller.predictCategory(s.name),
                                   price: s.price,
+                                  unitPrice: s.effectiveUnitPrice,
                                   quantity: s.quantity > 0 ? s.quantity : 1.0,
                                   unit: s.unit.isNotEmpty ? s.unit : 'un',
                                 );
@@ -1454,7 +1638,63 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       itemBuilder: (context, index) {
         final record = records[index];
-        return ExpansionTile(
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        return Dismissible(
+          key: ValueKey('history_record_${record.id}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF451A1A) : const Color(0xFFFEE2E2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Apagar',
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFFF87171) : const Color(0xFFEF4444),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.delete_outline_rounded,
+                  color: isDark ? const Color(0xFFF87171) : const Color(0xFFEF4444),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+          onDismissed: (_) {
+            final deletedRecord = record;
+            final deletedIndex = index;
+            widget.controller.deletePurchaseRecord(record.id);
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Compra de "${record.marketName}" (${AppFormatters.formatCurrency(record.totalAmount)}) apagada.',
+                ),
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: 'Desfazer',
+                  textColor: const Color(0xFF4ADE80),
+                  onPressed: () {
+                    widget.controller.restorePurchaseRecord(
+                      deletedRecord,
+                      atIndex: deletedIndex,
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+          child: ExpansionTile(
           shape: const Border(),
           collapsedShape: const Border(),
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -1525,6 +1765,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     color: textPrimary,
                   ),
                 ),
+                subtitle: item.quantity > 1
+                    ? Text(
+                        '${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 2)} ${item.unit} x ${AppFormatters.formatCurrency(item.effectiveUnitPrice)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      )
+                    : null,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1612,8 +1862,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ],
-        );
-      },
+        ),
+      );
+    },
     );
   }
 

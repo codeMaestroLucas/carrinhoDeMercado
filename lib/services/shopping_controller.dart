@@ -22,12 +22,20 @@ class ShoppingController extends ChangeNotifier {
   ShoppingController({this.enablePersistence = true}) {
     _initializeDefaultData();
     if (enablePersistence) {
-      loadFromDisk();
+      _loadFuture = loadFromDisk();
+      HomeWidgetService.registerWidgetSyncListener(_onWidgetDataChangedNatively);
     }
   }
 
+  void _onWidgetDataChangedNatively() {
+    syncFromHomeWidget();
+  }
+
   final bool enablePersistence;
-  final String _clientId =
+  Future<void>? _loadFuture;
+  Future<void>? get loadFuture => _loadFuture;
+
+  String _clientId =
       'client_${DateTime.now().microsecondsSinceEpoch}';
 
   List<ShoppingItem> _items = [];
@@ -239,6 +247,8 @@ class ShoppingController extends ChangeNotifier {
           ProductCategory.perfumariaHigiene,
           ProductCategory.bebidas,
           ProductCategory.alimentos,
+          ProductCategory.hortifruti,
+          ProductCategory.congelados,
           ProductCategory.bebeCrianca,
           ProductCategory.petShop,
           ProductCategory.bazar,
@@ -249,7 +259,9 @@ class ShoppingController extends ChangeNotifier {
         id: 'mercado_bairro',
         name: 'Mercado do Bairro',
         categoryOrder: [
+          ProductCategory.hortifruti,
           ProductCategory.alimentos,
+          ProductCategory.congelados,
           ProductCategory.bebidas,
           ProductCategory.perfumariaHigiene,
           ProductCategory.limpeza,
@@ -724,6 +736,16 @@ class ShoppingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void restorePurchaseRecord(PurchaseRecord record, {int? atIndex}) {
+    if (atIndex != null && atIndex >= 0 && atIndex <= _history.length) {
+      _history.insert(atIndex, record);
+    } else {
+      _history.insert(0, record);
+    }
+    _saveToDisk();
+    notifyListeners();
+  }
+
   /// Updates an item inside an existing purchase record by record ID and item index.
   void updatePurchaseRecordItem(
     String recordId,
@@ -946,11 +968,38 @@ class ShoppingController extends ChangeNotifier {
   // Cloud Sync (Firebase Firestore) Methods
   Future<void> initializeCloudSync() async {
     if (!enablePersistence) return;
+    if (_loadFuture != null) {
+      await _loadFuture;
+    }
     final ready = await CloudSyncService.initializeFirebase();
     if (ready && _sharedSpaceCode != null && _sharedSpaceCode!.isNotEmpty) {
       _startCloudListener(_sharedSpaceCode!);
+      await refreshCloudSync();
     }
     notifyListeners();
+  }
+
+  Future<void> refreshCloudSync() async {
+    if (!enablePersistence || _sharedSpaceCode == null || _sharedSpaceCode!.isEmpty) return;
+    try {
+      final code = _sharedSpaceCode!;
+      final data = await CloudSyncService.fetchSharedSpace(code);
+      if (data != null && data['updatedByClientId'] != _clientId) {
+        _isApplyingRemoteUpdate = true;
+        try {
+          _applyStateFromMap(data);
+          await _saveToDisk(pushCloud: false);
+          notifyListeners();
+        } finally {
+          _isApplyingRemoteUpdate = false;
+        }
+      }
+      if (_cloudSubscription == null && CloudSyncService.isFirebaseReady) {
+        _startCloudListener(code);
+      }
+    } catch (e) {
+      debugPrint('Falha ao atualizar dados da nuvem: $e');
+    }
   }
 
   Future<String> createNewSharedSpace() async {
@@ -1025,15 +1074,21 @@ class ShoppingController extends ChangeNotifier {
           _applyStateFromMap(data);
           _saveToDisk(pushCloud: false);
           notifyListeners();
+        } catch (e, st) {
+          debugPrint('Erro ao aplicar atualização remota da nuvem: $e\n$st');
         } finally {
           _isApplyingRemoteUpdate = false;
         }
+      },
+      onError: (err) {
+        debugPrint('Erro na conexão do listener de sincronização: $err');
       },
     );
   }
 
   Map<String, dynamic> _buildStateMap() {
     return {
+      'clientId': _clientId,
       'items': _items.map((e) => e.toJson()).toList(),
       'markets': _markets.map((m) => m.toJson()).toList(),
       'selectedMarketId': _selectedMarketId,
@@ -1050,11 +1105,11 @@ class ShoppingController extends ChangeNotifier {
     };
   }
 
-  void _applyStateFromMap(Map<String, dynamic> data) {
+  void _applyStateFromMap(Map<dynamic, dynamic> data) {
     if (data['items'] is List) {
       final loaded = (data['items'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(ShoppingItem.fromJson)
+          .whereType<Map>()
+          .map((m) => ShoppingItem.fromJson(Map<String, dynamic>.from(m)))
           .toList();
       final seen = <String>{};
       _items = loaded
@@ -1064,8 +1119,8 @@ class ShoppingController extends ChangeNotifier {
 
     if (data['markets'] is List) {
       final loadedMarkets = (data['markets'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(MarketProfile.fromJson)
+          .whereType<Map>()
+          .map((m) => MarketProfile.fromJson(Map<String, dynamic>.from(m)))
           .toList();
       if (loadedMarkets.isNotEmpty) {
         _markets = loadedMarkets;
@@ -1081,29 +1136,34 @@ class ShoppingController extends ChangeNotifier {
 
     if (data['history'] is List) {
       _history = (data['history'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(PurchaseRecord.fromJson)
+          .whereType<Map>()
+          .map((m) => PurchaseRecord.fromJson(Map<String, dynamic>.from(m)))
           .toList();
     }
 
     if (data['learnedCategories'] is Map) {
-      final rawMap = data['learnedCategories'] as Map<String, dynamic>;
+      final rawMap = data['learnedCategories'] as Map;
       _learnedCategories = {
         for (final entry in rawMap.entries)
           if (entry.value is String)
-            entry.key: ProductCategory.fromId(entry.value as String),
+            entry.key.toString(): ProductCategory.fromId(entry.value as String),
       };
     }
 
     if (data['categoryDictionary'] is Map) {
-      final rawDict = data['categoryDictionary'] as Map<String, dynamic>;
+      final rawDict = data['categoryDictionary'] as Map;
       for (final entry in rawDict.entries) {
-        final cat = ProductCategory.fromId(entry.key);
+        final cat = ProductCategory.fromId(entry.key.toString());
         if (entry.value is List) {
           _categoryDictionary[cat] =
-              (entry.value as List).whereType<String>().toList();
+              (entry.value as List).map((e) => e.toString()).toList();
         }
       }
+    }
+
+    if (data['clientId'] is String &&
+        (data['clientId'] as String).trim().isNotEmpty) {
+      _clientId = (data['clientId'] as String).trim();
     }
 
     if (data['showCheckedItems'] is bool) {
@@ -1115,7 +1175,24 @@ class ShoppingController extends ChangeNotifier {
     if (kIsWeb) return null;
     try {
       final parentDir = Directory.systemTemp.parent;
-      for (final subDirName in ['Documents', 'files', 'app_flutter']) {
+      final candidateSubDirs = [
+        'app_flutter',
+        'files/app_flutter',
+        'files',
+        'Documents',
+      ];
+
+      // 1. Procura primeiro se o arquivo já existe em algum dos diretórios candidatos
+      for (final subDirName in candidateSubDirs) {
+        final candidateFile =
+            File('${parentDir.path}/$subDirName/carrinho_compras_state_v1.json');
+        if (candidateFile.existsSync()) {
+          return candidateFile;
+        }
+      }
+
+      // 2. Se ainda não existe, escolhe o diretório válido existente para criar
+      for (final subDirName in candidateSubDirs) {
         final candidateDir = Directory('${parentDir.path}/$subDirName');
         if (candidateDir.existsSync()) {
           return File('${candidateDir.path}/carrinho_compras_state_v1.json');
@@ -1160,41 +1237,106 @@ class ShoppingController extends ChangeNotifier {
     }
   }
 
+  /// Força o envio imediato da lista atualizada para o HomeWidget
+  Future<void> flushToHomeWidget() async {
+    try {
+      await HomeWidgetService.updateHomeWidget(_items, isDarkMode: _isDarkMode);
+    } catch (_) {}
+  }
+
   /// Sincroniza a lista com o que foi modificado pelo widget na tela inicial
   Future<void> syncFromHomeWidget() async {
     try {
       final widgetItems = await HomeWidgetService.getWidgetShoppingItems();
-      if (widgetItems != null && widgetItems.isNotEmpty) {
-        bool hasChanges = widgetItems.length != _items.length;
-        if (!hasChanges) {
-          for (var i = 0; i < widgetItems.length; i++) {
-            if (widgetItems[i].id != _items[i].id ||
-                widgetItems[i].isChecked != _items[i].isChecked ||
-                widgetItems[i].quantity != _items[i].quantity ||
-                widgetItems[i].name != _items[i].name) {
-              hasChanges = true;
-              break;
-            }
+      if (widgetItems == null) return;
+
+      // Caso 1: A lista foi esvaziada pelo widget
+      if (widgetItems.isEmpty) {
+        if (_items.isNotEmpty) {
+          _items.clear();
+          notifyListeners();
+          _saveToDisk(pushCloud: true, updateWidget: false);
+        }
+        return;
+      }
+
+      // Caso 2: Mescla inteligente preservando metadados ricos do app (preço, mercado, etc.)
+      final localItemsById = <String, ShoppingItem>{
+        for (final item in _items) item.id: item,
+      };
+
+      bool hasChanges = widgetItems.length != _items.length;
+      final mergedItems = <ShoppingItem>[];
+
+      for (final wItem in widgetItems) {
+        final existing = localItemsById[wItem.id];
+        if (existing == null) {
+          // Novo item inserido pelo Widget (QuickAdd)
+          hasChanges = true;
+          final bestMarket = recommendCheapestMarketForProduct(wItem.name);
+          final enrichedCategory = wItem.category == ProductCategory.diversos
+              ? predictCategory(wItem.name)
+              : wItem.category;
+          mergedItems.add(
+            wItem.copyWith(
+              category: enrichedCategory,
+              marketId: wItem.marketId ?? bestMarket?.market.id ?? _selectedMarketId,
+            ),
+          );
+        } else {
+          // Item já existente: verifica se status de checado, quantidade ou nome foram alterados no widget
+          if (existing.isChecked != wItem.isChecked ||
+              existing.quantity != wItem.quantity ||
+              existing.name != wItem.name) {
+            hasChanges = true;
+            mergedItems.add(
+              existing.copyWith(
+                isChecked: wItem.isChecked,
+                quantity: wItem.quantity,
+                unit: wItem.unit,
+                name: wItem.name,
+              ),
+            );
+          } else {
+            mergedItems.add(existing);
           }
         }
+      }
 
-        if (hasChanges) {
-          _items = List.from(widgetItems);
-          notifyListeners();
+      // Verifica se itens foram deletados pelo widget
+      if (!hasChanges) {
+        final widgetIds = widgetItems.map((e) => e.id).toSet();
+        if (_items.any((item) => !widgetIds.contains(item.id))) {
+          hasChanges = true;
         }
+      }
+
+      if (hasChanges) {
+        _items = mergedItems;
+        notifyListeners();
+        _saveToDisk(pushCloud: true, updateWidget: false);
       }
     } catch (_) {}
   }
 
-  void _saveToDisk({bool pushCloud = true}) {
+  void _saveToDisk({
+    bool pushCloud = true,
+    bool updateWidget = true,
+  }) {
     if (!enablePersistence) return;
     _saveDebounceTimer?.cancel();
     _saveDebounceTimer = Timer(const Duration(milliseconds: 300), () async {
-      await _executeSaveToDisk(pushCloud: pushCloud);
+      await _executeSaveToDisk(
+        pushCloud: pushCloud,
+        updateWidget: updateWidget,
+      );
     });
   }
 
-  Future<void> _executeSaveToDisk({bool pushCloud = true}) async {
+  Future<void> _executeSaveToDisk({
+    bool pushCloud = true,
+    bool updateWidget = true,
+  }) async {
     if (!enablePersistence) return;
     try {
       final stateMap = _buildStateMap();
@@ -1202,33 +1344,41 @@ class ShoppingController extends ChangeNotifier {
       if (file != null) {
         final payload = jsonEncode({
           ...stateMap,
+          'clientId': _clientId,
           'sharedSpaceCode': _sharedSpaceCode,
           'isDarkMode': _isDarkMode,
         });
         await file.writeAsString(payload);
       }
 
+      // Atualiza o HomeWidget localmente de imediato, sem travar na rede
+      if (updateWidget) {
+        await HomeWidgetService.updateHomeWidget(_items, isDarkMode: _isDarkMode);
+      }
+
+      // Sincronização em nuvem desacoplada e sem travar a atualização local do widget
       if (pushCloud &&
           !_isApplyingRemoteUpdate &&
           _sharedSpaceCode != null &&
           _sharedSpaceCode!.isNotEmpty &&
           CloudSyncService.isFirebaseReady) {
-        await CloudSyncService.pushStateToSharedSpace(
+        CloudSyncService.pushStateToSharedSpace(
           spaceCode: _sharedSpaceCode!,
           stateMap: stateMap,
           clientId: _clientId,
-        );
+        ).catchError((e) {
+          debugPrint('Falha ao enviar estado para nuvem em segundo plano: $e');
+        });
       }
-
-      await HomeWidgetService.updateHomeWidget(_items, isDarkMode: _isDarkMode);
     } catch (_) {
-      // Ignore file system / network errors
+      // Ignore file system errors
     }
   }
 
   @override
   void dispose() {
     _saveDebounceTimer?.cancel();
+    HomeWidgetService.unregisterWidgetSyncListener(_onWidgetDataChangedNatively);
     _cloudSubscription?.cancel();
     super.dispose();
   }
