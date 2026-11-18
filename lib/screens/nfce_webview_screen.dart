@@ -9,6 +9,7 @@ import '../services/category_classifier.dart';
 import '../services/nfce_scanner_service.dart';
 import '../services/receipt_scanner_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/formatters.dart';
 
 /// Screen that loads an official SEFAZ NFC-e URL inside an In-App WebView.
 /// Configured with platform-matching User-Agents (without '; wv') and
@@ -70,6 +71,32 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
             .trim();
   }
 
+  function parseQty(rawStr, unit) {
+    if (!rawStr) return 1.0;
+    var s = rawStr.toString().trim().replace(/\s+/g, '');
+    if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    } else if (s.indexOf(',') !== -1) {
+      s = s.replace(',', '.');
+    }
+    var q = parseFloat(s);
+    if (isNaN(q) || q <= 0) return 1.0;
+
+    var normUnit = (unit || '').toLowerCase();
+    if (normUnit !== 'g' && normUnit !== 'gr' && normUnit !== 'gramas') {
+      if (q >= 10000 && q % 10000 === 0) {
+        q = q / 10000;
+      } else if (q >= 1000 && q % 1000 === 0) {
+        q = q / 1000;
+      }
+    }
+    return q;
+  }
+
   function processDocument(doc) {
     if (!doc || !doc.body) return;
 
@@ -90,6 +117,13 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         return;
       }
 
+      // Extract product code if present: (Cód: 1019816)
+      var productCode = '';
+      var codeMatch = liText.match(/\(c[óo]d(?:igo)?:\s*(\d+)\)/i);
+      if (codeMatch) {
+        productCode = codeMatch[1];
+      }
+
       // Name: <p class="h6"> or .col-9, ignoring <small>
       var rawName = '';
       var nameEl = li.querySelector('.col-9 p.h6, p.h6, .col-9');
@@ -105,25 +139,52 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
       var cols = li.querySelectorAll('.col-3, .col-4');
       for (var c = cols.length - 1; c >= 0; c--) {
         var cTxt = cols[c].innerText || cols[c].textContent || '';
-        var pMatch = cTxt.match(/(\d{1,4},\d{2})/);
+        var pMatch = cTxt.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
         if (pMatch) {
-          price = parseFloat(pMatch[1].replace('.', '').replace(',', '.'));
+          price = parseFloat(pMatch[1].replace(/\./g, '').replace(',', '.'));
           if (price > 0) break;
         }
       }
 
       if (!price || price <= 0) {
-        var allPrices = liText.match(/(\d{1,4},\d{2})/g);
+        var allPrices = liText.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/g);
         if (allPrices && allPrices.length > 0) {
-          price = parseFloat(allPrices[allPrices.length - 1].replace('.', '').replace(',', '.'));
+          price = parseFloat(allPrices[allPrices.length - 1].replace(/\./g, '').replace(',', '.'));
+        }
+      }
+
+      // Explicit Unit Price (Vl. Unit.: XX,XX)
+      var unitPrice = null;
+      var uvMatch = liText.match(/vl\.?\s*unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+      if (uvMatch) {
+        var parsedUv = parseFloat(uvMatch[1].replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(parsedUv) && parsedUv > 0) {
+          unitPrice = parsedUv;
         }
       }
 
       var cleanedName = cleanName(rawName);
+      var unit = 'un';
+      var uMatch = liText.match(/\bUN\s*:\s*([a-zA-Z]{1,4})\b/i) || liText.match(/\b(UN|KG|G|L|LT|ML|CX|DZ|PCT|PC)\b/i);
+      if (uMatch) {
+        unit = uMatch[1].toLowerCase();
+      }
+
+      var qty = 1.0;
+      var qMatch = liText.match(/(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)/i);
+      if (qMatch) {
+        qty = parseQty(qMatch[1], unit);
+      }
+
       if (cleanedName.length >= 2 && price > 0) {
-        if (!result.items.some(function(it) { return it.name === cleanedName && it.price === price; })) {
-          result.items.push({ name: cleanedName, price: price });
-        }
+        result.items.push({
+          name: cleanedName,
+          price: price,
+          quantity: qty,
+          unit: unit,
+          unitPrice: unitPrice,
+          productCode: productCode
+        });
       }
     });
 
@@ -134,10 +195,51 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         var row = el.closest('tr') || el.parentElement;
         var name = cleanName(el.innerText || el.textContent || '');
         var valEl = row ? row.querySelector('.valor, .fixo-prod-vl-total') : null;
+        var qEl = row ? row.querySelector('.Rqtd, .fixo-prod-qtd, .qtd') : null;
+        var uEl = row ? row.querySelector('.RUN, .fixo-prod-un, .unidade') : null;
+        var uvEl = row ? row.querySelector('.RvlUnit, .fixo-prod-vl-unit') : null;
+        var cEl = row ? row.querySelector('.RCod, .fixo-prod-cod') : null;
+
+        var unit = 'un';
+        if (uEl) {
+          var ut = (uEl.innerText || uEl.textContent || '').replace(/[^a-zA-Z]/g, '');
+          if (ut) unit = ut.toLowerCase();
+        }
+
+        var qty = 1.0;
+        if (qEl) {
+          var qm = (qEl.innerText || qEl.textContent || '').match(/(\d+(?:[,\.]\d+)?)/);
+          if (qm) {
+            qty = parseQty(qm[1], unit);
+          }
+        }
+
+        var unitPrice = null;
+        if (uvEl) {
+          var uvm = (uvEl.innerText || uvEl.textContent || '').match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
+          if (uvm) {
+            var pUv = parseFloat(uvm[1].replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(pUv) && pUv > 0) unitPrice = pUv;
+          }
+        }
+
+        var productCode = '';
+        if (cEl) {
+          var cm = (cEl.innerText || cEl.textContent || '').match(/(\d+)/);
+          if (cm) productCode = cm[1];
+        }
+
         if (valEl) {
           var p = parseFloat((valEl.innerText || valEl.textContent || '').replace(/[^\d,]/g, '').replace(',', '.'));
           if (name.length >= 2 && !isNaN(p) && p > 0) {
-            result.items.push({ name: name, price: p });
+            result.items.push({
+              name: name,
+              price: p,
+              quantity: qty,
+              unit: unit,
+              unitPrice: unitPrice,
+              productCode: productCode
+            });
           }
         }
       });
@@ -154,31 +256,58 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         if (lowLine.indexOf('qtde') !== -1 || lowLine.indexOf('vl. unit') !== -1) {
           var p = 0.0;
           if (i + 1 < lines.length) {
-            var nextPMatch = lines[i + 1].match(/^(\d{1,4},\d{2})$/);
+            var nextPMatch = lines[i + 1].match(/^(\d{1,3}(?:\.\d{3})*,\d{2})$/);
             if (nextPMatch) {
-              p = parseFloat(nextPMatch[1].replace('.', '').replace(',', '.'));
+              p = parseFloat(nextPMatch[1].replace(/\./g, '').replace(',', '.'));
             }
           }
           if (p <= 0) {
-            var thisPMatch = line.match(/(\d{1,4},\d{2})/g);
+            var thisPMatch = line.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/g);
             if (thisPMatch && thisPMatch.length > 0) {
-              p = parseFloat(thisPMatch[thisPMatch.length - 1].replace('.', '').replace(',', '.'));
+              p = parseFloat(thisPMatch[thisPMatch.length - 1].replace(/\./g, '').replace(',', '.'));
             }
           }
 
-          var candidateName = '';
-          if (i >= 2 && lines[i - 1].toLowerCase().indexOf('total') !== -1) {
-            candidateName = cleanName(lines[i - 2]);
-          } else if (i >= 1) {
-            candidateName = cleanName(lines[i - 1]);
+          var unitPrice = null;
+          var uvMatch = line.match(/vl\.?\s*unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+          if (uvMatch) {
+            var pUv = parseFloat(uvMatch[1].replace(/\./g, '').replace(',', '.'));
+            if (!isNaN(pUv) && pUv > 0) unitPrice = pUv;
           }
 
+          var unit = 'un';
+          var um = line.match(/\bUN\s*:\s*([a-zA-Z]{1,4})\b/i);
+          if (um) unit = um[1].toLowerCase();
+
+          var qty = 1.0;
+          var qm = line.match(/(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)/i);
+          if (qm) {
+            qty = parseQty(qm[1], unit);
+          }
+
+          var rawCandidate = '';
+          if (i >= 2 && lines[i - 1].toLowerCase().indexOf('total') !== -1) {
+            rawCandidate = lines[i - 2];
+          } else if (i >= 1) {
+            rawCandidate = lines[i - 1];
+          }
+
+          var productCode = '';
+          var cMatch = rawCandidate.match(/\(c[óo]d(?:igo)?:\s*(\d+)\)/i);
+          if (cMatch) productCode = cMatch[1];
+
+          var candidateName = cleanName(rawCandidate);
           if (candidateName.length >= 2 && p > 0) {
             var cLow = candidateName.toLowerCase();
             if (!cLow.includes('documento') && !cLow.includes('consumidor') && !cLow.includes('cnpj')) {
-              if (!result.items.some(function(it) { return it.name === candidateName && it.price === p; })) {
-                result.items.push({ name: candidateName, price: p });
-              }
+              result.items.push({
+                name: candidateName,
+                price: p,
+                quantity: qty,
+                unit: unit,
+                unitPrice: unitPrice,
+                productCode: productCode
+              });
             }
           }
         }
@@ -215,17 +344,17 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
         var elText = el.innerText || el.textContent || '';
         if (elText.toLowerCase().indexOf('valor a pagar') !== -1) {
           var valEl = el.querySelector('.col-4, .col-3, strong, p.h6');
-          var m = (valEl ? (valEl.innerText || valEl.textContent || '') : elText).match(/(\d{1,4},\d{2})/);
+          var m = (valEl ? (valEl.innerText || valEl.textContent || '') : elText).match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
           if (m) {
-            result.total = parseFloat(m[1].replace('.', '').replace(',', '.'));
+            result.total = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
           }
         }
       });
       if (!result.total || result.total === 0) {
         var bTxt = doc.body.innerText || doc.body.textContent || '';
-        var totMatch = bTxt.match(/(?:valor\s+a\s+pagar|valor\s+total|total\s+a\s+pagar|vPag)[^\d]*?(\d{1,4},\d{2})/i);
+        var totMatch = bTxt.match(/(?:valor\s+a\s+pagar|valor\s+total|total\s+a\s+pagar|vPag)[^\d]*?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
         if (totMatch) {
-          result.total = parseFloat(totMatch[1].replace('.', '').replace(',', '.'));
+          result.total = parseFloat(totMatch[1].replace(/\./g, '').replace(',', '.'));
         }
       }
     }
@@ -411,12 +540,28 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
               if (it is Map) {
                 final name = it['name']?.toString() ?? '';
                 final price = (it['price'] as num?)?.toDouble() ?? 0.0;
+                final unitPrice = (it['unitPrice'] as num?)?.toDouble();
+                final productCode = it['productCode']?.toString().trim();
+                final rawQty = (it['quantity'] as num?)?.toDouble() ?? 1.0;
+                final unit = it['unit']?.toString() ?? 'un';
+                final normalizedUnit = AppFormatters.normalizeUnit(unit);
+                final quantity = AppFormatters.parseQuantity(
+                      rawQty.toString(),
+                      unit: normalizedUnit,
+                    ) ??
+                    (rawQty > 0 ? rawQty : 1.0);
                 if (name.isNotEmpty && price > 0) {
                   final formattedName = _formatItemName(name);
                   items.add(
                     ScannedReceiptItem(
                       name: formattedName,
                       price: price,
+                      quantity: quantity > 0 ? quantity : 1.0,
+                      unit: normalizedUnit,
+                      unitPrice: unitPrice,
+                      productCode: (productCode != null && productCode.isNotEmpty)
+                          ? productCode
+                          : null,
                       category: CategoryClassifier.classify(formattedName),
                     ),
                   );
@@ -425,6 +570,7 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
             }
 
             if (items.isNotEmpty) {
+              final mergedItems = NfceScannerService.mergeDuplicateItems(items);
               final rawMarket = data['marketName']?.toString().trim();
               final marketName = (rawMarket != null && rawMarket.isNotEmpty)
                   ? _formatItemName(rawMarket)
@@ -437,7 +583,7 @@ class _NfceWebViewScreenState extends State<NfceWebViewScreen> {
                   : widget.accessKey;
 
               final parsed = NfceParsedResult(
-                items: items,
+                items: mergedItems,
                 marketName: marketName,
                 totalAmount: totalAmount,
                 accessKey: effectiveKey,

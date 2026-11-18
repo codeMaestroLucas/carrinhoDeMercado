@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/shopping_models.dart';
 import '../services/category_classifier.dart';
@@ -98,6 +99,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final editPriceController = TextEditingController(
       text: item.price.toStringAsFixed(2).replaceAll('.', ','),
     );
+    final editQuantityController = TextEditingController(
+      text: item.quantity == item.quantity.roundToDouble()
+          ? item.quantity.toInt().toString()
+          : item.quantity.toString().replaceAll('.', ','),
+    );
+    String selectedUnit = AppFormatters.normalizeUnit(item.unit);
     ProductCategory currentCategory = item.category;
 
     await showDialog<void>(
@@ -139,6 +146,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           });
                         }
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: TextField(
+                            controller: editQuantityController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Quantidade',
+                              prefixIcon: const Icon(
+                                Icons.numbers_rounded,
+                                color: AppColors.primaryGreen,
+                              ),
+                              filled: true,
+                              fillColor: subtleBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 4,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'].contains(selectedUnit)
+                                ? selectedUnit
+                                : 'un',
+                            decoration: InputDecoration(
+                              labelText: 'Unidade',
+                              filled: true,
+                              fillColor: subtleBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'un', child: Text('un')),
+                              DropdownMenuItem(value: 'kg', child: Text('kg')),
+                              DropdownMenuItem(value: 'g', child: Text('g')),
+                              DropdownMenuItem(value: 'L', child: Text('L')),
+                              DropdownMenuItem(value: 'ml', child: Text('ml')),
+                              DropdownMenuItem(value: 'dz', child: Text('dz')),
+                              DropdownMenuItem(value: 'cx', child: Text('cx')),
+                              DropdownMenuItem(value: 'pct', child: Text('pct')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() {
+                                  selectedUnit = val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -209,6 +276,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final newPrice = AppFormatters.parsePrice(
                       editPriceController.text.trim(),
                     );
+                    final newQuantity = AppFormatters.parseQuantity(
+                      editQuantityController.text.trim(),
+                      unit: selectedUnit,
+                    ) ?? 1.0;
 
                     if (newName.isEmpty || newPrice == null || newPrice < 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,8 +295,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       name: newName,
                       category: currentCategory,
                       price: newPrice,
-                      quantity: item.quantity,
-                      unit: item.unit,
+                      quantity: newQuantity > 0 ? newQuantity : 1.0,
+                      unit: selectedUnit,
                     );
 
                     widget.controller.updatePurchaseRecordItem(
@@ -305,7 +376,319 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Future<void> _showAddReceiptPurchaseModal() async {
+  Future<void> _handleNfceInput(String rawInput) async {
+    final targetUrl = NfceScannerService.resolveUrlFromInput(rawInput);
+    final accessKey = NfceScannerService.extractAccessKey(rawInput);
+
+    if (targetUrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível extrair um link válido de NFC-e ou chave de acesso de 44 dígitos.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    final result = await Navigator.of(context).push<NfceParsedResult>(
+      MaterialPageRoute(
+        builder: (_) => NfceWebViewScreen(
+          url: targetUrl,
+          accessKey: accessKey,
+        ),
+      ),
+    );
+
+    if (result != null && result.isSuccess && mounted) {
+      await _showAddReceiptPurchaseModal(initialNfceResult: result);
+    }
+  }
+
+  Future<void> _openLiveQrScannerFlow() async {
+    final scannedValue = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => const NfceQrScannerScreen(),
+      ),
+    );
+
+    if (scannedValue != null && scannedValue.trim().isNotEmpty && mounted) {
+      await _handleNfceInput(scannedValue.trim());
+    }
+  }
+
+  Future<void> _showPasteNfceFlow() async {
+    final linkController = TextEditingController();
+    final subtleBg = AppColors.subtleSurface(context);
+    final textSecondary = AppColors.textSecondary(context);
+    bool checkedClipboard = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            if (!checkedClipboard) {
+              checkedClipboard = true;
+              Clipboard.getData(Clipboard.kTextPlain).then((clip) {
+                final clipText = clip?.text?.trim() ?? '';
+                if (clipText.isNotEmpty &&
+                    (NfceScannerService.extractAccessKey(clipText) != null ||
+                        NfceScannerService.extractSefazUrl(clipText) != null)) {
+                  linkController.text = clipText;
+                  if (dialogCtx.mounted) {
+                    setDialogState(() {});
+                  }
+                }
+              }).catchError((_) {});
+            }
+
+            final text = linkController.text.trim();
+            final validation = NfceScannerService.validateInput(text);
+            final statusText = validation.statusMessage;
+            final Color statusColor = validation.isValid
+                ? AppColors.primaryGreen
+                : (text.replaceAll(RegExp(r'\D'), '').isNotEmpty &&
+                        text.replaceAll(RegExp(r'\D'), '').length < 44
+                    ? Colors.orange
+                    : Colors.redAccent);
+
+            return AlertDialog(
+              backgroundColor: AppColors.surface(context),
+              title: const Row(
+                children: [
+                  Icon(Icons.link_rounded, color: AppColors.primaryGreen),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Ler por Link ou Chave'),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Cole a URL do QR Code da NFC-e ou os 44 dígitos da Chave de Acesso impressa:',
+                      style: TextStyle(fontSize: 13, color: textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: linkController,
+                      maxLines: 3,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'https://... ou 3524 0112 3456...',
+                        filled: true,
+                        fillColor: subtleBg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          final clip =
+                              await Clipboard.getData(Clipboard.kTextPlain);
+                          final val = clip?.text?.trim();
+                          if (val != null && val.isNotEmpty) {
+                            linkController.text = val;
+                            setDialogState(() {});
+                          }
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.paste_rounded, size: 16),
+                      label: const Text('Colar da Área de Transferência'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    if (statusText != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actionsOverflowDirection: VerticalDirection.down,
+              actionsOverflowButtonSpacing: 8,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                  ),
+                  onPressed: () {
+                    final input = linkController.text.trim();
+                    if (input.isNotEmpty) {
+                      Navigator.of(dialogCtx).pop();
+                      _handleNfceInput(input);
+                    }
+                  },
+                  child: const Text('Abrir SEFAZ'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddPurchaseOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        final textPrimary = AppColors.textPrimary(context);
+        final textSecondary = AppColors.textSecondary(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded, color: AppColors.primaryGreen),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Como deseja adicionar a compra?',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primaryGreen),
+                  ),
+                  title: Text(
+                    'Ler pelo QR Code',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
+                  ),
+                  subtitle: Text(
+                    'Abre a câmera para escanear o QR Code da NFC-e',
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _openLiveQrScannerFlow();
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentGreen.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.link_rounded, color: AppColors.accentGreen),
+                  ),
+                  title: Text(
+                    'Ler pelo Link ou Chave',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
+                  ),
+                  subtitle: Text(
+                    'Cole a URL da SEFAZ ou os 44 dígitos da nota',
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _showPasteNfceFlow();
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.camera_alt_outlined, color: Colors.orange),
+                  ),
+                  title: Text(
+                    'Fotografar Cupom (OCR)',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
+                  ),
+                  subtitle: Text(
+                    'Foto de cupom impresso com reconhecimento de texto',
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _showAddReceiptPurchaseModal();
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.edit_note_rounded, color: Colors.blue),
+                  ),
+                  title: Text(
+                    'Digitar Manualmente',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
+                  ),
+                  subtitle: Text(
+                    'Cadastre mercado, produtos e valores manualmente',
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _showAddReceiptPurchaseModal();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddReceiptPurchaseModal({
+    NfceParsedResult? initialNfceResult,
+  }) async {
     final imagePicker = ImagePicker();
     String selectedMarketId = widget.controller.selectedMarket.id;
     final newMarketController = TextEditingController();
@@ -313,6 +696,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
     bool isScanning = false;
     String? scanError;
     final scannedItems = <ScannedReceiptItem>[];
+
+    if (initialNfceResult != null && initialNfceResult.isSuccess) {
+      scannedItems.addAll(initialNfceResult.items);
+      if (initialNfceResult.marketName != null &&
+          initialNfceResult.marketName!.isNotEmpty) {
+        final normalizedName =
+            CategoryClassifier.normalize(initialNfceResult.marketName!);
+        final existingMarket = widget.controller.markets.firstWhere(
+          (m) =>
+              CategoryClassifier.normalize(m.name) == normalizedName,
+          orElse: () =>
+              MarketProfile(id: '', name: '', categoryOrder: []),
+        );
+        if (existingMarket.id.isNotEmpty) {
+          selectedMarketId = existingMarket.id;
+          isCreatingNewMarket = false;
+        } else {
+          newMarketController.text = initialNfceResult.marketName!;
+          isCreatingNewMarket = true;
+        }
+      }
+    }
 
     final manualNameController = TextEditingController();
     final manualPriceController = TextEditingController();
@@ -338,6 +743,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               final editPriceController = TextEditingController(
                 text: item.price.toStringAsFixed(2).replaceAll('.', ','),
               );
+              final editQuantityController = TextEditingController(
+                text: item.quantity == item.quantity.roundToDouble()
+                    ? item.quantity.toInt().toString()
+                    : item.quantity.toString().replaceAll('.', ','),
+              );
+              String selectedUnit = AppFormatters.normalizeUnit(item.unit);
               ProductCategory currentCategory = item.category ??
                   widget.controller.predictCategory(item.name);
 
@@ -373,6 +784,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     });
                                   }
                                 },
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: TextField(
+                                      controller: editQuantityController,
+                                      keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Quantidade',
+                                        prefixIcon: const Icon(
+                                          Icons.numbers_rounded,
+                                          color: AppColors.primaryGreen,
+                                        ),
+                                        filled: true,
+                                        fillColor: subtleBg,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 4,
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'].contains(selectedUnit)
+                                          ? selectedUnit
+                                          : 'un',
+                                      decoration: InputDecoration(
+                                        labelText: 'Unidade',
+                                        filled: true,
+                                        fillColor: subtleBg,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'un', child: Text('un')),
+                                        DropdownMenuItem(value: 'kg', child: Text('kg')),
+                                        DropdownMenuItem(value: 'g', child: Text('g')),
+                                        DropdownMenuItem(value: 'L', child: Text('L')),
+                                        DropdownMenuItem(value: 'ml', child: Text('ml')),
+                                        DropdownMenuItem(value: 'dz', child: Text('dz')),
+                                        DropdownMenuItem(value: 'cx', child: Text('cx')),
+                                        DropdownMenuItem(value: 'pct', child: Text('pct')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setDialogState(() {
+                                            selectedUnit = val;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               TextField(
@@ -443,6 +914,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               final newPrice = AppFormatters.parsePrice(
                                 editPriceController.text,
                               );
+                              final newQuantity = AppFormatters.parseQuantity(
+                                editQuantityController.text,
+                                unit: selectedUnit,
+                              ) ?? 1.0;
                               if (newName.isEmpty || newPrice == null || newPrice <= 0) {
                                 return;
                               }
@@ -451,6 +926,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   name: newName,
                                   price: newPrice,
                                   category: currentCategory,
+                                  quantity: newQuantity > 0 ? newQuantity : 1.0,
+                                  unit: selectedUnit,
                                 );
                               });
                               Navigator.of(dialogCtx).pop();
@@ -759,7 +1236,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     const SizedBox(height: 12),
 
-                    // Card: Leitura de QR Code NFC-e com In-App WebView anti-Captcha
+                    // Card: Leitura de QR Code ou Link NFC-e com In-App WebView anti-Captcha
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -775,14 +1252,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           Row(
                             children: [
                               const Icon(
-                                Icons.qr_code_scanner_rounded,
+                                Icons.receipt_long_rounded,
                                 color: AppColors.primaryGreen,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
-                                  'Importar via QR Code da NFC-e',
+                                  'Importar Nota Fiscal (NFC-e)',
                                   style: TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
@@ -812,7 +1289,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Lê os produtos direto da SEFAZ com validação de Captcha integrada no app:',
+                            'Escolha se deseja ler escaneando o QR Code da nota ou digitando/colando o Link ou Chave:',
                             style:
                                 TextStyle(fontSize: 11.5, color: textSecondary),
                           ),
@@ -833,10 +1310,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ),
                                   onPressed:
                                       isScanning ? null : openLiveQrScanner,
-                                  icon: const Icon(Icons.qr_code_scanner,
+                                  icon: const Icon(Icons.qr_code_scanner_rounded,
                                       size: 16),
                                   label: const Text(
-                                    'Escanear QR',
+                                    'Ler por QR Code',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -854,10 +1331,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ),
                                   onPressed:
                                       isScanning ? null : showPasteNfceDialog,
-                                  icon: const Icon(Icons.paste_rounded,
+                                  icon: const Icon(Icons.link_rounded,
                                       size: 16),
                                   label: const Text(
-                                    'Colar Link/Chave',
+                                    'Ler por Link / Chave',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
@@ -1030,17 +1507,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           tooltip: 'Adicionar item à nota',
                           visualDensity: VisualDensity.compact,
                           onPressed: () {
-                            final name = manualNameController.text.trim();
+                            final rawName = manualNameController.text.trim();
                             final price = AppFormatters.parsePrice(
                               manualPriceController.text,
                             );
-                            if (name.isEmpty || price == null || price <= 0) {
+                            if (rawName.isEmpty || price == null || price <= 0) {
                               return;
                             }
+                            final cleanName =
+                                NfceScannerService.cleanNfceProductName(rawName);
                             setModalState(() {
                               scannedItems.insert(
                                 0,
-                                ScannedReceiptItem(name: name, price: price),
+                                ScannedReceiptItem(
+                                  name: cleanName.isNotEmpty ? cleanName : rawName,
+                                  price: price,
+                                  category: widget.controller.predictCategory(
+                                    cleanName.isNotEmpty ? cleanName : rawName,
+                                  ),
+                                  quantity: 1.0,
+                                  unit: 'un',
+                                ),
                               );
                               manualNameController.clear();
                               manualPriceController.clear();
@@ -1091,6 +1578,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             final item = scannedItems[idx];
                             final cat = item.category ??
                                 widget.controller.predictCategory(item.name);
+                            final qtyFormatted = AppFormatters.formatQuantity(
+                              item.quantity,
+                              item.unit,
+                            );
+                            final hasMultiple = item.quantity > 1;
+                            final unitPrice = item.effectiveUnitPrice;
+                            final isWeightOrVol = item.unit == 'kg' ||
+                                item.unit == 'g' ||
+                                item.unit == 'L' ||
+                                item.unit == 'ml';
                             return ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
@@ -1108,7 +1605,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                cat.label,
+                                hasMultiple
+                                    ? '${cat.label} • $qtyFormatted (${AppFormatters.formatCurrency(unitPrice)}${isWeightOrVol ? '/${item.unit}' : ' cada'})'
+                                    : '${cat.label} • $qtyFormatted',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: cat.color,
@@ -1250,7 +1749,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: const Text('Histórico de Compras'),
         actions: [
           FilledButton.icon(
-            onPressed: _showAddReceiptPurchaseModal,
+            onPressed: _showAddPurchaseOptions,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
@@ -1525,6 +2024,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     color: textPrimary,
                   ),
                 ),
+                subtitle: Text(
+                  item.quantity > 1
+                      ? '${item.category.label} • ${AppFormatters.formatQuantity(item.quantity, item.unit)} (${AppFormatters.formatCurrency(item.price / item.quantity)} cada)'
+                      : '${item.category.label} • ${AppFormatters.formatQuantity(item.quantity, item.unit)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                  ),
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1574,10 +2082,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     onPressed: () {
                       var added = 0;
                       for (final item in record.items) {
+                        final unitPrice = item.price > 0
+                            ? (item.quantity > 1 ? (item.price / item.quantity) : item.price)
+                            : null;
                         final res = widget.controller.addSingleItem(
                           item.name,
                           category: item.category,
-                          price: item.price > 0 ? item.price : null,
+                          price: unitPrice,
+                          quantity: item.quantity.round() > 0 ? item.quantity.round() : 1,
+                          unit: item.unit,
                         );
                         if (res != null) added++;
                       }
@@ -1653,9 +2166,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Ao finalizar uma compra na aba Lista ou escanear uma Nota Fiscal acima, o registro completo aparecerá aqui.',
+              'Ao finalizar uma compra na aba Lista ou ler uma Nota Fiscal pelo QR Code ou Link, o registro aparecerá aqui.',
               style: TextStyle(fontSize: 13, color: textSecondary),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                FilledButton.icon(
+                  onPressed: _openLiveQrScannerFlow,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                  label: const Text('Ler por QR Code'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _showPasteNfceFlow,
+                  icon: const Icon(Icons.link_rounded, size: 16),
+                  label: const Text('Ler por Link / Chave'),
+                ),
+              ],
             ),
           ],
         ),

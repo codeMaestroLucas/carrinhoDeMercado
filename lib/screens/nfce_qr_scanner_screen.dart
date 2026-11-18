@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../services/nfce_scanner_service.dart';
+import '../services/receipt_scanner_service.dart';
 import '../theme/app_colors.dart';
 
 class NfceQrScannerScreen extends StatefulWidget {
@@ -25,9 +27,13 @@ class _NfceQrScannerScreenState extends State<NfceQrScannerScreen>
   void initState() {
     super.initState();
     _controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.noDuplicates,
+      detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
-      formats: const [BarcodeFormat.qrCode],
+      formats: const [
+        BarcodeFormat.qrCode,
+        BarcodeFormat.code128,
+        BarcodeFormat.dataMatrix,
+      ],
     );
 
     _animController = AnimationController(
@@ -53,11 +59,17 @@ class _NfceQrScannerScreenState extends State<NfceQrScannerScreen>
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
       if (raw != null && raw.trim().isNotEmpty) {
-        _hasScanned = true;
-        HapticFeedback.mediumImpact();
-        _controller.stop();
-        Navigator.of(context).pop(raw.trim());
-        break;
+        final clean = raw.trim();
+        // Verify if barcode contains valid URL or access key
+        if (NfceScannerService.extractSefazUrl(clean) != null ||
+            NfceScannerService.extractAccessKey(clean) != null ||
+            clean.length >= 20) {
+          _hasScanned = true;
+          HapticFeedback.mediumImpact();
+          _controller.stop();
+          Navigator.of(context).pop(clean);
+          break;
+        }
       }
     }
   }
@@ -66,10 +78,11 @@ class _NfceQrScannerScreenState extends State<NfceQrScannerScreen>
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        imageQuality: 95,
+        imageQuality: 100,
       );
       if (picked == null) return;
 
+      // 1. Try mobile_scanner image barcode analysis first
       final capture = await _controller.analyzeImage(picked.path);
       if (capture != null && capture.barcodes.isNotEmpty) {
         for (final barcode in capture.barcodes) {
@@ -84,11 +97,34 @@ class _NfceQrScannerScreenState extends State<NfceQrScannerScreen>
         }
       }
 
+      // 2. Fallback: OCR recognition of printed 44-digit key or URL on the receipt
+      final ocrText =
+          await ReceiptScannerService.recognizeTextFromImage(picked.path);
+      if (ocrText.isNotEmpty) {
+        final url = NfceScannerService.extractSefazUrl(ocrText);
+        if (url != null && mounted) {
+          _hasScanned = true;
+          HapticFeedback.mediumImpact();
+          _controller.stop();
+          Navigator.of(context).pop(url);
+          return;
+        }
+
+        final key = NfceScannerService.extractAccessKey(ocrText);
+        if (key != null && mounted) {
+          _hasScanned = true;
+          HapticFeedback.mediumImpact();
+          _controller.stop();
+          Navigator.of(context).pop(key);
+          return;
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Nenhum QR Code encontrado nesta foto. Tente aproximar ou escolha outra imagem.',
+              'Não foi possível encontrar o QR Code ou Chave de Acesso legível nesta foto. Tente aproximar ou escolha outra imagem.',
             ),
             backgroundColor: Colors.orange,
           ),
@@ -108,59 +144,127 @@ class _NfceQrScannerScreenState extends State<NfceQrScannerScreen>
 
   Future<void> _showManualInputDialog() async {
     final textController = TextEditingController();
+    bool checkedClipboard = false;
+
     final result = await showDialog<String>(
       context: context,
       builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface(context),
-          title: const Row(
-            children: [
-              Icon(Icons.edit_note_rounded, color: AppColors.primaryGreen),
-              SizedBox(width: 8),
-              Expanded(child: Text('Digitar Chave / Link')),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Cole a URL do QR Code da SEFAZ ou os 44 dígitos da Chave de Acesso impressa:',
-                style: TextStyle(fontSize: 13),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            if (!checkedClipboard) {
+              checkedClipboard = true;
+              Clipboard.getData(Clipboard.kTextPlain).then((clip) {
+                final clipText = clip?.text?.trim() ?? '';
+                if (clipText.isNotEmpty &&
+                    (NfceScannerService.extractAccessKey(clipText) != null ||
+                        NfceScannerService.extractSefazUrl(clipText) != null)) {
+                  textController.text = clipText;
+                  if (dialogCtx.mounted) {
+                    setDialogState(() {});
+                  }
+                }
+              }).catchError((_) {});
+            }
+
+            final text = textController.text.trim();
+            final validation = NfceScannerService.validateInput(text);
+            final statusText = validation.statusMessage;
+            final Color statusColor = validation.isValid
+                ? AppColors.primaryGreen
+                : (text.replaceAll(RegExp(r'\D'), '').isNotEmpty &&
+                        text.replaceAll(RegExp(r'\D'), '').length < 44
+                    ? Colors.orange
+                    : Colors.redAccent);
+
+            return AlertDialog(
+              backgroundColor: AppColors.surface(context),
+              title: const Row(
+                children: [
+                  Icon(Icons.edit_note_rounded, color: AppColors.primaryGreen),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Digitar Chave / Link')),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: textController,
-                autofocus: true,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'https://... ou 44 dígitos',
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Cole a URL do QR Code da SEFAZ ou os 44 dígitos da Chave de Acesso impressa:',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: textController,
+                      autofocus: true,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        hintText: 'https://... ou 44 dígitos',
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          final clip =
+                              await Clipboard.getData(Clipboard.kTextPlain);
+                          final val = clip?.text?.trim();
+                          if (val != null && val.isNotEmpty) {
+                            textController.text = val;
+                            setDialogState(() {});
+                          }
+                        } catch (_) {}
+                      },
+                      icon: const Icon(Icons.paste_rounded, size: 16),
+                      label: const Text('Colar da Área de Transferência'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    if (statusText != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                final text = textController.text.trim();
-                if (text.isNotEmpty) {
-                  Navigator.of(dialogCtx).pop(text);
-                }
-              },
-              child: const Text('Confirmar'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    final text = textController.text.trim();
+                    if (text.isNotEmpty) {
+                      Navigator.of(dialogCtx).pop(text);
+                    }
+                  },
+                  child: const Text('Confirmar'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

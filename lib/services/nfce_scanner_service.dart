@@ -31,6 +31,22 @@ class NfceParsedResult {
   bool get isSuccess => items.isNotEmpty;
 }
 
+class NfceInputValidationResult {
+  const NfceInputValidationResult({
+    this.isValid = false,
+    this.statusMessage,
+    this.accessKey,
+    this.url,
+    this.uf,
+  });
+
+  final bool isValid;
+  final String? statusMessage;
+  final String? accessKey;
+  final String? url;
+  final String? uf;
+}
+
 class NfceScannerService {
   static const Map<String, String> _ufByCode = {
     '11': 'RO',
@@ -62,52 +78,150 @@ class NfceScannerService {
     '53': 'DF',
   };
 
+  static const Map<String, String> _ufNames = {
+    'AC': 'Acre',
+    'AL': 'Alagoas',
+    'AP': 'Amapá',
+    'AM': 'Amazonas',
+    'BA': 'Bahia',
+    'CE': 'Ceará',
+    'DF': 'Distrito Federal',
+    'ES': 'Espírito Santo',
+    'GO': 'Goiás',
+    'MA': 'Maranhão',
+    'MT': 'Mato Grosso',
+    'MS': 'Mato Grosso do Sul',
+    'MG': 'Minas Gerais',
+    'PA': 'Pará',
+    'PB': 'Paraíba',
+    'PR': 'Paraná',
+    'PE': 'Pernambuco',
+    'PI': 'Piauí',
+    'RJ': 'Rio de Janeiro',
+    'RN': 'Rio Grande do Norte',
+    'RS': 'Rio Grande do Sul',
+    'RO': 'Rondônia',
+    'RR': 'Roraima',
+    'SC': 'Santa Catarina',
+    'SP': 'São Paulo',
+    'SE': 'Sergipe',
+    'TO': 'Tocantins',
+  };
+
+  static bool _isValidUfCode(String code) => _ufByCode.containsKey(code);
+
+  /// Returns full friendly name of a Brazilian state given its 2-letter UF.
+  static String? getStateName(String? uf) {
+    if (uf == null) return null;
+    return _ufNames[uf.toUpperCase()];
+  }
+
   /// Extracts a 44-digit access key from a raw string, URL or OCR text.
   static String? extractAccessKey(String rawInput) {
-    // 1. Direct 44 consecutive digits
-    final directMatch = RegExp(r'\b(\d{44})\b').firstMatch(rawInput);
-    if (directMatch != null) return directMatch.group(1);
+    if (rawInput.trim().isEmpty) return null;
+    var text = rawInput.replaceAll('\u00A0', ' ').trim();
 
-    // 2. Chave de acesso inside URL param "p=..." (e.g. p=352309...|2|1|1|...)
-    final paramMatch = RegExp(r'[?&]p=([0-9]{44})').firstMatch(rawInput);
-    if (paramMatch != null) return paramMatch.group(1);
+    // Decode URL if percent encoded
+    if (text.contains('%')) {
+      try {
+        text = Uri.decodeComponent(text);
+      } catch (_) {}
+    }
+
+    // 1. Chave de acesso inside URL param (p=, chNFe=, chave=, chaveDeAcesso=, nfe=)
+    final paramMatch = RegExp(
+      r'[?&](?:p|chNFe|chave|chaveDeAcesso|nfe)=([0-9]{44})(?:[|%&]|$)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (paramMatch != null) {
+      final key = paramMatch.group(1)!;
+      if (_isValidUfCode(key.substring(0, 2))) return key;
+    }
+
+    // 2. Direct 44 consecutive digits
+    final directMatches = RegExp(r'\b(\d{44})\b').allMatches(text);
+    for (final m in directMatches) {
+      final candidate = m.group(1)!;
+      if (_isValidUfCode(candidate.substring(0, 2))) return candidate;
+    }
+    if (directMatches.isNotEmpty) return directMatches.first.group(1);
 
     // 3. 11 groups of 4 digits (e.g. "5326 1104 9720 9200 6163 6520 2000 2167 9411 9768 4255")
     final spacedMatch = RegExp(
-      r'\b\d{4}(?:[\s\.\-]+\d{4}){10}\b',
+      r'\b\d{4}(?:[\s\.\-]+[0-9]{4}){10}\b',
       caseSensitive: false,
-    ).firstMatch(rawInput);
+    ).firstMatch(text);
     if (spacedMatch != null) {
       final keyDigits = spacedMatch.group(0)!.replaceAll(RegExp(r'\D'), '');
-      if (keyDigits.length == 44) return keyDigits;
+      if (keyDigits.length == 44 && _isValidUfCode(keyDigits.substring(0, 2))) {
+        return keyDigits;
+      }
     }
 
-    // 4. If rawInput is a short string (e.g. typed key, without surrounding HTML)
-    if (rawInput.length <= 100) {
-      final cleanDigits = rawInput.replaceAll(RegExp(r'\D'), '');
-      if (cleanDigits.length == 44) return cleanDigits;
+    // 4. Preceded by keywords like "chave de acesso" or "nfc-e"
+    final keywordMatch = RegExp(
+      r'(?:chave(?:(?:\s+de)?\s+acesso)?|nfc-?e)[\s:]*([0-9\s\.\-]{44,60})',
+      caseSensitive: false,
+    ).firstMatch(text);
+    if (keywordMatch != null) {
+      final digits = keywordMatch.group(1)!.replaceAll(RegExp(r'\D'), '');
+      if (digits.length == 44 && _isValidUfCode(digits.substring(0, 2))) {
+        return digits;
+      }
+      if (digits.length >= 44) {
+        final sub = digits.substring(0, 44);
+        if (_isValidUfCode(sub.substring(0, 2))) return sub;
+      }
+    }
 
-      final sub44 = RegExp(r'\d{44}').firstMatch(cleanDigits);
-      if (sub44 != null) return sub44.group(0);
+    // 5. Look for any 44-digit sequence with a valid UF in all extracted digits
+    final allDigits = text.replaceAll(RegExp(r'\D'), '');
+    if (allDigits.length == 44 && _isValidUfCode(allDigits.substring(0, 2))) {
+      return allDigits;
+    }
+    if (allDigits.length > 44) {
+      for (int i = 0; i <= allDigits.length - 44; i++) {
+        final slice = allDigits.substring(i, i + 44);
+        if (_isValidUfCode(slice.substring(0, 2))) {
+          return slice;
+        }
+      }
     }
 
     return null;
   }
 
-  /// Extracts a valid SEFAZ NFC-e QR code URL from a string.
+  /// Extracts a valid SEFAZ NFC-e QR code URL from a string or clipboard input.
   static String? extractSefazUrl(String rawInput) {
-    final trimmed = rawInput.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
+    if (rawInput.trim().isEmpty) return null;
+    var text = rawInput.trim();
+
+    // Strip enclosing quotes, brackets, parentheses
+    text = text.replaceAll(RegExp(r'^["\x27<(\[]+|["\x27>)\]]+$'), '').trim();
+
+    // If input lacks scheme but starts with a known government portal domain
+    if (!text.startsWith('http://') && !text.startsWith('https://')) {
+      final domainMatch = RegExp(
+        r'^((?:www\.)?(?:[a-zA-Z0-9-]+\.)*(?:fazenda|sefaz|sefin|receita|portalsped|satsp|dec\.fazenda)[a-zA-Z0-9-._~:/?#\[\]@!$&()*+,;=%|]+)',
+        caseSensitive: false,
+      ).firstMatch(text);
+      if (domainMatch != null) {
+        text = 'https://${domainMatch.group(1)}';
+      }
+    }
+
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      return _cleanTrailingUrlPunctuation(text);
     }
 
     final urlRegex = RegExp(r'https?://[^\s<>"]+');
     final matches = urlRegex.allMatches(rawInput);
     for (final m in matches) {
-      final candidate = m.group(0)!;
+      final candidate = _cleanTrailingUrlPunctuation(m.group(0)!);
       final lower = candidate.toLowerCase();
       if (lower.contains('fazenda') ||
           lower.contains('sefaz') ||
+          lower.contains('sefin') ||
           lower.contains('nfce') ||
           lower.contains('nfe') ||
           lower.contains('satsp') ||
@@ -118,9 +232,13 @@ class NfceScannerService {
       }
     }
     if (matches.isNotEmpty) {
-      return matches.first.group(0);
+      return _cleanTrailingUrlPunctuation(matches.first.group(0)!);
     }
     return null;
+  }
+
+  static String _cleanTrailingUrlPunctuation(String url) {
+    return url.replaceAll(RegExp(r'[.,;:!?)\]\>]+$'), '');
   }
 
   /// Extracts UF State from a 44-digit access key.
@@ -138,6 +256,57 @@ class NfceScannerService {
       return '${cnpjRaw.substring(0, 2)}.${cnpjRaw.substring(2, 5)}.${cnpjRaw.substring(5, 8)}/${cnpjRaw.substring(8, 12)}-${cnpjRaw.substring(12, 14)}';
     }
     return cnpjRaw;
+  }
+
+  /// Validates pasted/typed NFC-e URL or access key and produces user-friendly feedback.
+  static NfceInputValidationResult validateInput(String rawInput) {
+    final text = rawInput.trim();
+    if (text.isEmpty) {
+      return const NfceInputValidationResult();
+    }
+
+    final key = extractAccessKey(text);
+    final url = extractSefazUrl(text);
+
+    if (url != null) {
+      final uf = key != null ? getUfFromAccessKey(key) : null;
+      final ufName = uf != null ? getStateName(uf) : null;
+      return NfceInputValidationResult(
+        isValid: true,
+        url: url,
+        accessKey: key,
+        uf: uf,
+        statusMessage: ufName != null
+            ? '✓ Link SEFAZ identificado ($ufName - $uf)'
+            : '✓ Link SEFAZ identificado',
+      );
+    }
+
+    if (key != null) {
+      final uf = getUfFromAccessKey(key);
+      final ufName = uf != null ? getStateName(uf) : null;
+      return NfceInputValidationResult(
+        isValid: true,
+        accessKey: key,
+        uf: uf,
+        statusMessage: ufName != null
+            ? '✓ Chave de acesso válida ($ufName - $uf)'
+            : '✓ Chave de 44 dígitos válida',
+      );
+    }
+
+    final digits = text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isNotEmpty && digits.length < 44) {
+      return NfceInputValidationResult(
+        isValid: false,
+        statusMessage: '${digits.length} de 44 dígitos digitados',
+      );
+    }
+
+    return const NfceInputValidationResult(
+      isValid: false,
+      statusMessage: 'Formato não reconhecido',
+    );
   }
 
   /// Fetches the NFC-e web page and parses its items, market name, and totals.
@@ -199,18 +368,60 @@ class NfceScannerService {
   static String? buildPortalUrlFromKey(String key) {
     final uf = getUfFromAccessKey(key);
     switch (uf) {
-      case 'SP':
-        return 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx?p=$key|2|1|1|';
-      case 'RS':
-        return 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=$key|2|1|1|';
-      case 'PR':
-        return 'http://www.fazenda.pr.gov.br/nfce/qrcode?p=$key|2|1|1|';
-      case 'MG':
-        return 'https://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=$key|2|1|1|';
-      case 'RJ':
-        return 'http://www.fazenda.rj.gov.br/nfc-e/qrcode?p=$key|2|1|1|';
+      case 'AC':
+        return 'http://sefaz.ac.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'AL':
+        return 'http://nfce.sefaz.al.gov.br/consultaNFCe.aspx?p=$key|2|1|1|';
+      case 'AM':
+        return 'http://sistemas.sefaz.am.gov.br/nfceweb/consultarNFCe.jsp?p=$key|2|1|1|';
+      case 'AP':
+        return 'https://www.sefaz.ap.gov.br/nfce/qrcode?p=$key|2|1|1|';
       case 'BA':
         return 'http://nfe.sefaz.ba.gov.br/servicos/nfce/qrcode.aspx?p=$key|2|1|1|';
+      case 'CE':
+        return 'http://nfce.sefaz.ce.gov.br/pages/ShowNFCe.html?p=$key|2|1|1|';
+      case 'DF':
+        return 'https://dec.fazenda.df.gov.br/ConsultarNFCe.aspx?p=$key|2|1|1|';
+      case 'ES':
+        return 'http://app.sefaz.es.gov.br/ConsultaNFCe/qrcode.aspx?p=$key|2|1|1|';
+      case 'GO':
+        return 'http://www.sefaz.go.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'MA':
+        return 'http://www.sefaz.ma.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'MG':
+        return 'https://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml?p=$key|2|1|1|';
+      case 'MS':
+        return 'http://www.dfe.ms.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'MT':
+        return 'http://www.sefaz.mt.gov.br/nfce/consultanfce?p=$key|2|1|1|';
+      case 'PA':
+        return 'https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/nfceForm.faces?p=$key|2|1|1|';
+      case 'PB':
+        return 'https://www.sefaz.pb.gov.br/nfce?p=$key|2|1|1|';
+      case 'PE':
+        return 'http://nfce.sefaz.pe.gov.br/nfce-web/consultarNFCe?p=$key|2|1|1|';
+      case 'PI':
+        return 'https://www.sefaz.pi.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'PR':
+        return 'http://www.fazenda.pr.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'RJ':
+        return 'http://www.fazenda.rj.gov.br/nfc-e/qrcode?p=$key|2|1|1|';
+      case 'RN':
+        return 'http://nfce.set.rn.gov.br/consultarNFCe.aspx?p=$key|2|1|1|';
+      case 'RO':
+        return 'http://www.sefin.ro.gov.br/nfce/qrcode?p=$key|2|1|1|';
+      case 'RR':
+        return 'https://www.sefaz.rr.gov.br/nfce/servlet/qrcode?p=$key|2|1|1|';
+      case 'RS':
+        return 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx?p=$key|2|1|1|';
+      case 'SC':
+        return 'https://sat.sef.sc.gov.br/nfce/consulta?p=$key|2|1|1|';
+      case 'SE':
+        return 'http://www.nfe.se.gov.br/portal/consultarNFCe.jsp?p=$key|2|1|1|';
+      case 'SP':
+        return 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx?p=$key|2|1|1|';
+      case 'TO':
+        return 'http://www.sefaz.to.gov.br/nfce/qrcode?p=$key|2|1|1|';
       default:
         return 'https://www.fazenda.pr.gov.br/nfce/qrcode?p=$key|2|1|1|';
     }
@@ -254,6 +465,12 @@ class NfceScannerService {
     }
   }
 
+  /// Merges identical items across SEFAZ rows (same name, unit, unit price, and product code when present).
+  static List<ScannedReceiptItem> mergeDuplicateItems(
+    List<ScannedReceiptItem> items,
+  ) =>
+      ReceiptScannerService.mergeDuplicateItems(items);
+
   /// Parses raw HTML from any state's NFC-e portal (SP, RS, PR, MG, RJ, BA, etc.)
   static NfceParsedResult parseNfceHtml(String html, {String? fallbackKey}) {
     final items = <ScannedReceiptItem>[];
@@ -289,8 +506,10 @@ class NfceScannerService {
       items.addAll(_parseTableGeneric(html));
     }
 
+    final mergedItems = mergeDuplicateItems(items);
+
     return NfceParsedResult(
-      items: items,
+      items: mergedItems,
       marketName: marketName,
       cnpj: keyMatch != null ? getCnpjFromAccessKey(keyMatch) : null,
       accessKey: keyMatch,
@@ -298,7 +517,7 @@ class NfceScannerService {
       totalAmount: totalAmount,
       stateUf: keyMatch != null ? getUfFromAccessKey(keyMatch) : null,
       rawHtml: html,
-      errorMessage: items.isEmpty
+      errorMessage: mergedItems.isEmpty
           ? 'Nenhum item pôde ser extraído da página. O portal da SEFAZ pode requerer Captcha. Recomendamos usar a "Foto do Cupom" (OCR offline) logo abaixo.'
           : null,
     );
@@ -419,7 +638,8 @@ class NfceScannerService {
 
     for (final liMatch in liMatches) {
       final liContent = liMatch.group(1)!;
-      final lower = liContent.toLowerCase();
+      final liText = _stripTags(liContent);
+      final lower = liText.toLowerCase();
 
       // Must be an item row (contains Qtde. or Vl. Unit.) and NOT summary rows
       if (!lower.contains('qtde') && !lower.contains('vl. unit')) {
@@ -431,6 +651,13 @@ class NfceScannerService {
           lower.contains('tributos')) {
         continue;
       }
+
+      // Extract product code if present: e.g. (Cód: 1019816)
+      final codeMatch = RegExp(
+        r'\(c[óo]d(?:igo)?:\s*(\d+)\)',
+        caseSensitive: false,
+      ).firstMatch(liText);
+      final productCode = codeMatch?.group(1);
 
       // Product Name: look inside <p class="h6"> or .col-9, stripping <small>
       String? rawName;
@@ -467,7 +694,7 @@ class NfceScannerService {
 
       for (final col3 in col3Matches.toList().reversed) {
         final col3Text = _stripTags(col3.group(1)!);
-        final pMatch = RegExp(r'(\d{1,4},\d{2})').firstMatch(col3Text);
+        final pMatch = RegExp(r'(\d{1,3}(?:\.\d{3})*,\d{2})').firstMatch(col3Text);
         if (pMatch != null) {
           final candidate = AppFormatters.parsePrice(pMatch.group(1)!);
           if (candidate != null && candidate > 0) {
@@ -478,19 +705,55 @@ class NfceScannerService {
       }
 
       if (price == null || price <= 0) {
-        final allPrices = RegExp(r'(\d{1,4},\d{2})').allMatches(liContent);
+        final allPrices = RegExp(r'(\d{1,3}(?:\.\d{3})*,\d{2})').allMatches(liText);
         if (allPrices.isNotEmpty) {
           price = AppFormatters.parsePrice(allPrices.last.group(1)!);
         }
       }
 
+      // Explicit Unit Price (Vl. Unit.: XX,XX)
+      double? unitPrice;
+      final uvMatch = RegExp(
+        r'vl\.?\s*unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})',
+        caseSensitive: false,
+      ).firstMatch(liText);
+      if (uvMatch != null) {
+        unitPrice = AppFormatters.parsePrice(uvMatch.group(1)!);
+      }
+
+      // Quantity & Unit extraction (from stripped plain text so <strong> doesn't break labels)
+      String unit = 'un';
+      final uMatch = RegExp(
+        r'\bUN\s*:\s*([a-zA-Z]{1,4})\b',
+        caseSensitive: false,
+      ).firstMatch(liText);
+      if (uMatch != null) {
+        unit = AppFormatters.normalizeUnit(uMatch.group(1)!);
+      }
+
+      double quantity = 1.0;
+      final qMatch = RegExp(
+        r'(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)',
+        caseSensitive: false,
+      ).firstMatch(liText);
+      if (qMatch != null) {
+        final parsedQ = AppFormatters.parseQuantity(qMatch.group(1)!, unit: unit);
+        if (parsedQ != null && parsedQ > 0) {
+          quantity = parsedQ;
+        }
+      }
+
       if (rawName != null && price != null && price > 0) {
         final cleanName = _cleanNfceProductName(rawName);
-        if (cleanName.length >= 2 && !items.any((i) => i.name == cleanName && i.price == price)) {
+        if (cleanName.length >= 2) {
           items.add(
             ScannedReceiptItem(
               name: cleanName,
               price: price,
+              quantity: quantity > 0 ? quantity : 1.0,
+              unit: unit,
+              unitPrice: unitPrice,
+              productCode: productCode,
               category: CategoryClassifier.classify(cleanName),
             ),
           );
@@ -502,15 +765,16 @@ class NfceScannerService {
 
     // Method 2: Scan generic block containers (<tr...>, <div...>) with Vl. Total
     final danfeLineRegex = RegExp(
-      r'([^\n<>]+?)(?:\s*\(c[óo]d(?:igo)?:\s*\d+\))?\s+Vl\.\s*Total:?\s*(?:R\$\s*)?(\d{1,4},\d{2})',
+      r'([^\n<>]+?)(?:\s*\(c[óo]d(?:igo)?:\s*(\d+)\))?\s+Vl\.\s*Total:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})',
       caseSensitive: false,
     );
 
     final blockRegex =
         RegExp(r'<(?:tr|div|p)[^>]*>(.*?)</(?:tr|div|p)>', dotAll: true);
-    final blocks = blockRegex.allMatches(html);
+    final blocks = blockRegex.allMatches(html).toList();
 
-    for (final block in blocks) {
+    for (var b = 0; b < blocks.length; b++) {
+      final block = blocks[b];
       final blockText = _stripTags(block.group(1)!);
       if (!blockText.toLowerCase().contains('vl. total') &&
           !blockText.toLowerCase().contains('vl.total')) {
@@ -528,20 +792,57 @@ class NfceScannerService {
       final match = danfeLineRegex.firstMatch(blockText);
       if (match != null) {
         final rawName = match.group(1)!.trim();
-        final priceStr = match.group(2)!;
+        final productCode = match.group(2);
+        final priceStr = match.group(3)!;
         final price = AppFormatters.parsePrice(priceStr);
+
+        double quantity = 1.0;
+        String unit = 'un';
+
+        final qText = blockText.toLowerCase().contains('qtde')
+            ? blockText
+            : (b + 1 < blocks.length ? _stripTags(blocks[b + 1].group(1)!) : '');
+        final uMatch = RegExp(
+          r'\bUN\s*:\s*([a-zA-Z]{1,4})\b',
+          caseSensitive: false,
+        ).firstMatch(qText);
+        if (uMatch != null) {
+          unit = AppFormatters.normalizeUnit(uMatch.group(1)!);
+        }
+
+        final qMatch = RegExp(
+          r'(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)',
+          caseSensitive: false,
+        ).firstMatch(qText);
+        if (qMatch != null) {
+          final parsedQ = AppFormatters.parseQuantity(qMatch.group(1)!, unit: unit);
+          if (parsedQ != null && parsedQ > 0) {
+            quantity = parsedQ;
+          }
+        }
+
+        double? unitPrice;
+        final uvMatch = RegExp(
+          r'vl\.?\s*unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})',
+          caseSensitive: false,
+        ).firstMatch(qText);
+        if (uvMatch != null) {
+          unitPrice = AppFormatters.parsePrice(uvMatch.group(1)!);
+        }
 
         final cleanedName = _cleanNfceProductName(rawName);
         if (cleanedName.length >= 2 && price != null && price > 0) {
-          if (!items.any((i) => i.name == cleanedName && i.price == price)) {
-            items.add(
-              ScannedReceiptItem(
-                name: cleanedName,
-                price: price,
-                category: CategoryClassifier.classify(cleanedName),
-              ),
-            );
-          }
+          items.add(
+            ScannedReceiptItem(
+              name: cleanedName,
+              price: price,
+              quantity: quantity > 0 ? quantity : 1.0,
+              unit: unit,
+              unitPrice: unitPrice,
+              productCode: productCode,
+              category: CategoryClassifier.classify(cleanedName),
+            ),
+          );
         }
       }
     }
@@ -558,13 +859,44 @@ class NfceScannerService {
         if (lower.contains('qtde') || lower.contains('vl. unit')) {
           // Find price on this line or line i+1
           double? price;
-          final pMatchNext = (i + 1 < rawLines.length) ? RegExp(r'^(\d{1,4},\d{2})$').firstMatch(rawLines[i + 1]) : null;
+          final pMatchNext = (i + 1 < rawLines.length) ? RegExp(r'^(\d{1,3}(?:\.\d{3})*,\d{2})$').firstMatch(rawLines[i + 1]) : null;
           if (pMatchNext != null) {
             price = AppFormatters.parsePrice(pMatchNext.group(1)!);
           } else {
-            final pMatchThis = RegExp(r'(\d{1,4},\d{2})').allMatches(line);
+            final pMatchThis = RegExp(r'(\d{1,3}(?:\.\d{3})*,\d{2})').allMatches(line);
             if (pMatchThis.isNotEmpty) {
               price = AppFormatters.parsePrice(pMatchThis.last.group(1)!);
+            }
+          }
+
+          double? unitPrice;
+          final uvMatch = RegExp(
+            r'vl\.?\s*unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})',
+            caseSensitive: false,
+          ).firstMatch(line);
+          if (uvMatch != null) {
+            unitPrice = AppFormatters.parsePrice(uvMatch.group(1)!);
+          }
+
+          String unit = 'un';
+          final um = RegExp(
+            r'\bUN\s*:\s*([a-zA-Z]{1,4})\b',
+            caseSensitive: false,
+          ).firstMatch(line);
+          if (um != null) {
+            unit = AppFormatters.normalizeUnit(um.group(1)!);
+          }
+
+          // Quantity & Unit extraction from line
+          double quantity = 1.0;
+          final qm = RegExp(
+            r'(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)',
+            caseSensitive: false,
+          ).firstMatch(line);
+          if (qm != null) {
+            final parsedQ = AppFormatters.parseQuantity(qm.group(1)!, unit: unit);
+            if (parsedQ != null && parsedQ > 0) {
+              quantity = parsedQ;
             }
           }
 
@@ -582,12 +914,22 @@ class NfceScannerService {
                 !cLower.contains('consumidor') &&
                 !cLower.contains('cnpj') &&
                 !cLower.contains('danfe')) {
+              final codeMatch = RegExp(
+                r'\(c[óo]d(?:igo)?:\s*(\d+)\)',
+                caseSensitive: false,
+              ).firstMatch(candidateName);
+              final productCode = codeMatch?.group(1);
+
               final cleanedName = _cleanNfceProductName(candidateName);
-              if (cleanedName.length >= 2 && !items.any((it) => it.name == cleanedName && it.price == price)) {
+              if (cleanedName.length >= 2) {
                 items.add(
                   ScannedReceiptItem(
                     name: cleanedName,
                     price: price,
+                    quantity: quantity > 0 ? quantity : 1.0,
+                    unit: unit,
+                    unitPrice: unitPrice,
+                    productCode: productCode,
                     category: CategoryClassifier.classify(cleanedName),
                   ),
                 );
@@ -622,6 +964,58 @@ class NfceScannerService {
               dotAll: true)
           .firstMatch(rowHtml);
 
+      String unit = 'un';
+      final runMatch = RegExp(
+        r'<span[^>]*class="[^"]*RUN[^"]*"[^>]*>(.*?)</span>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (runMatch != null) {
+        unit = AppFormatters.normalizeUnit(_stripTags(runMatch.group(1)!));
+      }
+
+      double quantity = 1.0;
+      final qtdMatch = RegExp(
+        r'<span[^>]*class="[^"]*Rqtd[^"]*"[^>]*>(.*?)</span>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (qtdMatch != null) {
+        final qText = _stripTags(qtdMatch.group(1)!);
+        final qm = RegExp(r'(\d+(?:[,\.]\d+)?)').firstMatch(qText);
+        if (qm != null) {
+          final parsedQ = AppFormatters.parseQuantity(qm.group(1)!, unit: unit);
+          if (parsedQ != null && parsedQ > 0) {
+            quantity = parsedQ;
+          }
+        }
+      }
+
+      double? unitPrice;
+      final rvlUnitMatch = RegExp(
+        r'<span[^>]*class="[^"]*RvlUnit[^"]*"[^>]*>(.*?)</span>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (rvlUnitMatch != null) {
+        final uText = _stripTags(rvlUnitMatch.group(1)!);
+        final uPm = RegExp(r'(\d{1,3}(?:\.\d{3})*,\d{2})').firstMatch(uText);
+        if (uPm != null) {
+          unitPrice = AppFormatters.parsePrice(uPm.group(1)!);
+        }
+      }
+
+      String? productCode;
+      final rCodMatch = RegExp(
+        r'<span[^>]*class="[^"]*RCod[^"]*"[^>]*>(.*?)</span>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (rCodMatch != null) {
+        final cDigits = RegExp(r'(\d+)').firstMatch(_stripTags(rCodMatch.group(1)!));
+        productCode = cDigits?.group(1);
+      }
+
       if (titleMatch != null && priceMatch != null) {
         final rawName = _stripTags(titleMatch.group(1)!);
         final priceStr = _stripTags(priceMatch.group(1)!);
@@ -633,6 +1027,10 @@ class NfceScannerService {
             ScannedReceiptItem(
               name: cleanedName,
               price: price,
+              quantity: quantity > 0 ? quantity : 1.0,
+              unit: unit,
+              unitPrice: unitPrice,
+              productCode: productCode,
               category: CategoryClassifier.classify(cleanedName),
             ),
           );
@@ -664,6 +1062,58 @@ class NfceScannerService {
         dotAll: true,
       ).firstMatch(rowHtml);
 
+      String unit = 'un';
+      final runMatch = RegExp(
+        r'<(?:span|td)[^>]*class="[^"]*(?:RUN|fixo-prod-un|unidade)[^"]*"[^>]*>(.*?)</(?:span|td)>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (runMatch != null) {
+        unit = AppFormatters.normalizeUnit(_stripTags(runMatch.group(1)!));
+      }
+
+      double quantity = 1.0;
+      final qtdMatch = RegExp(
+        r'<(?:span|td)[^>]*class="[^"]*(?:Rqtd|fixo-prod-qtd|qtd)[^"]*"[^>]*>(.*?)</(?:span|td)>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (qtdMatch != null) {
+        final qText = _stripTags(qtdMatch.group(1)!);
+        final qm = RegExp(r'(\d+(?:[,\.]\d+)?)').firstMatch(qText);
+        if (qm != null) {
+          final parsedQ = AppFormatters.parseQuantity(qm.group(1)!, unit: unit);
+          if (parsedQ != null && parsedQ > 0) {
+            quantity = parsedQ;
+          }
+        }
+      }
+
+      double? unitPrice;
+      final rvlUnitMatch = RegExp(
+        r'<(?:span|td)[^>]*class="[^"]*(?:RvlUnit|fixo-prod-vl-unit)[^"]*"[^>]*>(.*?)</(?:span|td)>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (rvlUnitMatch != null) {
+        final uText = _stripTags(rvlUnitMatch.group(1)!);
+        final uPm = RegExp(r'(\d{1,3}(?:\.\d{3})*,\d{2})').firstMatch(uText);
+        if (uPm != null) {
+          unitPrice = AppFormatters.parsePrice(uPm.group(1)!);
+        }
+      }
+
+      String? productCode;
+      final rCodMatch = RegExp(
+        r'<(?:span|td)[^>]*class="[^"]*(?:RCod|fixo-prod-cod)[^"]*"[^>]*>(.*?)</(?:span|td)>',
+        dotAll: true,
+        caseSensitive: false,
+      ).firstMatch(rowHtml);
+      if (rCodMatch != null) {
+        final cDigits = RegExp(r'(\d+)').firstMatch(_stripTags(rCodMatch.group(1)!));
+        productCode = cDigits?.group(1);
+      }
+
       if (nameMatch != null && priceMatch != null) {
         final rawName = _stripTags(nameMatch.group(1)!);
         final priceStr = _stripTags(priceMatch.group(1)!);
@@ -675,6 +1125,10 @@ class NfceScannerService {
             ScannedReceiptItem(
               name: cleanedName,
               price: price,
+              quantity: quantity > 0 ? quantity : 1.0,
+              unit: unit,
+              unitPrice: unitPrice,
+              productCode: productCode,
               category: CategoryClassifier.classify(cleanedName),
             ),
           );
@@ -712,6 +1166,27 @@ class NfceScannerService {
         final lastPriceStr = matches.last.group(1)!;
         final price = AppFormatters.parsePrice(lastPriceStr);
 
+        String unit = 'un';
+        final uMatch = RegExp(
+          r'\bUN\s*:\s*([a-zA-Z]{1,4})\b',
+          caseSensitive: false,
+        ).firstMatch(text);
+        if (uMatch != null) {
+          unit = AppFormatters.normalizeUnit(uMatch.group(1)!);
+        }
+
+        double quantity = 1.0;
+        final qMatch = RegExp(
+          r'(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,\.]\d+)?)',
+          caseSensitive: false,
+        ).firstMatch(text);
+        if (qMatch != null) {
+          final parsedQ = AppFormatters.parseQuantity(qMatch.group(1)!, unit: unit);
+          if (parsedQ != null && parsedQ > 0) {
+            quantity = parsedQ;
+          }
+        }
+
         // Name is the string before the first price
         final firstMatch = matches.first;
         final nameSection = text.substring(0, firstMatch.start).trim();
@@ -722,6 +1197,8 @@ class NfceScannerService {
             ScannedReceiptItem(
               name: cleanedName,
               price: price,
+              quantity: quantity > 0 ? quantity : 1.0,
+              unit: unit,
               category: CategoryClassifier.classify(cleanedName),
             ),
           );
@@ -751,6 +1228,7 @@ class NfceScannerService {
   /// - Removes (Cód: 70), (Código: 12345), (Cod: 123)
   /// - Removes leading item indexes (e.g. "001 7891234567890 ", "01 ")
   /// - Removes trailing tax flags and fiscal tokens (F1, T18%, I1, N1, etc.)
+  /// - Standardizes volume/weight package units (e.g. 1,5L, 2L, 500ml, 5kg, 100g)
   /// - Capitalizes words into Title Case nicely
   static String cleanNfceProductName(String raw) {
     var s = raw;
@@ -770,13 +1248,43 @@ class NfceScannerService {
       '',
     );
 
-    // 4. Capitalize words nicely
+    // 4. Standardize volume/weight unit tokens before capitalization:
+    // "1,5 L" or "1.5l" -> "1,5L", "2 L" or "2l" -> "2L", "500 ML" -> "500ml", "5 KG" -> "5kg"
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+(?:[,\.]\d+)?)\s*(l|lt|lts|litros?)\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}L',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+)\s*(ml|mls)\b', caseSensitive: false),
+      (m) => '${m.group(1)}ml',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+(?:[,\.]\d+)?)\s*(kg|kilos?|quilos?)\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}kg',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+)\s*(g|gr|grs|gramas?)\b', caseSensitive: false),
+      (m) => '${m.group(1)}g',
+    );
+
+    // 5. Expand abbreviations (e.g. "lt" -> "leite", "cr lt" -> "creme de leite", "am" -> "amaciante")
+    s = CategoryClassifier.expandAbbreviations(s);
+
+    // 6. Capitalize words nicely
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (s.isEmpty) return '';
 
     final words = s.split(' ');
     final formatted = words.map((w) {
       if (w.isEmpty) return '';
+      // Preserve uppercase L for liters: e.g. 1,5L, 2L, 1L
+      if (RegExp(r'^\d+(?:[,\.]\d+)?L$').hasMatch(w)) {
+        return w;
+      }
+      // Preserve ml, kg, g
+      if (RegExp(r'^\d+(?:[,\.]\d+)?(?:ml|kg|g)$', caseSensitive: false).hasMatch(w)) {
+        return w.toLowerCase();
+      }
       final lower = w.toLowerCase();
       return lower[0].toUpperCase() + lower.substring(1);
     }).join(' ');

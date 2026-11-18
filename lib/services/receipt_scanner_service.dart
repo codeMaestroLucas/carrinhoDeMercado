@@ -1,6 +1,7 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../models/shopping_models.dart';
 import '../utils/formatters.dart';
+import 'category_classifier.dart';
 
 class ScannedReceiptItem {
   ScannedReceiptItem({
@@ -9,6 +10,8 @@ class ScannedReceiptItem {
     this.category,
     this.quantity = 1.0,
     this.unit = 'un',
+    this.unitPrice,
+    this.productCode,
   });
 
   String name;
@@ -16,9 +19,94 @@ class ScannedReceiptItem {
   ProductCategory? category;
   double quantity;
   String unit;
+  double? unitPrice;
+  String? productCode;
+
+  /// Unit price used to identify identical products when merging duplicates.
+  /// Uses the explicit SEFAZ `Vl. Unit.` when available, falling back to `price / quantity`.
+  double get effectiveUnitPrice =>
+      unitPrice ?? (quantity > 0 ? price / quantity : price);
 }
 
 class ReceiptScannerService {
+  /// Merges repeated items representing the exact same product
+  /// (common in SEFAZ NFC-e where identical units or weighed items appear on consecutive rows).
+  ///
+  /// Matches when:
+  /// 1. Normalized product names match.
+  /// 2. Normalized units match (e.g. both `un` or both `kg`).
+  /// 3. Product codes (`Cód`) match when available on both items.
+  /// 4. Unit prices match within a R$ 0,02 rounding tolerance.
+  static List<ScannedReceiptItem> mergeDuplicateItems(
+    List<ScannedReceiptItem> items,
+  ) {
+    final merged = <ScannedReceiptItem>[];
+
+    for (final item in items) {
+      final normName = CategoryClassifier.normalize(item.name);
+      final normUnit = AppFormatters.normalizeUnit(item.unit);
+      final itemUnitPrice = item.effectiveUnitPrice;
+      final itemCode = item.productCode?.trim() ?? '';
+
+      int matchIndex = -1;
+      for (int i = 0; i < merged.length; i++) {
+        final existing = merged[i];
+        final existingName = CategoryClassifier.normalize(existing.name);
+        final existingUnit = AppFormatters.normalizeUnit(existing.unit);
+
+        if (existingName != normName || existingUnit != normUnit) {
+          continue;
+        }
+
+        // Extra verifier: product code when present on both items
+        final existingCode = existing.productCode?.trim() ?? '';
+        if (itemCode.isNotEmpty &&
+            existingCode.isNotEmpty &&
+            itemCode != existingCode) {
+          continue;
+        }
+
+        final existingUnitPrice = existing.effectiveUnitPrice;
+        if ((existingUnitPrice - itemUnitPrice).abs() <= 0.02) {
+          matchIndex = i;
+          break;
+        }
+      }
+
+      if (matchIndex >= 0) {
+        final existing = merged[matchIndex];
+        existing.quantity = double.parse(
+          (existing.quantity + item.quantity).toStringAsFixed(4),
+        );
+        existing.price = double.parse(
+          (existing.price + item.price).toStringAsFixed(2),
+        );
+        if (existing.unitPrice == null && item.unitPrice != null) {
+          existing.unitPrice = item.unitPrice;
+        }
+        if ((existing.productCode == null || existing.productCode!.isEmpty) &&
+            itemCode.isNotEmpty) {
+          existing.productCode = itemCode;
+        }
+      } else {
+        merged.add(
+          ScannedReceiptItem(
+            name: item.name,
+            price: double.parse(item.price.toStringAsFixed(2)),
+            category: item.category,
+            quantity: double.parse(
+              (item.quantity > 0 ? item.quantity : 1.0).toStringAsFixed(4),
+            ),
+            unit: normUnit,
+            unitPrice: item.unitPrice,
+            productCode: item.productCode,
+          ),
+        );
+      }
+    }
+
+    return merged;
+  }
   static final List<String> _ignoredReceiptKeywords = [
     'cnpj',
     'inscricao estadual',
@@ -155,11 +243,29 @@ class ReceiptScannerService {
         if (matches.isNotEmpty) {
           final lastPriceStr = matches.last.group(1)!;
           final parsedPrice = AppFormatters.parsePrice(lastPriceStr);
+
+          // Extract quantity and unit
+          double quantity = 1.0;
+          String unit = 'un';
+          final qm = RegExp(
+            r'^(\d+(?:[,\.]\d+)?)\s*([a-zA-Z]{1,4})?\s*[xX*]',
+            caseSensitive: false,
+          ).firstMatch(rawLine);
+          if (qm != null) {
+            if (qm.group(2) != null) {
+              unit = AppFormatters.normalizeUnit(qm.group(2)!);
+            }
+            final pq = AppFormatters.parseQuantity(qm.group(1)!, unit: unit);
+            if (pq != null && pq > 0) quantity = pq;
+          }
+
           if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
             items.add(
               ScannedReceiptItem(
                 name: pendingProductName,
                 price: parsedPrice,
+                quantity: quantity > 0 ? quantity : 1.0,
+                unit: unit,
               ),
             );
             pendingProductName = null;
@@ -180,12 +286,26 @@ class ReceiptScannerService {
         final beforePrices = rawLine.substring(0, firstMatch.start).trim();
         final cleanedName = _cleanReceiptProductName(beforePrices);
 
+        double quantity = 1.0;
+        String unit = 'un';
+        final qm = RegExp(
+          r'\b(\d+(?:[,\.]\d+)?)\s*(un|kg|g|l|lt|ml|dz|cx|pct)\b(?:\s*[xX*])?',
+          caseSensitive: false,
+        ).firstMatch(rawLine);
+        if (qm != null) {
+          unit = AppFormatters.normalizeUnit(qm.group(2)!);
+          final pq = AppFormatters.parseQuantity(qm.group(1)!, unit: unit);
+          if (pq != null && pq > 0) quantity = pq;
+        }
+
         if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
           if (cleanedName.length >= 2) {
             items.add(
               ScannedReceiptItem(
                 name: cleanedName,
                 price: parsedPrice,
+                quantity: quantity > 0 ? quantity : 1.0,
+                unit: unit,
               ),
             );
             pendingProductName = null;
@@ -195,6 +315,8 @@ class ReceiptScannerService {
               ScannedReceiptItem(
                 name: pendingProductName,
                 price: parsedPrice,
+                quantity: quantity > 0 ? quantity : 1.0,
+                unit: unit,
               ),
             );
             pendingProductName = null;
@@ -210,7 +332,7 @@ class ReceiptScannerService {
       }
     }
 
-    return items;
+    return mergeDuplicateItems(items);
   }
 
   static bool _shouldIgnoreReceiptLine(String line) {
@@ -249,44 +371,26 @@ class ReceiptScannerService {
       '',
     );
 
-    // 3. Expand common supermarket receipt abbreviations into clean words:
-    final words = s.split(RegExp(r'\s+'));
-    final cleanedWords = <String>[];
-    final abbrevMap = <String, String>{
-      'CHOC': 'Chocolate',
-      'HIDRAT': 'Hidratante',
-      'ESPONJA': 'Esponja',
-      'REFRIG': 'Refrigerante',
-      'SAB': 'Sabonete',
-      'SHAMP': 'Shampoo',
-      'COND': 'Condicionador',
-      'DESOD': 'Desodorante',
-      'DET': 'Detergente',
-      'AMAC': 'Amaciante',
-      'LIMP': 'Limpador',
-      'BISC': 'Biscoito',
-      'BOL': 'Bolacha',
-      'MARG': 'Margarina',
-      'MANTEIG': 'Manteiga',
-      'IORG': 'Iogurte',
-      'LEIT': 'Leite',
-      'QUEIJ': 'Queijo',
-      'PRES': 'Presunto',
-      'PANO': 'Pano',
-      'GOMA': 'Goma',
-      'MASCAR': 'Mascar',
-    };
+    // Standardize volume/weight unit tokens before capitalization:
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+(?:[,\.]\d+)?)\s*(l|lt|lts|litros?)\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}L',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+)\s*(ml|mls)\b', caseSensitive: false),
+      (m) => '${m.group(1)}ml',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+(?:[,\.]\d+)?)\s*(kg|kilos?|quilos?)\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}kg',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'\b(\d+)\s*(g|gr|grs|gramas?)\b', caseSensitive: false),
+      (m) => '${m.group(1)}g',
+    );
 
-    for (var w in words) {
-      final upper = w.toUpperCase();
-      // Drop meaningless single-letter codes or noise tokens left at the edges like "F1", "SC", "M"
-      if (abbrevMap.containsKey(upper)) {
-        cleanedWords.add(abbrevMap[upper]!);
-      } else {
-        cleanedWords.add(w);
-      }
-    }
-    s = cleanedWords.join(' ');
+    // 3. Expand common supermarket receipt abbreviations into clean words:
+    s = CategoryClassifier.expandAbbreviations(s);
 
     // 4. Remove dangling isolated noise tokens at the end like " M ", " S SC ", " A "
     s = s.replaceFirst(RegExp(r'\s+[A-Za-z0-9]{1,2}(?:\s+[A-Za-z0-9]{1,2})*\s*$'), '');
@@ -296,10 +400,16 @@ class ReceiptScannerService {
       return '';
     }
 
-    // Format nicely: Capitalize each word nicely
+    // Format nicely: Capitalize each word nicely, preserving standard package units
     final parts = s.split(' ');
     final formatted = parts.map((p) {
       if (p.isEmpty) return '';
+      if (RegExp(r'^\d+(?:[,\.]\d+)?L$').hasMatch(p)) {
+        return p;
+      }
+      if (RegExp(r'^\d+(?:[,\.]\d+)?(?:ml|kg|g)$', caseSensitive: false).hasMatch(p)) {
+        return p.toLowerCase();
+      }
       final lower = p.toLowerCase();
       return lower[0].toUpperCase() + lower.substring(1);
     }).join(' ');

@@ -103,48 +103,438 @@ class CategoryClassifier {
     return resultWords.join(' ');
   }
 
-  /// Dictionary of common abbreviations found on supermarket receipts and NFC-e
+  /// Dictionary of common multi-word abbreviations found on Brazilian supermarket receipts and NFC-e
+  static const Map<String, String> commonPhraseAbbreviations = {
+    // Creme de leite
+    'cr leite': 'creme de leite',
+    'cr lt': 'creme de leite',
+    'crm leite': 'creme de leite',
+    'crem leite': 'creme de leite',
+    // Leite condensado & derivados
+    'l cond': 'leite condensado',
+    'lt cond': 'leite condensado',
+    'leit cond': 'leite condensado',
+    'lt sd': 'leite semidesnatado',
+    // Limpa móveis & Casa & Banheiro
+    'l mov': 'limpa moveis',
+    'limp mov': 'limpa moveis',
+    'lustr mov': 'lustra moveis',
+    'lustra mov': 'lustra moveis',
+    'tira man': 'tira manchas',
+    'cx acop': 'caixa acoplada',
+    'assento sanit': 'assento sanitario',
+    // Água sanitária & Limpeza pesada
+    'agua sanit': 'agua sanitaria',
+    'ag sanit': 'agua sanitaria',
+    'aq sanit': 'agua sanitaria',
+    'clor ativ': 'cloro ativo',
+    'limp vid': 'limpa vidros',
+    'limpa vid': 'limpa vidros',
+    'limp alum': 'limpa aluminio',
+    'limpa alum': 'limpa aluminio',
+    'limp forn': 'limpa forno',
+    'limpa forn': 'limpa forno',
+    'esp aco': 'esponja de aco',
+    'esp mult': 'esponja multiuso',
+    'pan prat': 'pano de prato',
+    'pano prat': 'pano de prato',
+    'pan chao': 'pano de chao',
+    'pano chao': 'pano de chao',
+    'pano mult': 'pano multiuso',
+    'saco lix': 'saco de lixo',
+    'sc lixo': 'saco de lixo',
+    'sc lix': 'saco de lixo',
+    'sab po': 'sabao em po',
+    'sab em po': 'sabao em po',
+    'sab barra': 'sabao em barra',
+    'sab de coco': 'sabao de coco',
+    'sab coco': 'sabao de coco',
+    // Higiene & Papéis & Perfumaria
+    'papel hig': 'papel higienico',
+    'pap hig': 'papel higienico',
+    'papel toalh': 'papel toalha',
+    'pap toalh': 'papel toalha',
+    'esc dent': 'escova dental',
+    'esc dente': 'escova dental',
+    'cr dent': 'creme dental',
+    'crm dent': 'creme dental',
+    'cd colg': 'creme dental colgate',
+    'cd sorr': 'creme dental sorriso',
+    'cd oral': 'creme dental oral',
+    'cd sensod': 'creme dental sensodyne',
+    'cd close': 'creme dental closeup',
+    'fio dent': 'fio dental',
+    'enx bucal': 'enxaguante bucal',
+    'enxag bucal': 'enxaguante bucal',
+    'ap barb': 'aparelho de barbear',
+    'apar barb': 'aparelho de barbear',
+    'esp barb': 'espuma de barbear',
+    'cr barb': 'creme de barbear',
+    'lam barb': 'lamina de barbear',
+    'lenc umed': 'lenco umedecido',
+    'lenco umed': 'lenco umedecido',
+    'lenc umedec': 'lenco umedecido',
+    'prot solar': 'protetor solar',
+    'prot sol': 'protetor solar',
+    'prot diar': 'protetor diario',
+    'prot diario': 'protetor diario',
+    'desod aer': 'desodorante aerosol',
+    'desod aero': 'desodorante aerosol',
+    'desod roll': 'desodorante roll on',
+    'desod rolon': 'desodorante roll on',
+    'd giov': 'desodorante giovanna',
+    'giov bab': 'giovanna baby',
+    'giov ba': 'giovanna baby',
+    'giov baby': 'giovanna baby',
+    'sh else': 'shampoo elseve',
+    'cond else': 'condicionador elseve',
+    'ag mice': 'agua micelar',
+    'agua mice': 'agua micelar',
+    'sab liq': 'sabonete liquido',
+    // Molho / Extrato / Óleos / Matinais
+    'molh tom': 'molho de tomate',
+    'ext tom': 'extrato de tomate',
+    'm tarant': 'molho tarantella',
+    'molh shoyu': 'molho shoyu',
+    'molh ingles': 'molho ingles',
+    'az oliva': 'azeite de oliva',
+    'az extravirgem': 'azeite extravirgem',
+    'azeite extrav': 'azeite extravirgem',
+    'azeite ext virgem': 'azeite extravirgem',
+    'ext virgem': 'extravirgem',
+    'ext virg': 'extravirgem',
+    'ol soja': 'oleo de soja',
+    'ol sj': 'oleo de soja',
+    'oleo soj': 'oleo de soja',
+    'ol girassol': 'oleo de girassol',
+    'ol milho': 'oleo de milho',
+    'far trigo': 'farinha de trigo',
+    'far mandioca': 'farinha de mandioca',
+    'far mand': 'farinha de mandioca',
+    'mist bolo': 'mistura para bolo',
+    'acuc refin': 'acucar refinado',
+    'acuc crist': 'acucar cristal',
+    'lt po': 'leite em po',
+    'lt em po': 'leite em po',
+    'leite po': 'leite em po',
+    // Padaria & Laticínios
+    'pao forma': 'pao de forma',
+    'pao franc': 'pao frances',
+    'pao fran': 'pao frances',
+    'pao queijo': 'pao de queijo',
+    'pao qj': 'pao de queijo',
+    'pao qjo': 'pao de queijo',
+    'beb lact': 'bebida lactea',
+    'iog nat': 'iogurte natural',
+    'qj ral': 'queijo ralado',
+    // Batatas & Salgadinhos
+    'bat palha': 'batata palha',
+    'bat frita': 'batata frita',
+    'bat chips': 'batata chips',
+    // Carnes & Frios
+    'peito frang': 'peito de frango',
+    'pei frang': 'peito de frango',
+    'peit frang': 'peito de frango',
+    'fil frang': 'file de frango',
+    'file frang': 'file de frango',
+    'cox frang': 'coxa de frango',
+    'cx frang': 'coxa de frango',
+    's coxa': 'sobrecoxa',
+    'sobr coxa': 'sobrecoxa',
+    'c file': 'contra file',
+    'cnt file': 'contra file',
+    'contra fil': 'contra file',
+    'fil mignon': 'file mignon',
+    'fl mignon': 'file mignon',
+    'carn moid': 'carne moida',
+    'carne moid': 'carne moida',
+    'carn moida': 'carne moida',
+    'cost bov': 'costela bovina',
+    'cost suin': 'costela suina',
+    'li fgo': 'linguica de frango',
+    'li cal': 'linguica calabresa',
+    'li tosc': 'linguica toscana',
+    'ling calab': 'linguica calabresa',
+    'ling tosc': 'linguica toscana',
+    'ling toscana': 'linguica toscana',
+    'ling frang': 'linguica de frango',
+    'cal def': 'calabresa defumada',
+    'pei peru': 'peito de peru',
+    'sand ipan': 'sandalia ipanema',
+    // Bebidas
+    'ag miner': 'agua mineral',
+    'ag mineral': 'agua mineral',
+    'agua min': 'agua mineral',
+    'ag min': 'agua mineral',
+    'ag tonica': 'agua tonica',
+    'ag tonic': 'agua tonica',
+    'agua ton': 'agua tonica',
+    'ag coco': 'agua de coco',
+    'agua coco': 'agua de coco',
+    // Descartáveis & Embalagens
+    'papel alum': 'papel aluminio',
+    'pap alum': 'papel aluminio',
+    'film pvc': 'filme pvc',
+    'plast film': 'plastico filme',
+    'papel mant': 'papel manteiga',
+    'cop desc': 'copo descartavel',
+    'copo desc': 'copo descartavel',
+    'prat desc': 'prato descartavel',
+    'prato desc': 'prato descartavel',
+    'talh desc': 'talher descartavel',
+    'sac plast': 'sacola plastica',
+    'sacola plast': 'sacola plastica',
+    'frald desc': 'fralda descartavel',
+    'fralda desc': 'fralda descartavel',
+    'frald inf': 'fralda infantil',
+    'fralda inf': 'fralda infantil',
+    'frald ger': 'fralda geriatrica',
+    'fralda ger': 'fralda geriatrica',
+    'filt pap': 'filtro de papel',
+    'filtro pap': 'filtro de papel',
+    'pilh alc': 'pilha alcalina',
+    'pilha alc': 'pilha alcalina',
+    // Restrições e modificadores
+    's lact': 'sem lactose',
+    'zero lact': 'zero lactose',
+    's lactose': 'sem lactose',
+    's glut': 'sem gluten',
+    's gluten': 'sem gluten',
+    's acuc': 'sem acucar',
+    's gas': 'sem gas',
+    'c gas': 'com gas',
+    's sal': 'sem sal',
+    'c sal': 'com sal',
+  };
+
+  /// Dictionary of common single-word abbreviations found on Brazilian supermarket receipts and NFC-e
   static const Map<String, String> commonAbbreviations = {
-    'refri': 'refrigerante',
-    'refrig': 'refrigerante',
-    'bisc': 'biscoito',
-    'bol': 'bolacha',
-    'prot': 'protetor',
-    'liq': 'liquido',
-    'conc': 'concentrado',
-    'choc': 'chocolate',
-    'achoc': 'achocolatado',
-    'manteig': 'manteiga',
-    'margar': 'margarina',
-    'iog': 'iogurte',
-    'iorg': 'iogurte',
-    'sab': 'sabonete',
-    'desod': 'desodorante',
+    // Specifically requested abbreviations:
+    'lt': 'leite',
+    'am': 'amaciante',
+    'det': 'detergente',
+    'deseng': 'desengordurante',
+    'hid': 'hidratante',
     'cond': 'condicionador',
-    'shamp': 'shampoo',
-    'desinf': 'desinfetante',
-    'deterg': 'detergente',
-    'amaciant': 'amaciante',
-    'amac': 'amaciante',
-    'alcatr': 'alcatra',
-    'mussar': 'mussarela',
-    'parmes': 'parmesao',
-    'presun': 'presunto',
+    'sh': 'shampoo',
+    'esc': 'escova',
+    'pip': 'pipoca',
+    'qj': 'queijo',
+    'oreg': 'oregano',
+    'pei': 'peito',
+    'esp': 'esponja',
+    'bisc': 'biscoito',
+    'iog': 'iogurte',
+
+    // Supermarket single-word abbreviations:
+    // Alimentos & Grãos
+    'arr': 'arroz',
+    'feij': 'feijao',
+    'fej': 'feijao',
+    'mac': 'macarrao',
+    'macar': 'macarrao',
+    'macarr': 'macarrao',
+    'macc': 'macarrao',
+    'espag': 'espaguete',
+    'tarant': 'tarantella',
+    'vinag': 'vinagre',
+    'amid': 'amido',
+    'ferm': 'fermento',
+    'ferment': 'fermento',
     'far': 'farinha',
     'farin': 'farinha',
     'torrad': 'torrada',
+    'torr': 'torrada',
+    'crois': 'croissant',
     'gelat': 'gelatina',
+    'acuc': 'acucar',
+    'adoc': 'adocante',
+    'azeit': 'azeitona',
+    'temp': 'tempero',
+    'temper': 'temperado',
+    'molh': 'molho',
+    'ext': 'extrato',
+    'tom': 'tomate',
+    'cen': 'cenoura',
+    'bat': 'batata',
+    'ceb': 'cebola',
+    'baud': 'bauducco',
+
+    // Laticínios e Matinais
+    'iorg': 'iogurte',
+    'iogurt': 'iogurte',
+    'leit': 'leite',
+    'qjo': 'queijo',
+    'queij': 'queijo',
+    'mussar': 'mussarela',
+    'muss': 'mussarela',
+    'parmes': 'parmesao',
+    'parm': 'parmesao',
+    'prov': 'provolone',
+    'ricot': 'ricota',
+    'gorg': 'gorgonzola',
+    'requeij': 'requeijao',
+    'req': 'requeijao',
+    'manteig': 'manteiga',
+    'mant': 'manteiga',
+    'margar': 'margarina',
+    'marg': 'margarina',
+    'choc': 'chocolate',
+    'achoc': 'achocolatado',
+    'bol': 'bolacha',
+    'bolach': 'bolacha',
+
+    // Carnes & Frios
+    'carn': 'carne',
+    'alcatr': 'alcatra',
     'hamb': 'hamburguer',
+    'frang': 'frango',
+    'fgo': 'frango',
+    'presun': 'presunto',
+    'pres': 'presunto',
+    'sard': 'sardinha',
+    'picanh': 'picanha',
+    'cost': 'costela',
+    'ling': 'linguica',
+    'lingui': 'linguica',
+    'sals': 'salsicha',
+    'salsich': 'salsicha',
+    'mort': 'mortadela',
+    'mortad': 'mortadela',
+    'salam': 'salame',
+    'cong': 'congelado',
+    'fat': 'fatiado',
+    'ft': 'fatiado',
+    'ral': 'ralado',
+    'moid': 'moida',
+    'def': 'defumada',
+    'apim': 'apimentada',
+
+    // Bebidas
+    'ag': 'agua',
+    'refri': 'refrigerante',
+    'refrig': 'refrigerante',
+    'cerv': 'cerveja',
+    'cervej': 'cerveja',
+    'aguard': 'aguardente',
+    'energ': 'energetico',
+    'isot': 'isotonico',
+    'nect': 'nectar',
+
+    // Limpeza
+    'desinf': 'desinfetante',
+    'desf': 'desinfetante',
+    'deterg': 'detergente',
+    'amaciant': 'amaciante',
+    'amac': 'amaciante',
+    'dowc': 'downy concentrado',
+    'polif': 'poliflor',
+    'glad': 'glade',
+    'coz': 'cozinha',
+    'limp': 'limpador',
+    'alvej': 'alvejante',
+    'multius': 'multiuso',
+    'inset': 'inseticida',
+    'insetic': 'inseticida',
+    'odoriz': 'odorizador',
+    'aromat': 'aromatizador',
+
+    // Higiene & Perfumaria & Infantil
+    'sab': 'sabonete',
+    'sbt': 'sabonete',
+    'sabon': 'sabonete',
+    'desod': 'desodorante',
+    'desodor': 'desodorante',
+    'shamp': 'shampoo',
+    'shp': 'shampoo',
+    'hidrat': 'hidratante',
+    'hidr': 'hidratacao',
+    'condic': 'condicionador',
+    'colg': 'colgate',
+    'acet': 'acetona',
+    'cicatr': 'cicatricure',
+    'hast': 'hastes',
+    'cottonb': 'cottonbaby',
+    'absorv': 'absorvente',
+    'abs': 'absorvente',
+    'frald': 'fralda',
+    'prot': 'protetor',
+    'ph': 'papel higienico',
+    'sanit': 'sanitaria',
+    'hig': 'higienico',
+    'toalh': 'toalha',
+    'guardan': 'guardanapo',
+
+    // Especificações / Embalagem / Atributos
+    'liq': 'liquido',
+    'lq': 'liquido',
+    'conc': 'concentrado',
     'rechead': 'recheado',
     'rech': 'recheado',
     'int': 'integral',
+    'integr': 'integral',
     'trad': 'tradicional',
+    'orig': 'original',
+    'nat': 'natural',
+    'desn': 'desnatado',
+    'desnat': 'desnatado',
+    'semidesn': 'semidesnatado',
+    'instant': 'instantaneo',
+    'inst': 'instantaneo',
+    'alcal': 'alcalina',
+    'almof': 'almofadado',
+    'sach': 'sache',
+    'pct': 'pacote',
+    'pcte': 'pacote',
+    'cx': 'caixa',
+    'grf': 'garrafa',
+    'unid': 'unidade',
+    'emb': 'embalagem',
   };
 
-  /// Expands abbreviations in a normalized string.
-  static String expandAbbreviations(String normalizedText) {
-    final words = normalizedText.split(RegExp(r'\s+'));
-    final expanded = words.map((w) => commonAbbreviations[w] ?? w);
+  /// Expands multi-word phrases and common abbreviations in a text.
+  /// Standardizes volume tokens (e.g. "1 lt" -> "1L") before expanding standalone "lt" -> "leite".
+  static String expandAbbreviations(String text) {
+    if (text.isEmpty) return text;
+
+    // 1. Standardize volume/package tokens attached to numbers so "1 lt" -> "1L", "1K" -> "1kg", avoiding "1 leite"
+    var result = text.replaceAllMapped(
+      RegExp(r'\b(\d+(?:[,\.]\d+)?)\s*(?:l|lt|lts|litros?)\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}L',
+    );
+    result = result.replaceAllMapped(
+      RegExp(r'\b([1235]|10|0[,\.]\d+)\s*k\b', caseSensitive: false),
+      (m) => '${m.group(1)!.replaceAll('.', ',')}kg',
+    );
+
+    // 2. Standardize slash notations ("s/s" -> "sem semente", "c/" -> "com ", "s/" -> "sem ", "p/" -> "para ")
+    result = result.replaceAll(RegExp(r'\bs/s\b', caseSensitive: false), 'sem semente');
+    result = result.replaceAll(RegExp(r'\bc/\s*', caseSensitive: false), 'com ');
+    result = result.replaceAll(RegExp(r'\bs/\s*', caseSensitive: false), 'sem ');
+    result = result.replaceAll(RegExp(r'\bp/\s*(?=[a-zA-ZÀ-ÿ])', caseSensitive: false), 'para ');
+
+    // 3. Expand multi-word phrase abbreviations first (matching with word boundaries and flexible whitespace)
+    for (final entry in commonPhraseAbbreviations.entries) {
+      final phrasePattern = entry.key.split(' ').map(RegExp.escape).join(r'\s+');
+      final pattern = RegExp(r'\b' + phrasePattern + r'\b', caseSensitive: false);
+      result = result.replaceAll(pattern, entry.value);
+    }
+
+    // 4. Expand single-word abbreviations
+    final lowerText = result.toLowerCase();
+    final isBigMac = lowerText.contains('big mac');
+    final words = result.split(RegExp(r'\s+'));
+    final expanded = words.map((w) {
+      final lower = w.replaceAll(RegExp(r'[^\w]'), '').toLowerCase();
+      if (lower == 'mac' && isBigMac) {
+        return w;
+      }
+      if (commonAbbreviations.containsKey(lower)) {
+        return commonAbbreviations[lower]!;
+      }
+      return w;
+    });
+
     return expanded.join(' ');
   }
 
@@ -180,7 +570,11 @@ class CategoryClassifier {
   static final Map<ProductCategory, List<String>> defaultKeywordDictionary = {
     ProductCategory.bebeCrianca: [
       'fralda',
+      'fralda descartável',
+      'fralda descartavel',
+      'fralda infantil',
       'lenço umedecido',
+      'lenco umedecido',
       'papinha',
       'mamadeira',
       'chupeta',
@@ -223,15 +617,27 @@ class CategoryClassifier {
       'gato',
     ],
     ProductCategory.descartaveis: [
+      'sacola',
+      'sacola plástica',
+      'sacola plastica',
+      'sacola biodegradável',
+      'sacola biodegradavel',
+      'sacola retornável',
+      'sacola retornavel',
       'papel toalha',
       'guardanapo',
       'papel alumínio',
+      'papel aluminio',
       'filme pvc',
       'plástico filme',
+      'plastico filme',
       'papel manteiga',
       'copo descartável',
+      'copo descartavel',
       'prato descartável',
+      'prato descartavel',
       'talher descartável',
+      'talher descartavel',
       'garfo descartável',
       'colher descartável',
       'canudo',
@@ -239,17 +645,21 @@ class CategoryClassifier {
       'espetinho',
       'saco de lixo',
       'saco lixo',
-      'sacola plástica',
       'saco freezer',
       'embalagem descartável',
       'filtro de papel',
       'filtro de café',
       'coador de papel',
       'descartável',
+      'descartavel',
     ],
     ProductCategory.perfumariaHigiene: [
       'papel higiênico',
+      'papel higienico',
       'sabonete',
+      'sabonete líquido',
+      'sabonete liquido',
+      'sabonete em barra',
       'shampoo',
       'xampu',
       'condicionador',
@@ -258,6 +668,9 @@ class CategoryClassifier {
       'pasta de dente',
       'creme dental',
       'escova de dente',
+      'escova dental',
+      'escova de dentes',
+      'escova',
       'fio dental',
       'enxaguante bucal',
       'listerine',
@@ -278,11 +691,27 @@ class CategoryClassifier {
       'protetor diario',
       'cotonete',
       'hastes flexíveis',
+      'hastes',
+      'cottonbaby',
       'algodão',
+      'algodao',
       'aparelho de barbear',
       'gillette',
       'espuma de barbear',
       'hidratante',
+      'hidratante corporal',
+      'agua micelar',
+      'água micelar',
+      'cicatricure',
+      'giovanna baby',
+      'elseve',
+      'leite de rosas',
+      'leite de colônia',
+      'leite de colonia',
+      'óleo corporal',
+      'oleo corporal',
+      'óleo capilar',
+      'oleo capilar',
       'protetor solar',
       'perfume',
       'colônia',
@@ -311,6 +740,13 @@ class CategoryClassifier {
       'omo',
       'brilhante',
       'ariel',
+      'tixan',
+      'minuano',
+      'ajax',
+      'harpic',
+      'poliflor',
+      'glade',
+      'caixa acoplada',
       'amaciante',
       'downy',
       'comfort',
@@ -336,6 +772,7 @@ class CategoryClassifier {
       'lã de aço',
       'palha de aço',
       'pano de chão',
+      'pano de chao',
       'pano multiuso',
       'perfex',
       'flanela',
@@ -344,6 +781,27 @@ class CategoryClassifier {
       'pá de lixo',
       'balde',
       'lustra móveis',
+      'lustra moveis',
+      'limpa móveis',
+      'limpa moveis',
+      'limpador',
+      'limpa vidro',
+      'limpa vidros',
+      'limpa alumínio',
+      'limpa aluminio',
+      'limpa forno',
+      'alvejante',
+      'cloro ativo',
+      'aromatizador',
+      'odorizador',
+      'esponja de aço',
+      'esponja de aco',
+      'esponja multiuso',
+      'escova sanitária',
+      'escova sanitaria',
+      'escova de limpeza',
+      'óleo de peroba',
+      'oleo de peroba',
       'cera',
       'tira manchas',
       'vanish',
@@ -354,6 +812,8 @@ class CategoryClassifier {
       'raid',
       'álcool',
       'alcool',
+      'álcool em gel',
+      'alcool em gel',
       'limpeza',
       'luva de borracha',
       'prendedor de roupa',
@@ -363,8 +823,11 @@ class CategoryClassifier {
       'agua mineral',
       'água com gás',
       'agua com gas',
+      'água tônica',
+      'agua tonica',
       'água de coco',
       'agua de coco',
+      'aguardente',
       'refrigerante',
       'refri',
       'coca-cola',
@@ -405,6 +868,12 @@ class CategoryClassifier {
       'isotônico',
       'isotonico',
       'gatorade',
+      'chá',
+      'cha',
+      'chá leão',
+      'cha leao',
+      'matte leão',
+      'matte leao',
       'chá mate',
       'cha mate',
       'chá gelado',
@@ -459,6 +928,9 @@ class CategoryClassifier {
       'adaptador',
       'caderno',
       'caneta',
+      'ralinho',
+      'assento sanitário',
+      'assento sanitario',
     ],
     ProductCategory.alimentos: [
       'arroz',
@@ -466,14 +938,28 @@ class CategoryClassifier {
       'feijao',
       'macarrão',
       'macarrao',
-      'massa',
       'espaguete',
       'lasanha',
       'miojo',
-      'óleo',
-      'oleo',
+      'massa de pastel',
+      'massa de pizza',
+      'massa folhada',
+      'óleo de soja',
+      'oleo de soja',
+      'óleo de girassol',
+      'oleo de girassol',
+      'óleo de canola',
+      'oleo de canola',
+      'óleo de milho',
+      'oleo de milho',
+      'óleo vegetal',
+      'oleo vegetal',
       'azeite',
       'vinagre',
+      'sal refinado',
+      'sal grosso',
+      'sal marinho',
+      'sal de cozinha',
       'sal',
       'açúcar',
       'acucar',
@@ -481,8 +967,6 @@ class CategoryClassifier {
       'adocante',
       'café',
       'cafe',
-      'chá',
-      'cha',
       'leite',
       'leite condensado',
       'creme de leite',
@@ -495,6 +979,8 @@ class CategoryClassifier {
       'mozzarella',
       'parmesão',
       'parmesao',
+      'provolone',
+      'gorgonzola',
       'ricota',
       'presunto',
       'peito de peru',
@@ -502,6 +988,10 @@ class CategoryClassifier {
       'salame',
       'linguiça',
       'linguica',
+      'linguiça calabresa',
+      'linguica calabresa',
+      'linguiça toscana',
+      'linguica toscana',
       'salsicha',
       'bacon',
       'carne',
@@ -510,15 +1000,22 @@ class CategoryClassifier {
       'acém',
       'acem',
       'alcatra',
+      'contra filé',
+      'contra file',
+      'filé mignon',
+      'file mignon',
       'picanha',
       'costela',
       'carne moída',
       'carne moida',
       'frango',
+      'sassami',
       'peito de frango',
-      'coxa',
+      'peito bovino',
+      'peito',
+      'coxa de frango',
       'sobrecoxa',
-      'asa',
+      'asa de frango',
       'peixe',
       'tilápia',
       'tilapia',
@@ -532,6 +1029,8 @@ class CategoryClassifier {
       'ovos',
       'pão',
       'pao',
+      'pão francês',
+      'pao frances',
       'pão de forma',
       'pao de forma',
       'pao forma',
@@ -570,15 +1069,21 @@ class CategoryClassifier {
       'nutella',
       'geleia',
       'mel',
-      'doce',
+      'doce de leite',
       'goiabada',
       'sorvete',
       'iogurte',
       'danone',
-      'nestle',
       'molho de tomate',
       'extrato de tomate',
       'pomarola',
+      'tarantella',
+      'yoki',
+      'freegells',
+      'halls',
+      'trident',
+      'mentos',
+      'bala',
       'ketchup',
       'mostarda',
       'maionese',
@@ -589,7 +1094,9 @@ class CategoryClassifier {
       'ervilha',
       'seleta',
       'batata',
-      'chips',
+      'batata chips',
+      'chips de batata',
+      'chips batata',
       'batata palha',
       'batata frita',
       'cebola',
@@ -632,7 +1139,11 @@ class CategoryClassifier {
       'páprica',
       'paprica',
       'caldo knorr',
-      'tempero',
+      'caldo de galinha',
+      'caldo de carne',
+      'tempero sazon',
+      'tempero arisco',
+      'tempero completo',
       'sazon',
       'banana',
       'maçã',
@@ -738,8 +1249,11 @@ class CategoryClassifier {
 
     ProductCategory? bestMatch;
     int bestScore = 0;
+    const minConfidenceScore = 12;
 
     for (final entry in dictionary.entries) {
+      if (entry.key == ProductCategory.diversos) continue;
+
       for (final rawKeyword in entry.value) {
         final keyword = normalize(rawKeyword);
         if (keyword.isEmpty) continue;
@@ -748,31 +1262,31 @@ class CategoryClassifier {
 
         // Exact match against expanded name
         if (keyword == expanded || keyword == normalized) {
-          score = keyword.length * 10;
+          score = max(keyword.length * 10, 24);
         }
         // Multi-word phrase match (e.g. "pao de forma", "coca cola", "saco de lixo")
         else if (keyword.contains(' ')) {
           if (expanded.contains(keyword) || normalized.contains(keyword)) {
-            score = keyword.length * 6;
+            score = max(keyword.length * 6, 20);
           }
         }
         // Single word matching & fuzzy approximation
         else {
           for (final word in expandedWords) {
             if (word == keyword) {
-              score = max(score, keyword.length * 4);
+              score = max(score, max(keyword.length * 4, 14));
             }
-            // Prefix matching for abbreviations (e.g. "refri" -> "refrigerante", "prot" -> "protetor")
-            else if (word.length >= 3 && keyword.length >= 4 && keyword.startsWith(word)) {
+            // Controlled prefix matching for abbreviations or words >= 4 letters
+            else if (word.length >= 4 && keyword.length >= 5 && keyword.startsWith(word)) {
               score = max(score, word.length * 3);
             }
-            else if (keyword.length >= 4 && word.length >= 4 && word.startsWith(keyword)) {
+            else if (keyword.length >= 5 && word.length >= 5 && word.startsWith(keyword)) {
               score = max(score, keyword.length * 3);
             }
-            // Fuzzy string similarity (Levenshtein distance)
-            else if (word.length >= 4 && keyword.length >= 4) {
+            // Fuzzy string similarity (Levenshtein distance) - only for longer words
+            else if (word.length >= 5 && keyword.length >= 5) {
               final sim = stringSimilarity(word, keyword);
-              if (sim >= 0.78) {
+              if (sim >= 0.82) {
                 score = max(score, (keyword.length * sim * 2.5).round());
               }
             }
@@ -782,12 +1296,12 @@ class CategoryClassifier {
           if (score == 0 && expanded != normalized) {
             for (final word in itemWords) {
               if (word == keyword) {
-                score = max(score, keyword.length * 4);
-              } else if (word.length >= 3 && keyword.length >= 4 && keyword.startsWith(word)) {
+                score = max(score, max(keyword.length * 4, 14));
+              } else if (word.length >= 4 && keyword.length >= 5 && keyword.startsWith(word)) {
                 score = max(score, word.length * 3);
-              } else if (word.length >= 4 && keyword.length >= 4) {
+              } else if (word.length >= 5 && keyword.length >= 5) {
                 final sim = stringSimilarity(word, keyword);
-                if (sim >= 0.78) {
+                if (sim >= 0.82) {
                   score = max(score, (keyword.length * sim * 2.5).round());
                 }
               }
@@ -800,6 +1314,10 @@ class CategoryClassifier {
           bestMatch = entry.key;
         }
       }
+    }
+
+    if (bestScore < minConfidenceScore) {
+      return ProductCategory.diversos;
     }
 
     return bestMatch ?? ProductCategory.diversos;
