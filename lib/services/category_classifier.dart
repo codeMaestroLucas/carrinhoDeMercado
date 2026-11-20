@@ -2,7 +2,7 @@ import 'dart:math';
 import '../models/shopping_models.dart';
 
 class CategoryClassifier {
-  static String normalize(String input) {
+  static String _stripDiacritics(String input) {
     final lower = input.trim().toLowerCase();
     const diacriticsMap = {
       'á': 'a',
@@ -36,13 +36,161 @@ class CategoryClassifier {
       final char = lower[i];
       buffer.write(diacriticsMap[char] ?? char);
     }
+    return buffer.toString();
+  }
+
+  static String normalize(String input) {
     // Replace hyphens, slashes and underscores with spaces so 'coca-cola' matches 'coca cola'
-    final rawNorm = buffer
-        .toString()
+    final rawNorm = _stripDiacritics(input)
         .replaceAll(RegExp(r'[-_/]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return singularize(rawNorm);
+  }
+
+  static const Set<String> _receiptNoiseTokens = {
+    'cod',
+    'codigo',
+    'ref',
+    'referencia',
+    'plu',
+    'ean',
+    'gtin',
+    'sku',
+    'lote',
+    'prom',
+    'promocao',
+    'oferta',
+    'desc',
+    'desconto',
+    'kg',
+    'un',
+    'und',
+    'unid',
+    'unidade',
+    'gr',
+    'lt',
+  };
+
+  static const Set<String> _connectorWords = {
+    'de',
+    'da',
+    'do',
+    'das',
+    'dos',
+    'e',
+    'em',
+    'com',
+    'para',
+    'sem',
+    'ao',
+    'a',
+    'o',
+  };
+
+  /// Normalizes a product name for price history grouping and comparison.
+  /// Strips receipt codes (e.g. "COD 123", "#456", standalone 3+ digit PLU/EAN
+  /// numbers), receipt noise tokens ("kg", "un", "prom"), expands common
+  /// abbreviations, and singularizes words.
+  static String normalizeForComparison(String input) {
+    var cleaned = _stripDiacritics(input);
+
+    // Remove explicit code prefixes with numbers (e.g. "cod 123", "ref: 45", "#987")
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\b(?:cod|codigo|ref|referencia|plu|ean|gtin|sku|lote)\s*[:.#-]?\s*\d+\b',
+      ),
+      ' ',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'#\s*\d+\b'), ' ');
+
+    // Replace common receipt punctuation with spaces
+    cleaned = cleaned.replaceAll(RegExp(r'[-_/()\[\]{}:;.,#*]'), ' ');
+
+    final rawTokens = cleaned
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final filteredTokens = <String>[];
+    for (final token in rawTokens) {
+      if (_receiptNoiseTokens.contains(token)) continue;
+      // Strip standalone numeric codes of 3+ digits (PLU, EAN, internal codes),
+      // while keeping 1-2 digit numbers (e.g. "tipo 1", "12 rolos") and
+      // numbers attached to units (e.g. "500g", "1l", "2kg").
+      if (RegExp(r'^\d{3,}$').hasMatch(token)) continue;
+      filteredTokens.add(token);
+    }
+
+    if (filteredTokens.isEmpty) {
+      return normalize(input);
+    }
+
+    final expanded = expandAbbreviations(filteredTokens.join(' '));
+    final result = singularize(expanded).trim();
+    return result.isEmpty ? normalize(input) : result;
+  }
+
+  /// Computes a similarity score between 0.0 and 1.0 for two product names,
+  /// combining token overlap (with fuzzy token matching) and Levenshtein ratio.
+  static double productSimilarity(
+    String a,
+    String b, {
+    ProductCategory? categoryA,
+    ProductCategory? categoryB,
+  }) {
+    final normA = normalizeForComparison(a);
+    final normB = normalizeForComparison(b);
+    if (normA.isEmpty || normB.isEmpty) return 0.0;
+    if (normA == normB) return 1.0;
+
+    final tokensA = normA
+        .split(' ')
+        .where((t) => t.length > 1 && !_connectorWords.contains(t))
+        .toSet()
+        .toList();
+    final tokensB = normB
+        .split(' ')
+        .where((t) => t.length > 1 && !_connectorWords.contains(t))
+        .toSet()
+        .toList();
+
+    double tokenScore = 0.0;
+    if (tokensA.isNotEmpty && tokensB.isNotEmpty) {
+      var matchedA = 0.0;
+      for (final ta in tokensA) {
+        var best = 0.0;
+        for (final tb in tokensB) {
+          if (ta == tb) {
+            best = 1.0;
+            break;
+          }
+          final sim = stringSimilarity(ta, tb);
+          if (sim >= 0.80 && sim > best) {
+            best = sim;
+          }
+        }
+        matchedA += best;
+      }
+
+      final unionCount = {...tokensA, ...tokensB}.length;
+      final jaccard = unionCount > 0 ? matchedA / unionCount : 0.0;
+      final minCount = min(tokensA.length, tokensB.length);
+      final containment = minCount > 0 ? matchedA / minCount : 0.0;
+      tokenScore = (0.55 * jaccard) + (0.45 * containment);
+    }
+
+    final wholeSim = stringSimilarity(normA, normB);
+    var score = (0.60 * tokenScore) + (0.40 * wholeSim);
+
+    if (categoryA != null &&
+        categoryB != null &&
+        categoryA == categoryB &&
+        (tokenScore > 0.0 || wholeSim >= 0.45)) {
+      score = min(1.0, score + 0.08);
+    }
+
+    return score.clamp(0.0, 1.0);
   }
 
   /// Converts common Portuguese plural words to their singular form.

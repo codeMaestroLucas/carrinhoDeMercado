@@ -778,7 +778,7 @@ class ShoppingController extends ChangeNotifier {
     for (final record in _history) {
       for (final item in record.items) {
         if (item.price <= 0) continue;
-        final key = CategoryClassifier.normalize(item.name);
+        final key = CategoryClassifier.normalizeForComparison(item.name);
         if (key.isEmpty) continue;
         productsMap.putIfAbsent(key, () => []).add(
               ProductHistoryOccurrence(
@@ -988,7 +988,7 @@ class ShoppingController extends ChangeNotifier {
         _isApplyingRemoteUpdate = true;
         try {
           _applyStateFromMap(data);
-          await _saveToDisk(pushCloud: false);
+          _saveToDisk(pushCloud: false);
           notifyListeners();
         } finally {
           _isApplyingRemoteUpdate = false;
@@ -1168,6 +1168,85 @@ class ShoppingController extends ChangeNotifier {
 
     if (data['showCheckedItems'] is bool) {
       _showCheckedItems = data['showCheckedItems'] as bool;
+    }
+
+    _migrateAlimentosToSubcategories();
+  }
+
+  /// Ensures Hortifruti and Congelados dictionaries are populated and
+  /// reclassifies legacy items/history saved as generic `alimentos` when
+  /// they match Hortifruti or Congelados keywords.
+  void _migrateAlimentosToSubcategories() {
+    for (final cat in const [
+      ProductCategory.hortifruti,
+      ProductCategory.congelados,
+    ]) {
+      final list = _categoryDictionary[cat];
+      if (list == null || list.isEmpty) {
+        _categoryDictionary[cat] = List<String>.from(
+          CategoryClassifier.defaultKeywordDictionary[cat] ?? const [],
+        );
+      }
+    }
+
+    ProductCategory? resolveSubcategory(String name) {
+      final detected = CategoryClassifier.classify(
+        name,
+        customDictionary: _categoryDictionary,
+      );
+      if (detected == ProductCategory.hortifruti ||
+          detected == ProductCategory.congelados) {
+        return detected;
+      }
+      return null;
+    }
+
+    for (var i = 0; i < _items.length; i++) {
+      final item = _items[i];
+      if (item.category == ProductCategory.alimentos) {
+        final target = resolveSubcategory(item.name);
+        if (target != null) {
+          _items[i] = item.copyWith(category: target);
+        }
+      }
+    }
+
+    for (var i = 0; i < _history.length; i++) {
+      final record = _history[i];
+      var changed = false;
+      final updatedItems = record.items.map((item) {
+        if (item.category == ProductCategory.alimentos) {
+          final target = resolveSubcategory(item.name);
+          if (target != null) {
+            changed = true;
+            return PurchaseHistoryItem(
+              name: item.name,
+              category: target,
+              price: item.price,
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              unit: item.unit,
+            );
+          }
+        }
+        return item;
+      }).toList();
+      if (changed) {
+        _history[i] = record.copyWith(items: updatedItems);
+      }
+    }
+
+    final learnedUpdates = <String, ProductCategory>{};
+    for (final entry in _learnedCategories.entries) {
+      if (entry.value == ProductCategory.alimentos) {
+        final target = resolveSubcategory(entry.key);
+        if (target != null) {
+          learnedUpdates[entry.key] = target;
+        }
+      }
+    }
+    if (learnedUpdates.isNotEmpty) {
+      _learnedCategories.addAll(learnedUpdates);
     }
   }
 

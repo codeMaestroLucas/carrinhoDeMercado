@@ -50,7 +50,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     String productName, {
     List<PurchaseRecord>? sourceRecords,
   }) {
-    final targetKey = CategoryClassifier.normalize(productName);
+    final targetKey = CategoryClassifier.normalizeForComparison(productName);
     if (targetKey.isEmpty) return null;
 
     final records = sourceRecords ?? widget.controller.history;
@@ -60,7 +60,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     for (final record in records) {
       for (final item in record.items) {
-        if (CategoryClassifier.normalize(item.name) == targetKey) {
+        if (CategoryClassifier.normalizeForComparison(item.name) == targetKey) {
           displayName ??= item.name;
           category ??= item.category;
           occurrences.add(
@@ -3053,19 +3053,39 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
             final textPrimary = AppColors.textPrimary(context);
             final textSecondary = AppColors.textSecondary(context);
             final borderColor = AppColors.border(context);
-            final query = CategoryClassifier.normalize(searchCtrl.text.trim());
+            final rawQuery = searchCtrl.text.trim();
 
-            final candidates = widget.allAggregates.where((p) {
+            final filteredCandidates = widget.allAggregates.where((p) {
               if (sameCategoryFilter &&
                   referenceItem != null &&
                   p.category != referenceItem.category) {
                 return false;
               }
-              if (query.isNotEmpty && !p.normalizedKey.contains(query)) {
+              if (rawQuery.isNotEmpty && !p.matchesSearchQuery(rawQuery)) {
                 return false;
               }
               return true;
             }).toList();
+
+            final similarKeys = <String>{};
+            final List<ProductHistoryAggregate> candidates;
+            if (referenceItem != null && rawQuery.isEmpty) {
+              final similar = ProductHistoryAggregate.findSimilarProducts(
+                referenceItem,
+                filteredCandidates,
+              );
+              for (final s in similar) {
+                similarKeys.add(s.product.normalizedKey);
+              }
+              candidates = [
+                ...similar.map((s) => s.product),
+                ...filteredCandidates.where(
+                  (p) => !similarKeys.contains(p.normalizedKey),
+                ),
+              ];
+            } else {
+              candidates = filteredCandidates;
+            }
 
             return DraggableScrollableSheet(
               expand: false,
@@ -3212,6 +3232,9 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
                                   final isOtherSelected = referenceItem != null &&
                                       prod.normalizedKey ==
                                           referenceItem.normalizedKey;
+                                  final isSimilar = similarKeys.contains(
+                                    prod.normalizedKey,
+                                  );
                                   return ListTile(
                                     enabled: !isOtherSelected,
                                     contentPadding:
@@ -3226,15 +3249,44 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
                                         size: 17,
                                       ),
                                     ),
-                                    title: Text(
-                                      prod.displayName,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: isOtherSelected
-                                            ? textSecondary
-                                            : textPrimary,
-                                      ),
+                                    title: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            prod.displayName,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isOtherSelected
+                                                  ? textSecondary
+                                                  : textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        if (isSimilar && !isOtherSelected) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primaryGreen
+                                                  .withValues(alpha: 0.14),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'Semelhante',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.accentGreen,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     subtitle: Text(
                                       isOtherSelected
@@ -3557,9 +3609,8 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
     required Color textSecondary,
     required Color borderColor,
   }) {
-    final query =
-        CategoryClassifier.normalize(_inlineSearchController.text.trim());
-    final candidates = widget.allAggregates.where((p) {
+    final rawQuery = _inlineSearchController.text.trim();
+    final filteredCandidates = widget.allAggregates.where((p) {
       if (_itemA != null && p.normalizedKey == _itemA!.normalizedKey) {
         return false;
       }
@@ -3568,11 +3619,31 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
           p.category != _itemA!.category) {
         return false;
       }
-      if (query.isNotEmpty && !p.normalizedKey.contains(query)) {
+      if (rawQuery.isNotEmpty && !p.matchesSearchQuery(rawQuery)) {
         return false;
       }
       return true;
     }).toList();
+
+    final similarKeys = <String>{};
+    final List<ProductHistoryAggregate> candidates;
+    if (_itemA != null && rawQuery.isEmpty) {
+      final similar = ProductHistoryAggregate.findSimilarProducts(
+        _itemA!,
+        filteredCandidates,
+      );
+      for (final s in similar) {
+        similarKeys.add(s.product.normalizedKey);
+      }
+      candidates = [
+        ...similar.map((s) => s.product),
+        ...filteredCandidates.where(
+          (p) => !similarKeys.contains(p.normalizedKey),
+        ),
+      ];
+    } else {
+      candidates = filteredCandidates;
+    }
 
     return _AnalyticsCard(
       child: Column(
@@ -3674,6 +3745,7 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
               ),
               itemBuilder: (context, index) {
                 final prod = candidates[index];
+                final isSimilar = similarKeys.contains(prod.normalizedKey);
                 return ListTile(
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -3687,13 +3759,41 @@ class _ProductComparisonScreenState extends State<ProductComparisonScreen> {
                       size: 16,
                     ),
                   ),
-                  title: Text(
-                    prod.displayName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: textPrimary,
-                    ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          prod.displayName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (isSimilar) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                AppColors.primaryGreen.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Semelhante',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.accentGreen,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   subtitle: Text(
                     '${prod.category.label} • Média: ${AppFormatters.formatCurrency(prod.averagePrice)}',

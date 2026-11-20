@@ -114,7 +114,16 @@ class ProductHistoryAggregate {
     return '${cheapest.marketName} é ${diffPercent.toStringAsFixed(0)}% mais barato para este item que ${compared.marketName}.';
   }
 
+  static bool _hasReceiptCode(String name) {
+    return RegExp(
+      r'(?:\b(?:cod|codigo|ref|plu|ean|gtin|sku|lote)\b|#\s*\d+|\b\d{3,}\b)',
+      caseSensitive: false,
+    ).hasMatch(name);
+  }
+
   /// Builds a sorted list of all unique product aggregates across the given purchase records.
+  /// Groups items using [CategoryClassifier.normalizeForComparison] so receipt codes
+  /// and noise tokens do not fragment the same product across purchases.
   static List<ProductHistoryAggregate> buildAllFromRecords(
     List<PurchaseRecord> records,
   ) {
@@ -124,9 +133,13 @@ class ProductHistoryAggregate {
 
     for (final record in records) {
       for (final item in record.items) {
-        final key = CategoryClassifier.normalize(item.name);
+        final key = CategoryClassifier.normalizeForComparison(item.name);
         if (key.isEmpty) continue;
-        displayNames.putIfAbsent(key, () => item.name);
+        final currentDisplay = displayNames[key];
+        if (currentDisplay == null ||
+            (_hasReceiptCode(currentDisplay) && !_hasReceiptCode(item.name))) {
+          displayNames[key] = item.name;
+        }
         categories.putIfAbsent(key, () => item.category);
         grouped.putIfAbsent(key, () => []).add(
               ProductHistoryOccurrence(
@@ -155,5 +168,52 @@ class ProductHistoryAggregate {
           ),
     );
     return list;
+  }
+
+  /// Returns products from [candidates] that are similar to [target],
+  /// sorted from most similar to least similar.
+  static List<({ProductHistoryAggregate product, double similarity})>
+      findSimilarProducts(
+    ProductHistoryAggregate target,
+    List<ProductHistoryAggregate> candidates, {
+    double minSimilarity = 0.42,
+    int limit = 10,
+  }) {
+    final scored = <({ProductHistoryAggregate product, double similarity})>[];
+    for (final candidate in candidates) {
+      if (candidate.normalizedKey == target.normalizedKey) continue;
+      final score = CategoryClassifier.productSimilarity(
+        target.displayName,
+        candidate.displayName,
+        categoryA: target.category,
+        categoryB: candidate.category,
+      );
+      if (score >= minSimilarity) {
+        scored.add((product: candidate, similarity: score));
+      }
+    }
+
+    scored.sort((a, b) {
+      final cmp = b.similarity.compareTo(a.similarity);
+      if (cmp != 0) return cmp;
+      return b.product.pricedOccurrences.length
+          .compareTo(a.product.pricedOccurrences.length);
+    });
+
+    return scored.take(limit).toList();
+  }
+
+  /// Checks whether this aggregate matches a user search query using both
+  /// normalized substring matching and fuzzy similarity.
+  bool matchesSearchQuery(String rawQuery) {
+    final normQuery = CategoryClassifier.normalizeForComparison(rawQuery);
+    if (normQuery.isEmpty) return true;
+    if (normalizedKey.contains(normQuery)) return true;
+    if (CategoryClassifier.normalize(displayName).contains(
+          CategoryClassifier.normalize(rawQuery),
+        )) {
+      return true;
+    }
+    return CategoryClassifier.productSimilarity(displayName, rawQuery) >= 0.55;
   }
 }
