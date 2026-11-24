@@ -1,0 +1,153 @@
+import { useEffect, useState } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import { RefreshCw, WifiOff } from 'lucide-react';
+import { useShoppingStore } from './store/useShoppingStore';
+import { BottomNav, type AppTab } from './components/layout/BottomNav';
+import { SplashScreen } from './components/layout/SplashScreen';
+import { ShoppingListPage } from './pages/ShoppingListPage';
+import { HomePage } from './pages/HomePage';
+import { HistoryPage } from './pages/HistoryPage';
+import { MarketConfigPage } from './pages/MarketConfigPage';
+
+export function App() {
+  const isHydrated = useShoppingStore((s) => s.isHydrated);
+  const isDarkMode = useShoppingStore((s) => s.isDarkMode);
+  const items = useShoppingStore((s) => s.items);
+  const initializeApp = useShoppingStore((s) => s.initializeApp);
+  const refreshCloudSync = useShoppingStore((s) => s.refreshCloudSync);
+  const flushPendingSync = useShoppingStore((s) => s.flushPendingSync);
+
+  const [activeTab, setActiveTab] = useState<AppTab>('list');
+  const [showSplash, setShowSplash] = useState(true);
+  const [autoFocusQuickAdd, setAutoFocusQuickAdd] = useState(false);
+  const [autoOpenScanner, setAutoOpenScanner] = useState(false);
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false,
+  );
+
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
+
+  useEffect(() => {
+    void initializeApp();
+    const timer = setTimeout(() => setShowSplash(false), 650);
+
+    // Handle PWA app shortcuts (?action=quick-add or ?action=scan-receipt)
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (action === 'quick-add') {
+      setActiveTab('list');
+      setAutoFocusQuickAdd(true);
+      setShowSplash(false);
+    } else if (action === 'scan-receipt') {
+      setActiveTab('history');
+      setAutoOpenScanner(true);
+      setShowSplash(false);
+    }
+
+    const onOnline = () => {
+      setIsOffline(false);
+      void flushPendingSync().then(() => refreshCloudSync());
+    };
+    const onOffline = () => setIsOffline(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        void flushPendingSync();
+      } else if (document.visibilityState === 'visible') {
+        void flushPendingSync().then(() => refreshCloudSync());
+      }
+    };
+    const onPageHide = () => {
+      void flushPendingSync();
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [initializeApp, refreshCloudSync, flushPendingSync]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', isDarkMode ? '#121417' : '#00C853');
+    }
+  }, [isDarkMode]);
+
+  const pendingCount = items.filter((i) => !i.isChecked).length;
+
+  return (
+    <>
+      {showSplash && !isHydrated && (
+        <SplashScreen onDismiss={() => setShowSplash(false)} />
+      )}
+      {showSplash && isHydrated && (
+        <SplashScreen onDismiss={() => setShowSplash(false)} />
+      )}
+
+      {isOffline && (
+        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-1.5 bg-amber-500 px-3 py-1 text-[11px] font-bold text-white">
+          <WifiOff size={13} />
+          <span>Modo offline ativo — alterações salvas localmente</span>
+        </div>
+      )}
+
+      {needRefresh && (
+        <div className="fixed inset-x-4 top-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#111827] px-4 py-2.5 text-xs text-white shadow-xl dark:bg-[#F3F4F6] dark:text-[#111827]">
+          <span className="font-semibold">Nova versão do app disponível</span>
+          <button
+            type="button"
+            onClick={() => void updateServiceWorker(true)}
+            className="flex shrink-0 items-center gap-1 rounded-xl bg-[#00C853] px-3 py-1.5 font-bold text-white"
+          >
+            <RefreshCw size={12} />
+            Atualizar
+          </button>
+        </div>
+      )}
+
+      <main className="min-h-screen">
+        {activeTab === 'home' && <HomePage />}
+        {activeTab === 'list' && (
+          <ShoppingListPage
+            autoFocusQuickAdd={autoFocusQuickAdd}
+            onQuickAddConsumed={() => setAutoFocusQuickAdd(false)}
+          />
+        )}
+        {activeTab === 'history' && (
+          <HistoryPage
+            autoOpenScanner={autoOpenScanner}
+            onScannerOpened={() => setAutoOpenScanner(false)}
+            onNavigateToList={() => setActiveTab('list')}
+          />
+        )}
+        {activeTab === 'config' && <MarketConfigPage />}
+      </main>
+
+      <BottomNav
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        pendingCount={pendingCount}
+      />
+    </>
+  );
+}
+
+export default App;

@@ -1,0 +1,384 @@
+import {
+  PRODUCT_CATEGORIES,
+  type CategorySpendingSummary,
+  type MarketProductStats,
+  type PriceIndexSummary,
+  type ProductCategoryId,
+  type ProductHistoryOccurrence,
+  type ProductVariationItem,
+  type PurchaseRecord,
+} from '../types/shopping';
+import { CategoryClassifier } from './categoryClassifier';
+
+export interface ProductHistoryAggregate {
+  normalizedKey: string;
+  displayName: string;
+  category: ProductCategoryId;
+  occurrences: ProductHistoryOccurrence[]; // sorted newest to oldest
+  pricedOccurrences: ProductHistoryOccurrence[];
+  chronologicalPricedOccurrences: ProductHistoryOccurrence[];
+  lastPrice: number;
+  previousPrice: number | null;
+  variationPercentFromLastTime: number | null;
+  lastMarket: string;
+  lastDate: string;
+  averagePrice: number;
+  minPriceOccurrence: ProductHistoryOccurrence | null;
+  maxPriceOccurrence: ProductHistoryOccurrence | null;
+  marketRanking: MarketProductStats[];
+  marketComparisonInsight: string | null;
+}
+
+function hasReceiptCode(name: string): boolean {
+  return /(?:\b(?:cod|codigo|ref|plu|ean|gtin|sku|lote)\b|#\s*\d+|\b\d{3,}\b)/i.test(
+    name,
+  );
+}
+
+export function createProductHistoryAggregate(
+  normalizedKey: string,
+  displayName: string,
+  category: ProductCategoryId,
+  occurrencesInput: ProductHistoryOccurrence[],
+): ProductHistoryAggregate {
+  const occurrences = [...occurrencesInput].sort(
+    (a, b) => Date.parse(b.date) - Date.parse(a.date),
+  );
+  const pricedOccurrences = occurrences.filter((e) => e.price > 0);
+  const chronologicalPricedOccurrences = [...pricedOccurrences].reverse();
+
+  const lastPrice = pricedOccurrences.length > 0 ? pricedOccurrences[0].price : 0;
+  const previousPrice =
+    pricedOccurrences.length >= 2 ? pricedOccurrences[1].price : null;
+  const variationPercentFromLastTime =
+    previousPrice != null && previousPrice > 0
+      ? ((lastPrice - previousPrice) / previousPrice) * 100
+      : null;
+
+  const lastMarket =
+    pricedOccurrences.length > 0
+      ? pricedOccurrences[0].marketName
+      : occurrences[0]?.marketName ?? 'Mercado';
+  const lastDate =
+    pricedOccurrences.length > 0
+      ? pricedOccurrences[0].date
+      : occurrences[0]?.date ?? new Date().toISOString();
+
+  const averagePrice =
+    pricedOccurrences.length > 0
+      ? pricedOccurrences.reduce((acc, item) => acc + item.price, 0) /
+        pricedOccurrences.length
+      : 0;
+
+  const minPriceOccurrence =
+    pricedOccurrences.length > 0
+      ? pricedOccurrences.reduce((a, b) => (a.price <= b.price ? a : b))
+      : null;
+  const maxPriceOccurrence =
+    pricedOccurrences.length > 0
+      ? pricedOccurrences.reduce((a, b) => (a.price >= b.price ? a : b))
+      : null;
+
+  const byMarket = new Map<string, ProductHistoryOccurrence[]>();
+  for (const occ of pricedOccurrences) {
+    const existing = byMarket.get(occ.marketName) ?? [];
+    existing.push(occ);
+    byMarket.set(occ.marketName, existing);
+  }
+
+  const marketRanking: MarketProductStats[] = Array.from(byMarket.entries())
+    .map(([marketName, list]) => {
+      const sorted = [...list].sort(
+        (a, b) => Date.parse(b.date) - Date.parse(a.date),
+      );
+      const avg =
+        sorted.reduce((sum, e) => sum + e.price, 0) / sorted.length;
+      return {
+        marketName,
+        averagePrice: avg,
+        lastPrice: sorted[0].price,
+        lastDate: sorted[0].date,
+        purchaseCount: sorted.length,
+      };
+    })
+    .sort((a, b) => a.averagePrice - b.averagePrice);
+
+  let marketComparisonInsight: string | null = null;
+  if (marketRanking.length >= 2) {
+    const cheapest = marketRanking[0];
+    const compared = marketRanking[marketRanking.length - 1];
+    if (compared.averagePrice > 0) {
+      const diffPercent =
+        ((compared.averagePrice - cheapest.averagePrice) /
+          compared.averagePrice) *
+        100;
+      if (diffPercent < 0.5) {
+        marketComparisonInsight = `${cheapest.marketName} e ${compared.marketName} têm preços médios praticamente iguais para este item.`;
+      } else {
+        marketComparisonInsight = `${cheapest.marketName} é ${diffPercent.toFixed(0)}% mais barato para este item que ${compared.marketName}.`;
+      }
+    }
+  }
+
+  return {
+    normalizedKey,
+    displayName,
+    category,
+    occurrences,
+    pricedOccurrences,
+    chronologicalPricedOccurrences,
+    lastPrice,
+    previousPrice,
+    variationPercentFromLastTime,
+    lastMarket,
+    lastDate,
+    averagePrice,
+    minPriceOccurrence,
+    maxPriceOccurrence,
+    marketRanking,
+    marketComparisonInsight,
+  };
+}
+
+export function buildAllProductAggregates(
+  records: PurchaseRecord[],
+  options?: { marketFilter?: string | null },
+): ProductHistoryAggregate[] {
+  const grouped = new Map<string, ProductHistoryOccurrence[]>();
+  const displayNames = new Map<string, string>();
+  const categories = new Map<string, ProductCategoryId>();
+
+  for (const record of records) {
+    if (options?.marketFilter && record.marketName !== options.marketFilter) {
+      continue;
+    }
+    for (const item of record.items) {
+      const key = CategoryClassifier.normalizeForComparison(item.name);
+      if (!key) continue;
+
+      const currentDisplay = displayNames.get(key);
+      if (
+        !currentDisplay ||
+        (hasReceiptCode(currentDisplay) && !hasReceiptCode(item.name))
+      ) {
+        displayNames.set(key, item.name);
+      }
+      if (!categories.has(key)) {
+        categories.set(key, item.category);
+      }
+
+      const list = grouped.get(key) ?? [];
+      list.push({
+        productName: item.name,
+        category: item.category,
+        price: item.price,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        unit: item.unit,
+        marketName: record.marketName,
+        date: record.date,
+      });
+      grouped.set(key, list);
+    }
+  }
+
+  return Array.from(grouped.entries())
+    .map(([key, occurrences]) =>
+      createProductHistoryAggregate(
+        key,
+        displayNames.get(key)!,
+        categories.get(key)!,
+        occurrences,
+      ),
+    )
+    .sort((a, b) =>
+      a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase()),
+    );
+}
+
+export function matchesAggregateSearchQuery(
+  aggregate: ProductHistoryAggregate,
+  rawQuery: string,
+): boolean {
+  const normQuery = CategoryClassifier.normalizeForComparison(rawQuery);
+  if (!normQuery) return true;
+  if (aggregate.normalizedKey.includes(normQuery)) return true;
+  if (
+    CategoryClassifier.normalize(aggregate.displayName).includes(
+      CategoryClassifier.normalize(rawQuery),
+    )
+  ) {
+    return true;
+  }
+  return (
+    CategoryClassifier.productSimilarity(aggregate.displayName, rawQuery) >=
+    0.55
+  );
+}
+
+export function findSimilarProducts(
+  target: ProductHistoryAggregate,
+  candidates: ProductHistoryAggregate[],
+  options?: { minSimilarity?: number; limit?: number },
+): Array<{ product: ProductHistoryAggregate; similarity: number }> {
+  const minSimilarity = options?.minSimilarity ?? 0.42;
+  const limit = options?.limit ?? 10;
+
+  const scored: Array<{ product: ProductHistoryAggregate; similarity: number }> =
+    [];
+
+  for (const candidate of candidates) {
+    if (candidate.normalizedKey === target.normalizedKey) continue;
+    const score = CategoryClassifier.productSimilarity(
+      target.displayName,
+      candidate.displayName,
+      {
+        categoryA: target.category,
+        categoryB: candidate.category,
+      },
+    );
+    if (score >= minSimilarity) {
+      scored.push({ product: candidate, similarity: score });
+    }
+  }
+
+  scored.sort((a, b) => {
+    if (b.similarity !== a.similarity) return b.similarity - a.similarity;
+    return (
+      b.product.pricedOccurrences.length - a.product.pricedOccurrences.length
+    );
+  });
+
+  return scored.slice(0, limit);
+}
+
+export function calculatePriceIndex(
+  history: PurchaseRecord[],
+  daysWindow = 60,
+): PriceIndexSummary {
+  const cutoffMs = Date.now() - daysWindow * 24 * 60 * 60 * 1000;
+
+  const productsMap = new Map<string, ProductHistoryOccurrence[]>();
+  for (const record of history) {
+    for (const item of record.items) {
+      if (item.price <= 0) continue;
+      const key = CategoryClassifier.normalizeForComparison(item.name);
+      if (!key) continue;
+      const list = productsMap.get(key) ?? [];
+      list.push({
+        productName: item.name,
+        category: item.category,
+        price: item.price,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        unit: item.unit,
+        marketName: record.marketName,
+        date: record.date,
+      });
+      productsMap.set(key, list);
+    }
+  }
+
+  const variations: ProductVariationItem[] = [];
+  let increasedCount = 0;
+  let decreasedCount = 0;
+  let stableCount = 0;
+  let totalVariationSum = 0;
+
+  for (const list of productsMap.values()) {
+    list.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    if (list.length < 2) continue;
+
+    const latest = list[0];
+    if (Date.parse(latest.date) < cutoffMs) continue;
+
+    const previous = list[1];
+    if (previous.price <= 0) continue;
+
+    const diffPercent =
+      ((latest.price - previous.price) / previous.price) * 100;
+    totalVariationSum += diffPercent;
+
+    if (diffPercent > 0.5) {
+      increasedCount++;
+    } else if (diffPercent < -0.5) {
+      decreasedCount++;
+    } else {
+      stableCount++;
+    }
+
+    variations.push({
+      productName: latest.productName,
+      category: latest.category,
+      currentPrice: latest.price,
+      previousPrice: previous.price,
+      variationPercent: diffPercent,
+      marketName: latest.marketName,
+    });
+  }
+
+  const overallVariation =
+    variations.length > 0 ? totalVariationSum / variations.length : 0;
+
+  const topIncreases = variations
+    .filter((v) => v.variationPercent > 0.5)
+    .sort((a, b) => b.variationPercent - a.variationPercent)
+    .slice(0, 6);
+
+  const topDecreases = variations
+    .filter((v) => v.variationPercent < -0.5)
+    .sort((a, b) => a.variationPercent - b.variationPercent)
+    .slice(0, 6);
+
+  return {
+    periodLabel: `Últimos ${daysWindow} dias`,
+    overallVariationPercent: overallVariation,
+    totalComparedItems: variations.length,
+    increasedCount,
+    decreasedCount,
+    stableCount,
+    topIncreases,
+    topDecreases,
+  };
+}
+
+export function calculateCategorySpending(
+  history: PurchaseRecord[],
+  startDate?: Date | null,
+): CategorySpendingSummary[] {
+  const spendingMap = new Map<ProductCategoryId, number>();
+  const countMap = new Map<ProductCategoryId, number>();
+  let total = 0;
+  const startMs = startDate ? startDate.getTime() : null;
+
+  for (const record of history) {
+    if (startMs != null && Date.parse(record.date) < startMs) continue;
+    for (const item of record.items) {
+      if (item.price <= 0) continue;
+      spendingMap.set(
+        item.category,
+        (spendingMap.get(item.category) ?? 0) + item.price,
+      );
+      countMap.set(item.category, (countMap.get(item.category) ?? 0) + 1);
+      total += item.price;
+    }
+  }
+
+  if (total <= 0) return [];
+
+  const result: CategorySpendingSummary[] = [];
+  for (const cat of PRODUCT_CATEGORIES) {
+    const amount = spendingMap.get(cat.id) ?? 0;
+    if (amount > 0) {
+      result.push({
+        category: cat.id,
+        totalSpent: amount,
+        percentage: (amount / total) * 100,
+        itemCount: countMap.get(cat.id) ?? 0,
+      });
+    }
+  }
+
+  result.sort((a, b) => b.totalSpent - a.totalSpent);
+  return result;
+}
