@@ -20,9 +20,10 @@ export default defineConfig({
         short_name: 'Carrinho',
         description:
           'Aplicativo inteligente de lista e carrinho de compras com leitura de cupom fiscal, comparação de preços e sincronização em família.',
-        theme_color: '#00C853',
+        theme_color: '#F8F9FA',
         background_color: '#F8F9FA',
-        display: 'standalone',
+        display: 'fullscreen',
+        display_override: ['fullscreen', 'standalone'],
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
@@ -32,11 +33,13 @@ export default defineConfig({
             src: '/icons/Icon-192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: '/icons/Icon-512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: '/icons/Icon-maskable-192.png',
@@ -72,6 +75,94 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,json,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
+          // 1. Google Fonts Stylesheets (Stale-While-Revalidate)
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts-stylesheets',
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 2. Google Fonts Webfont binaries (CacheFirst with 1-year expiration)
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-webfonts',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 3. Static Images and Vector Graphics (Stale-While-Revalidate)
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif|ico)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'app-images-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 4. Lottie Animations and Local JSON Assets (Stale-While-Revalidate)
+          {
+            urlPattern: /\.(?:json)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'json-assets-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 14,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 5. JavaScript & CSS chunks (Stale-While-Revalidate for offline readiness)
+          {
+            urlPattern: /\.(?:js|css)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'static-resources',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 6. External SEFAZ / NFC-e Proxy APIs (NetworkFirst with 3s timeout for 3G resilience)
+          {
+            urlPattern: /^https:\/\/api\.allorigins\.win\/raw\?.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'sefaz-proxy-cache',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          // 7. Firestore API (NetworkOnly, managed by Firestore's internal persistentLocalCache)
           {
             urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
             handler: 'NetworkOnly',

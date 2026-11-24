@@ -18,7 +18,8 @@ export function App() {
   const flushPendingSync = useShoppingStore((s) => s.flushPendingSync);
 
   const [activeTab, setActiveTab] = useState<AppTab>('list');
-  const [showSplash, setShowSplash] = useState(true);
+  // Optimistic boot: if cached local state is present, skip splash completely (t=0 render)
+  const [showSplash, setShowSplash] = useState(() => !isHydrated);
   const [autoFocusQuickAdd, setAutoFocusQuickAdd] = useState(false);
   const [autoOpenScanner, setAutoOpenScanner] = useState(false);
   const [isOffline, setIsOffline] = useState(
@@ -32,7 +33,13 @@ export function App() {
 
   useEffect(() => {
     void initializeApp();
-    const timer = setTimeout(() => setShowSplash(false), 650);
+
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    if (isHydrated) {
+      setShowSplash(false);
+    } else {
+      fallbackTimer = setTimeout(() => setShowSplash(false), 450);
+    }
 
     // Handle PWA app shortcuts (?action=quick-add or ?action=scan-receipt)
     const params = new URLSearchParams(window.location.search);
@@ -69,13 +76,13 @@ export function App() {
     window.addEventListener('pagehide', onPageHide);
 
     return () => {
-      clearTimeout(timer);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', onPageHide);
     };
-  }, [initializeApp, refreshCloudSync, flushPendingSync]);
+  }, [initializeApp, refreshCloudSync, flushPendingSync, isHydrated]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -87,7 +94,7 @@ export function App() {
 
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', isDarkMode ? '#121417' : '#00C853');
+      metaTheme.setAttribute('content', isDarkMode ? '#121417' : '#F8F9FA');
     }
   }, [isDarkMode]);
 
@@ -95,10 +102,7 @@ export function App() {
 
   return (
     <>
-      {showSplash && !isHydrated && (
-        <SplashScreen onDismiss={() => setShowSplash(false)} />
-      )}
-      {showSplash && isHydrated && (
+      {showSplash && (
         <SplashScreen onDismiss={() => setShowSplash(false)} />
       )}
 

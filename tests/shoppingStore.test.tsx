@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useShoppingStore } from '../src/store/useShoppingStore';
 import { ShoppingListPage } from '../src/pages/ShoppingListPage';
+import { SwipeableShoppingItemRow } from '../src/components/list/SwipeableShoppingItemRow';
 import { calculatePriceIndex } from '../src/services/productHistoryService';
 import {
   CloudSyncService,
@@ -115,12 +116,12 @@ describe('useShoppingStore & ShoppingListPage', () => {
     store.addSingleItem('Tomate'); // hortifruti
 
     render(<ShoppingListPage />);
-    expect(screen.getByText('Lista de Compras')).toBeInTheDocument();
+    expect(screen.getByText(/Lista •/i)).toBeInTheDocument();
     expect(screen.getByText(/Detergente Ypê/i)).toBeInTheDocument();
     expect(screen.getByText(/Tomate/i)).toBeInTheDocument();
 
     // Switch to Atacadão (limpeza comes before hortifruti)
-    fireEvent.click(screen.getByRole('button', { name: 'Atacadão' }));
+    fireEvent.click(screen.getByRole('button', { name: /Atacadão/i }));
     expect(
       screen.getByText(/Itens organizados na ordem de setores de Atacadão/i),
     ).toBeInTheDocument();
@@ -132,7 +133,7 @@ describe('useShoppingStore & ShoppingListPage', () => {
     );
 
     // Switch to Mercado do Bairro (hortifruti comes before limpeza)
-    fireEvent.click(screen.getByRole('button', { name: 'Mercado do Bairro' }));
+    fireEvent.click(screen.getByRole('button', { name: /Mercado do Bairro/i }));
     const updatedText = document.body.textContent ?? '';
     expect(updatedText.indexOf('Tomate')).toBeLessThan(
       updatedText.indexOf('Detergente'),
@@ -171,5 +172,62 @@ describe('useShoppingStore & ShoppingListPage', () => {
 
     await useShoppingStore.getState().refreshCloudSync();
     expect(fetchSpy).toHaveBeenCalledWith('CASA-1234');
+  });
+
+  it('supports tap to check/uncheck, long press to open edit, and swipe left to remove', async () => {
+    vi.useFakeTimers();
+    const toggleChecked = vi.fn();
+    const openEdit = vi.fn();
+    const remove = vi.fn();
+    const updateQty = vi.fn();
+
+    const mockItem = {
+      id: 'item-1',
+      name: 'Café Especial',
+      quantity: 1,
+      unit: 'un',
+      category: 'alimentos' as const,
+      isChecked: false,
+      marketId: null,
+      price: 15.9,
+      isPriceTotal: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    render(
+      <SwipeableShoppingItemRow
+        item={mockItem}
+        onToggleChecked={toggleChecked}
+        onOpenEdit={openEdit}
+        onRemove={remove}
+        onUpdateQuantity={updateQty}
+      />,
+    );
+
+    const card = screen.getByText('Café Especial');
+
+    // 1. Tap / click: toggles checked
+    fireEvent.mouseDown(card, { clientX: 100, clientY: 100 });
+    fireEvent.mouseUp(card, { clientX: 100, clientY: 100 });
+    expect(toggleChecked).toHaveBeenCalledWith('item-1');
+    expect(openEdit).not.toHaveBeenCalled();
+
+    // 2. Long press (500ms): opens edit modal
+    fireEvent.mouseDown(card, { clientX: 100, clientY: 100 });
+    vi.advanceTimersByTime(550);
+    expect(openEdit).toHaveBeenCalledWith(mockItem);
+    fireEvent.mouseUp(card, { clientX: 100, clientY: 100 });
+    // mouseUp after long press should not toggle checked again
+    expect(toggleChecked).toHaveBeenCalledTimes(1);
+
+    // 3. Swipe left past -85px threshold: triggers remove
+    const cardContainer = card.closest('div[style]') || card;
+    fireEvent.mouseDown(cardContainer, { clientX: 200, clientY: 100 });
+    fireEvent.mouseMove(cardContainer, { clientX: 100, clientY: 100 });
+    fireEvent.mouseUp(cardContainer, { clientX: 100, clientY: 100 });
+    vi.runAllTimers();
+    expect(remove).toHaveBeenCalledWith('item-1');
+
+    vi.useRealTimers();
   });
 });

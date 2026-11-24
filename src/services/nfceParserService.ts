@@ -2,9 +2,9 @@ import type { NfceParsedResult, ScannedReceiptItem } from '../types/shopping';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryClassifier } from './categoryClassifier';
 import {
-  ABBREV_MAP,
-  PHRASE_ABBREV_MAP,
   accumulateScannedItems,
+  cleanReceiptProductName,
+  isTotalProductName,
 } from './receiptParserService';
 
 const UF_BY_CODE: Record<string, string> = {
@@ -13,10 +13,6 @@ const UF_BY_CODE: Record<string, string> = {
   '28': 'SE', '29': 'BA', '31': 'MG', '32': 'ES', '33': 'RJ', '35': 'SP', '41': 'PR',
   '42': 'SC', '43': 'RS', '50': 'MS', '51': 'MT', '52': 'GO', '53': 'DF',
 };
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 export function verifyCheckDigit(key: string): boolean {
   if (key.length !== 44) return false;
@@ -317,38 +313,7 @@ export function parseNfceQuantity(raw: string): number {
 }
 
 export function cleanNfceProductName(raw: string): string {
-  let s = raw
-    .replace(/\s*\(c[óo]d(?:igo)?:\s*\d+\)\s*/gi, ' ')
-    .replace(/^\s*\(?código:[^)]*\)?\s*/i, '')
-    .replace(/^\s*\d{1,4}\s+\d{4,14}\s+/, '')
-    .replace(/^\s*\d{1,14}[\s.-]+/, '')
-    .replace(/\b(?:F\d+|T\d+(?:[,.]\d+)?%?|I\d+|N\d+|II|FF|NN)\b.*$/i, '');
-
-  for (const [key, val] of Object.entries(PHRASE_ABBREV_MAP)) {
-    const pattern = new RegExp(`\\b${escapeRegExp(key)}\\b`, 'gi');
-    s = s.replace(pattern, val);
-  }
-
-  s = s.replace(/\s+/g, ' ').trim();
-  if (!s) return '';
-
-  const minorPrepositions = new Set([
-    'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'e', 'para',
-  ]);
-  return s
-    .split(' ')
-    .map((w) => {
-      if (!w) return '';
-      const upper = w.toUpperCase();
-      const expanded = ABBREV_MAP[upper] ?? w;
-      if (/^\d+(?:[,.]\d+)?[a-zA-Z]{1,3}$/.test(expanded)) {
-        return expanded.toLowerCase();
-      }
-      const lower = expanded.toLowerCase();
-      if (minorPrepositions.has(lower)) return lower;
-      return lower[0].toUpperCase() + lower.slice(1);
-    })
-    .join(' ');
+  return cleanReceiptProductName(raw);
 }
 
 function stripTags(html: string): string {
@@ -364,7 +329,40 @@ function stripTags(html: string): string {
     .trim();
 }
 
+export function cleanMarketName(raw: string): string {
+  const s = stripTags(raw)
+    .replace(/\s*-\s*filial\s*\d+.*$/i, '')
+    .replace(/\s*\/\s*filial\s*\d+.*$/i, '')
+    .replace(/\s*-\s*matriz.*$/i, '')
+    .replace(/\b(?:s\.?a\.?|s\/a|ltda\.?|eireli\.?|me|epp)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const words = s.split(' ');
+  const minor = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  return words
+    .map((w) => {
+      const lower = w.toLowerCase();
+      if (minor.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
 function extractMarketName(html: string): string | undefined {
+  // 1. Try trade name (Nome Fantasia) first
+  const fantasiaMatch =
+    /<(?:span|div|td|p|b)[^>]*class="[^"]*(?:txtFantasia|nomeFantasia|fantasia|lblFantasia)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|td|p|b)>/i.exec(
+      html,
+    );
+  if (fantasiaMatch) {
+    const clean = stripTags(fantasiaMatch[1]);
+    if (clean.length > 2 && !clean.toLowerCase().includes('consumidor')) {
+      return clean;
+    }
+  }
+
+  // 2. Try card-header, txtTopo or preceding CNPJ
   const cardHeaderMatch =
     /card-header[^>]*>[\s\S]*?<div[^>]*class="col"[^>]*style="[^"]*font-weight:\s*bold[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(
       html,
@@ -413,7 +411,8 @@ function extractMarketName(html: string): string | undefined {
 
   const boldMatch = /<b[^>]*class="[^"]*razaoSocial[^"]*"[^>]*>([\s\S]*?)<\/b>/i.exec(html);
   if (boldMatch) {
-    return stripTags(boldMatch[1]);
+    const clean = stripTags(boldMatch[1]);
+    if (clean.length > 2) return clean;
   }
 
   return undefined;
@@ -468,6 +467,7 @@ function buildScannedItem(
       : effectiveTotal);
   const cleanedName = cleanNfceProductName(rawName);
   if (cleanedName.length < 2) return null;
+  if (isTotalProductName(cleanedName)) return null;
 
   return {
     name: cleanedName,

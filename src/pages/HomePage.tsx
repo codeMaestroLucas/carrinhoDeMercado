@@ -1,14 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
-  Calendar,
   GitCompareArrows,
   Search,
-  ShoppingBag,
   TrendingDown,
   TrendingUp,
+  Wallet,
 } from 'lucide-react';
 import {
   PRODUCT_CATEGORY_MAP,
@@ -22,6 +21,11 @@ import {
   matchesAggregateSearchQuery,
   type ProductHistoryAggregate,
 } from '../services/productHistoryService';
+import {
+  buildHomeSnapshot,
+  loadHomeSnapshotSync,
+  saveHomeSnapshot,
+} from '../services/homeSnapshotService';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryIcon } from '../components/common/CategoryIcon';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
@@ -60,7 +64,13 @@ export function HomePage() {
     );
   }, [allAggregates, searchQuery]);
 
+  // Stale-While-Revalidate: Instant cached snapshot on initial mount
+  const cachedSnapshot = useMemo(() => loadHomeSnapshotSync(), []);
+
   const monthlyStats = useMemo(() => {
+    if (history.length === 0 && cachedSnapshot?.monthlyStats) {
+      return cachedSnapshot.monthlyStats;
+    }
     const now = new Date();
     const curYear = now.getFullYear();
     const curMonth = now.getMonth();
@@ -94,27 +104,50 @@ export function HomePage() {
       previousMonthTotal,
       diffPercent,
     };
-  }, [history]);
+  }, [history, cachedSnapshot]);
 
-  const priceIndex = useMemo(
-    () => calculatePriceIndex(history, priceIndexDays),
-    [history, priceIndexDays],
-  );
+  const priceIndex = useMemo(() => {
+    if (history.length === 0 && cachedSnapshot?.priceIndex) {
+      return cachedSnapshot.priceIndex;
+    }
+    return calculatePriceIndex(history, priceIndexDays);
+  }, [history, priceIndexDays, cachedSnapshot]);
 
-  const categorySpending = useMemo(
-    () => calculateCategorySpending(history),
-    [history],
-  );
+  const categorySpending = useMemo(() => {
+    if (history.length === 0 && cachedSnapshot?.categorySpending) {
+      return cachedSnapshot.categorySpending;
+    }
+    return calculateCategorySpending(history);
+  }, [history, cachedSnapshot]);
 
   const availableMarketNames = useMemo(() => {
+    if (history.length === 0 && cachedSnapshot?.availableMarketNames) {
+      return cachedSnapshot.availableMarketNames;
+    }
     const set = new Set<string>();
     markets.forEach((m) => set.add(m.name));
     history.forEach((r) => set.add(r.marketName));
     return Array.from(set).sort();
-  }, [markets, history]);
+  }, [markets, history, cachedSnapshot]);
+
+  // Update snapshot when fresh history or markets arrive
+  useEffect(() => {
+    if (history.length > 0) {
+      const timer = setTimeout(() => {
+        const snap = buildHomeSnapshot(history, markets, 0, priceIndexDays);
+        saveHomeSnapshot(snap);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [history, markets, priceIndexDays]);
 
   const highlightedVariations =
     variationTab === 'up' ? priceIndex.topIncreases : priceIndex.topDecreases;
+
+  const currentMonthName = useMemo(() => {
+    const raw = new Date().toLocaleDateString('pt-BR', { month: 'long' });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-24 pt-safe dark:bg-[#121417]">
@@ -122,10 +155,10 @@ export function HomePage() {
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div>
             <h1 className="text-lg font-extrabold text-[#111827] dark:text-[#F3F4F6]">
-              Resumo &amp; Economia
+              Início &amp; Análises
             </h1>
             <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Acompanhe gastos, inflação e melhores preços
+              Acompanhe gastos, inflação e economia por mercado
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -151,49 +184,79 @@ export function HomePage() {
       </header>
 
       <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
-        {/* Monthly Spending Summary */}
-        <section className="rounded-3xl bg-gradient-to-br from-[#00C853] to-[#059669] p-5 text-white shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold">
-              <Calendar size={12} />
-              Gastos do Mês Atual
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/90">
-              <ShoppingBag size={14} />
-              {monthlyStats.currentMonthCount}{' '}
-              {monthlyStats.currentMonthCount === 1 ? 'compra' : 'compras'}
-            </span>
+        {/* Monthly Spending Summary Card with decorative gocery.jpg background */}
+        <section className="relative overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-xs dark:border-[#2E3440] dark:bg-[#1E2229]">
+          {/* Decorative gocery.jpg image on the right with smooth gradient mask */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-36 sm:w-48 overflow-hidden rounded-r-3xl">
+            <img
+              src="/assets/gocery.jpg"
+              alt=""
+              className="h-full w-full object-cover object-center opacity-25 dark:opacity-20 [mask-image:linear-gradient(to_right,transparent,black)] [-webkit-mask-image:linear-gradient(to_right,transparent,black)]"
+            />
           </div>
 
-          <p className="mt-3 text-3xl font-extrabold tracking-tight">
-            {AppFormatters.formatCurrency(monthlyStats.currentMonthTotal)}
-          </p>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00C853]/15 text-[#00C853]">
+                  <Wallet size={17} />
+                </div>
+                <span className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
+                  Gastos em {currentMonthName}
+                </span>
+              </div>
+              <span className="rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-semibold text-[#4B5563] dark:bg-[#121417] dark:text-[#9CA3AF]">
+                {monthlyStats.currentMonthCount}{' '}
+                {monthlyStats.currentMonthCount === 1 ? 'compra' : 'compras'}
+              </span>
+            </div>
 
-          {monthlyStats.diffPercent != null ? (
-            <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-white/90">
-              {monthlyStats.diffPercent <= 0 ? (
-                <ArrowDownRight size={15} />
-              ) : (
-                <ArrowUpRight size={15} />
-              )}
-              {Math.abs(monthlyStats.diffPercent).toFixed(1)}%{' '}
-              {monthlyStats.diffPercent <= 0 ? 'a menos' : 'a mais'} que no mês
-              anterior ({AppFormatters.formatCurrency(monthlyStats.previousMonthTotal)})
+            <p className="mt-3 text-3xl font-extrabold tracking-tight text-[#111827] dark:text-[#F3F4F6]">
+              {AppFormatters.formatCurrency(monthlyStats.currentMonthTotal)}
             </p>
-          ) : (
-            <p className="mt-1.5 text-xs text-white/80">
-              Finalize compras ou importe cupons fiscais para acompanhar seu histórico mensal.
-            </p>
-          )}
+
+            {monthlyStats.diffPercent != null ? (
+              <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+                {monthlyStats.diffPercent <= 0 ? (
+                  <ArrowDownRight size={15} className="text-[#00C853]" />
+                ) : (
+                  <ArrowUpRight size={15} className="text-rose-500" />
+                )}
+                <span
+                  className={
+                    monthlyStats.diffPercent <= 0
+                      ? 'text-[#00C853]'
+                      : 'text-rose-500'
+                  }
+                >
+                  {Math.abs(monthlyStats.diffPercent).toFixed(1)}%
+                </span>{' '}
+                {monthlyStats.diffPercent <= 0 ? 'a menos' : 'a mais'} que no mês anterior ({AppFormatters.formatCurrency(monthlyStats.previousMonthTotal)})
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                Finalize compras ou importe cupons fiscais para acompanhar seus gastos.
+              </p>
+            )}
+          </div>
         </section>
 
         {history.length === 0 ? (
-          <section className="rounded-3xl border border-dashed border-[#E5E7EB] bg-white p-8 text-center dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <BarChart3 size={34} className="mx-auto text-[#00C853]" />
-            <h2 className="mt-3 text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
-              Nenhum histórico registrado ainda
+          <section className="overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white p-5 text-center shadow-xs dark:border-[#2E3440] dark:bg-[#1E2229]">
+            <div className="relative mx-auto mb-4 h-28 w-full overflow-hidden rounded-2xl border border-[#E5E7EB] dark:border-[#2E3440]">
+              <img
+                src="/assets/gocery.jpg"
+                alt=""
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
+                <BarChart3 size={38} className="text-white drop-shadow-md" />
+              </div>
+            </div>
+            <h2 className="text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
+              Suas análises aparecerão aqui
             </h2>
-            <p className="mt-1 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            <p className="mx-auto mt-1 max-w-sm text-xs text-[#6B7280] dark:text-[#9CA3AF]">
               Finalize uma lista de compras ou importe uma NFC-e na aba{' '}
               <strong>Histórico</strong> para liberar gráficos de variação de preços e recomendações de mercado.
             </p>

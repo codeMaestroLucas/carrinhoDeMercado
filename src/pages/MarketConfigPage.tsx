@@ -23,6 +23,8 @@ import {
   Copy,
   Edit3,
   GripVertical,
+  Maximize2,
+  Minimize2,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -153,6 +155,29 @@ export function MarketConfigPage() {
     useState<ProductCategoryId | null>(null);
   const [newKeywordInput, setNewKeywordInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(
+    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false,
+  );
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+          setIsFullscreen(true);
+          notify('Modo tela cheia ativado');
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+          notify('Modo tela cheia desativado');
+        }
+      }
+    } catch (_) {
+      notify('Tela cheia não suportada neste navegador');
+    }
+  };
 
   const selectedMarket =
     markets.find((m) => m.id === selectedMarketId) ?? markets[0];
@@ -493,6 +518,33 @@ export function MarketConfigPage() {
               </div>
             </SortableContext>
           </DndContext>
+        </section>
+
+        {/* Immersive Fullscreen Mode Section */}
+        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
+                <Maximize2 size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
+                  Modo Tela Cheia Imersivo
+                </h2>
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                  Oculta a barra de notificações e barras do sistema
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 rounded-xl bg-[#00C853] px-3.5 py-2 text-xs font-bold text-white transition active:scale-95"
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              <span>{isFullscreen ? 'Sair' : 'Ativar'}</span>
+            </button>
+          </div>
         </section>
 
         {/* Smart Category Dictionary */}

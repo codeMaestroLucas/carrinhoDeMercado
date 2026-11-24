@@ -19,9 +19,15 @@ import {
 import { CategoryClassifier } from '../services/categoryClassifier';
 import { CloudSyncService } from '../services/cloudSyncService';
 import {
+  clearPersistedSessionSync,
   loadPersistedState,
+  loadPersistedStateSync,
   savePersistedState,
 } from '../services/storageService';
+import {
+  buildHomeSnapshot,
+  saveHomeSnapshot,
+} from '../services/homeSnapshotService';
 
 function createDefaultMarkets(): MarketProfile[] {
   const allIds = PRODUCT_CATEGORIES.map((c) => c.id);
@@ -91,6 +97,7 @@ export interface ShoppingState {
   cloudError: string | null;
 
   initializeApp: () => Promise<void>;
+  validateAndSyncInBackground: (spaceCode: string) => Promise<void>;
   setCategoryFilter: (category: ProductCategoryId | null) => void;
   setShowCheckedItems: (value: boolean) => void;
   toggleDarkMode: () => void;
@@ -133,6 +140,7 @@ export interface ShoppingState {
   updateItemQuantity: (id: string, quantity: number) => void;
   removeItem: (id: string) => void;
   clearCheckedItems: () => void;
+  uncheckAllItems: () => void;
   clearAllItems: () => void;
 
   addKeywordToCategory: (category: ProductCategoryId, rawKeyword: string) => boolean;
@@ -297,6 +305,17 @@ async function persistAndPush(
     lastSyncedAtIso: state.lastSyncedAtIso,
   });
 
+  try {
+    const snapshot = buildHomeSnapshot(
+      state.history,
+      state.markets,
+      state.items.filter((i) => !i.isChecked).length,
+    );
+    saveHomeSnapshot(snapshot);
+  } catch {
+    // Ignore snapshot write failures
+  }
+
   if (!shouldQueuePush || !state.sharedSpaceCode) return;
 
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -404,83 +423,229 @@ function startCloudListener(
   });
 }
 
-export const useShoppingStore = create<ShoppingState>((set, get) => ({
-  isHydrated: false,
-  clientId: `client_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-  items: [],
-  markets: createDefaultMarkets(),
-  selectedMarketId: 'mercado_padrao',
-  history: [],
-  learnedCategories: {},
-  categoryDictionary: CategoryClassifier.cloneDefaultDictionary(),
-  categoryFilter: null,
-  showCheckedItems: true,
-  isDarkMode: false,
-  sharedSpaceCode: null,
-  isSyncingCloud: false,
-  hasPendingCloudPush: false,
-  lastSyncedAtIso: null,
-  cloudError: null,
+function getInitialSynchronousState(): Partial<ShoppingState> {
+  const sync = loadPersistedStateSync();
+  if (!sync) return {};
 
-  async initializeApp() {
-    if (get().isHydrated) return;
+  const dummyCurrent = {
+    categoryDictionary: CategoryClassifier.cloneDefaultDictionary(),
+    markets: createDefaultMarkets(),
+    history: [],
+  } as unknown as ShoppingState;
 
-    const saved = await loadPersistedState();
-    if (saved) {
-      if (typeof saved.lastAppliedRemoteTimestampMs === 'number') {
-        lastAppliedRemoteTimestampMs = saved.lastAppliedRemoteTimestampMs;
+  if (typeof sync.lastAppliedRemoteTimestampMs === 'number') {
+    lastAppliedRemoteTimestampMs = sync.lastAppliedRemoteTimestampMs;
+  }
+
+  const patch = parseRemoteState(sync as Record<string, unknown>, dummyCurrent);
+  const prefersDark =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+
+  return {
+    ...patch,
+    clientId:
+      typeof sync.clientId === 'string' && sync.clientId
+        ? sync.clientId
+        : undefined,
+    sharedSpaceCode:
+      typeof sync.sharedSpaceCode === 'string' && sync.sharedSpaceCode
+        ? sync.sharedSpaceCode
+        : null,
+    hasPendingCloudPush: Boolean(sync.hasPendingCloudPush),
+    lastSyncedAtIso:
+      typeof sync.lastSyncedAtIso === 'string' ? sync.lastSyncedAtIso : null,
+    isDarkMode:
+      typeof sync.isDarkMode === 'boolean'
+        ? sync.isDarkMode
+        : Boolean(prefersDark),
+    isHydrated: true,
+  };
+}
+
+export const useShoppingStore = create<ShoppingState>((set, get) => {
+  const syncInitial = getInitialSynchronousState();
+
+  return {
+    isHydrated: Boolean(syncInitial.isHydrated),
+    clientId:
+      syncInitial.clientId ??
+      `client_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    items: syncInitial.items ?? [],
+    markets: syncInitial.markets ?? createDefaultMarkets(),
+    selectedMarketId: syncInitial.selectedMarketId ?? 'mercado_padrao',
+    history: syncInitial.history ?? [],
+    learnedCategories: syncInitial.learnedCategories ?? {},
+    categoryDictionary:
+      syncInitial.categoryDictionary ??
+      CategoryClassifier.cloneDefaultDictionary(),
+    categoryFilter: null,
+    showCheckedItems: syncInitial.showCheckedItems ?? true,
+    isDarkMode: syncInitial.isDarkMode ?? false,
+    sharedSpaceCode: syncInitial.sharedSpaceCode ?? null,
+    isSyncingCloud: false,
+    hasPendingCloudPush: syncInitial.hasPendingCloudPush ?? false,
+    lastSyncedAtIso: syncInitial.lastSyncedAtIso ?? null,
+    cloudError: null,
+
+    async initializeApp() {
+      // 1. Asynchronously reconcile with IndexedDB in background without blocking UI
+      try {
+        const saved = await loadPersistedState();
+        if (saved) {
+          if (typeof saved.lastAppliedRemoteTimestampMs === 'number') {
+            lastAppliedRemoteTimestampMs = saved.lastAppliedRemoteTimestampMs;
+          }
+          const patch = parseRemoteState(saved as Record<string, unknown>, get());
+          set({
+            ...patch,
+            clientId:
+              typeof saved.clientId === 'string' && saved.clientId
+                ? saved.clientId
+                : get().clientId,
+            sharedSpaceCode:
+              typeof saved.sharedSpaceCode === 'string' && saved.sharedSpaceCode
+                ? saved.sharedSpaceCode
+                : get().sharedSpaceCode,
+            hasPendingCloudPush: Boolean(saved.hasPendingCloudPush),
+            lastSyncedAtIso:
+              typeof saved.lastSyncedAtIso === 'string'
+                ? saved.lastSyncedAtIso
+                : get().lastSyncedAtIso,
+            isDarkMode:
+              typeof saved.isDarkMode === 'boolean'
+                ? saved.isDarkMode
+                : get().isDarkMode,
+            isHydrated: true,
+          });
+        } else {
+          set({ isHydrated: true });
+        }
+      } catch {
+        set({ isHydrated: true });
       }
-      const patch = parseRemoteState(saved as Record<string, unknown>, get());
-      set({
-        ...patch,
-        clientId:
-          typeof saved.clientId === 'string' && saved.clientId
-            ? saved.clientId
-            : get().clientId,
-        sharedSpaceCode:
-          typeof saved.sharedSpaceCode === 'string' && saved.sharedSpaceCode
-            ? saved.sharedSpaceCode
-            : null,
-        hasPendingCloudPush: Boolean(saved.hasPendingCloudPush),
-        lastSyncedAtIso:
-          typeof saved.lastSyncedAtIso === 'string'
-            ? saved.lastSyncedAtIso
-            : null,
-        isDarkMode:
-          typeof saved.isDarkMode === 'boolean'
-            ? saved.isDarkMode
-            : window.matchMedia?.('(prefers-color-scheme: dark)').matches ??
-              false,
-        isHydrated: true,
-      });
-    } else {
-      const prefersDark =
-        typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-      set({ isDarkMode: Boolean(prefersDark), isHydrated: true });
-    }
 
-    const ready = CloudSyncService.initializeFirebase();
-    const spaceCode = get().sharedSpaceCode;
-    if (!ready && spaceCode) {
-      set({
-        cloudError:
-          CloudSyncService.getInitializationError() ??
-          'Não foi possível conectar ao Firebase.',
-      });
-      return;
-    }
-
-    if (ready && spaceCode) {
-      if (get().hasPendingCloudPush) {
-        await get().flushPendingSync();
+      // 2. Refresh local home snapshot in background
+      try {
+        const snapshot = buildHomeSnapshot(
+          get().history,
+          get().markets,
+          get().items.filter((i) => !i.isChecked).length,
+        );
+        saveHomeSnapshot(snapshot);
+      } catch {
+        // Ignore snapshot generation failure
       }
+
+      // 3. Optimistic session validation & parallel sync in background
+      const spaceCode = get().sharedSpaceCode;
+      if (spaceCode) {
+        void get().validateAndSyncInBackground(spaceCode);
+      }
+    },
+
+    async validateAndSyncInBackground(spaceCode: string) {
+      if (!spaceCode) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+      const ready = CloudSyncService.initializeFirebase();
+      if (!ready) {
+        set({
+          cloudError:
+            CloudSyncService.getInitializationError() ??
+            'Não foi possível conectar ao Firebase.',
+        });
+        return;
+      }
+
       startCloudListener(spaceCode, get, set);
-      if (!get().hasPendingCloudPush) {
-        await get().refreshCloudSync();
+
+      // Strategy 3: Parallelize space fetch and pending push using Promise.allSettled
+      set({ isSyncingCloud: true });
+
+      const tasks: [Promise<Record<string, unknown> | null>, Promise<void> | null] = [
+        CloudSyncService.fetchSharedSpace(spaceCode),
+        get().hasPendingCloudPush ? get().flushPendingSync() : null,
+      ];
+
+      const [fetchResult, pushResult] = await Promise.allSettled([
+        tasks[0],
+        tasks[1] ?? Promise.resolve(),
+      ]);
+
+      set({ isSyncingCloud: false });
+
+      // Strategy 1: Check for 401 / permission-denied / unauthenticated
+      if (fetchResult.status === 'rejected') {
+        const errorMsg =
+          fetchResult.reason instanceof Error
+            ? fetchResult.reason.message
+            : String(fetchResult.reason);
+        const isAuthError =
+          errorMsg.includes('permission-denied') ||
+          errorMsg.includes('unauthenticated') ||
+          errorMsg.includes('401') ||
+          errorMsg.includes('403') ||
+          errorMsg.includes('Permissão negada');
+
+        if (isAuthError) {
+          clearPersistedSessionSync();
+          cloudUnsubscribe?.();
+          cloudUnsubscribe = null;
+          set({
+            sharedSpaceCode: null,
+            hasPendingCloudPush: false,
+            cloudError:
+              'Sessão expirada ou sem permissão de acesso ao espaço. O app continuará em modo local.',
+          });
+          scheduleSave(get, set, { pushCloud: false, immediate: true });
+          return;
+        }
+
+        set({ cloudError: errorMsg });
+        return;
       }
-    }
-  },
+
+      if (fetchResult.status === 'fulfilled') {
+        const data = fetchResult.value;
+        if (!data) {
+          clearPersistedSessionSync();
+          cloudUnsubscribe?.();
+          cloudUnsubscribe = null;
+          set({
+            sharedSpaceCode: null,
+            hasPendingCloudPush: false,
+            cloudError: `O espaço "${spaceCode}" não foi encontrado no servidor. Conectando em modo local.`,
+          });
+          scheduleSave(get, set, { pushCloud: false, immediate: true });
+          return;
+        }
+
+        // Stale-While-Revalidate: Reconcile fresh server data with local state
+        const remoteTs =
+          typeof data.updatedAtMs === 'number' ? data.updatedAtMs : null;
+        if (remoteTs == null || remoteTs >= lastAppliedRemoteTimestampMs) {
+          if (remoteTs != null) lastAppliedRemoteTimestampMs = remoteTs;
+          const patch = parseRemoteState(data, get());
+          set({
+            ...patch,
+            lastSyncedAtIso: new Date().toISOString(),
+            cloudError: null,
+          });
+          scheduleSave(get, set, { pushCloud: false, immediate: true });
+        }
+      }
+
+      if (pushResult.status === 'rejected') {
+        set({
+          hasPendingCloudPush: true,
+          cloudError:
+            pushResult.reason instanceof Error
+              ? pushResult.reason.message
+              : String(pushResult.reason),
+        });
+      }
+    },
 
   setCategoryFilter(category) {
     set({ categoryFilter: category });
@@ -807,6 +972,13 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
 
   clearCheckedItems() {
     set((s) => ({ items: s.items.filter((i) => !i.isChecked) }));
+    scheduleSave(get, set);
+  },
+
+  uncheckAllItems() {
+    set((s) => ({
+      items: s.items.map((i) => ({ ...i, isChecked: false })),
+    }));
     scheduleSave(get, set);
   },
 
@@ -1209,4 +1381,5 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
       set({ isSyncingCloud: false });
     }
   },
-}));
+  };
+});

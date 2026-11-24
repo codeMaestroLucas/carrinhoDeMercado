@@ -33,6 +33,8 @@ const IGNORED_RECEIPT_KEYWORDS = [
 ];
 
 export const PHRASE_ABBREV_MAP: Record<string, string> = {
+  'CHOC BARRA': 'Chocolate em Barra',
+  'CHOCOLATE BARRA': 'Chocolate em Barra',
   'CR LEITE': 'Creme de Leite',
   'CREM LEIT': 'Creme de Leite',
   'CR DE LEITE': 'Creme de Leite',
@@ -71,8 +73,106 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'CH VERDE': 'Cheiro Verde',
   'CHEIRO VERD': 'Cheiro Verde',
   'MOLHO TOM': 'Molho de Tomate',
+  'MOLH TOM': 'Molho de Tomate',
+  'MOL TOM': 'Molho de Tomate',
   'EXTR TOM': 'Extrato de Tomate',
+  'EXT TOM': 'Extrato de Tomate',
   'POLP TOM': 'Polpa de Tomate',
+  'POL TOM': 'Polpa de Tomate',
+  'LEIT COND': 'Leite Condensado',
+  'LEITE COND': 'Leite Condensado',
+  'L COND': 'Leite Condensado',
+  'LEIT CONDENS': 'Leite Condensado',
+  'LEITE CONDENS': 'Leite Condensado',
+  'LEIT UHT': 'Leite UHT',
+  'LEITE UHT': 'Leite UHT',
+  'LEIT INT': 'Leite Integral',
+  'LEITE INT': 'Leite Integral',
+  'LEIT DESN': 'Leite Desnatado',
+  'LEITE DESN': 'Leite Desnatado',
+  'LEIT SEMI': 'Leite Semidesnatado',
+  'LEITE SEMI': 'Leite Semidesnatado',
+  'PEIT PERU': 'Peito de Peru',
+  'PEITO PERU': 'Peito de Peru',
+  'PEIT FRANG': 'Peito de Frango',
+  'PEITO FRANG': 'Peito de Frango',
+  'FILE PEIT': 'Filé de Peito',
+  'FILE DE PEITO': 'Filé de Peito',
+  'FILE MIGNON': 'Filé Mignon',
+  'F MIGNON': 'Filé Mignon',
+  'CONTRA FILE': 'Contrafilé',
+  'C FILE': 'Contrafilé',
+  'COX SOBRECOX': 'Coxa e Sobrecoxa',
+  'C SOBRECOX': 'Coxa e Sobrecoxa',
+  'CARN MOID': 'Carne Moída',
+  'CARNE MOID': 'Carne Moída',
+  'LING CALAB': 'Linguiça Calabresa',
+  'LINGUICA CALAB': 'Linguiça Calabresa',
+  'LING TOSC': 'Linguiça Toscana',
+  'LINGUICA TOSC': 'Linguiça Toscana',
+  'DOCE LEIT': 'Doce de Leite',
+  'DOCE DE LEIT': 'Doce de Leite',
+  'AZEIT EXTR VIRG': 'Azeite Extra Virgem',
+  'AZEITE EV': 'Azeite Extra Virgem',
+  'AZ EXT VIRG': 'Azeite Extra Virgem',
+  'P CAFE': 'Pó de Café',
+  'PO CAFE': 'Pó de Café',
+  'PO DE CAFE': 'Pó de Café',
+  'C/ GAS': 'Com Gás',
+  'COM GAS': 'Com Gás',
+  'S/ GAS': 'Sem Gás',
+  'SEM GAS': 'Sem Gás',
+  'C/ LACT': 'Com Lactose',
+  'COM LACT': 'Com Lactose',
+  'S/ LACT': 'Sem Lactose',
+  'SEM LACT': 'Sem Lactose',
+  'ZERO LACT': 'Zero Lactose',
+  'C/ CAROC': 'Com Caroço',
+  'COM CAROC': 'Com Caroço',
+  'S/ CAROC': 'Sem Caroço',
+  'SEM CAROC': 'Sem Caroço',
+  'FOLHA DUPLA': 'Folha Dupla',
+  'FD DUPLA': 'Folha Dupla',
+  'FOLHA TRIPLA': 'Folha Tripla',
+  'FD TRIPLA': 'Folha Tripla',
+  'SACO P/ LIXO': 'Saco para Lixo',
+  'SC LIXO': 'Saco para Lixo',
+  'SACO LIX': 'Saco para Lixo',
+  'SAB LIQ': 'Sabonete Líquido',
+  'SAB LIQUIDO': 'Sabonete Líquido',
+  'DESOD AER': 'Desodorante Aerossol',
+  'DESOD AEROS': 'Desodorante Aerossol',
+  'LIMP MULT': 'Limpador Multiuso',
+  'LIMP MULTIUSO': 'Limpador Multiuso',
+  'AMAC CONC': 'Amaciante Concentrado',
+  'MAC INST': 'Macarrão Instantâneo',
+  'MACARR INST': 'Macarrão Instantâneo',
+  'PAO HAMB': 'Pão de Hambúrguer',
+  'PAO BURGUER': 'Pão de Hambúrguer',
+  'PAO HOT DOG': 'Pão de Hot Dog',
+  'PAO HD': 'Pão de Hot Dog',
+  'PAO QUEIJ': 'Pão de Queijo',
+  'P DE QUEIJO': 'Pão de Queijo',
+  'AG COCO': 'Água de Coco',
+  'AGUA COCO': 'Água de Coco',
+  'BEB LACT': 'Bebida Láctea',
+  'IORG GREGO': 'Iogurte Grego',
+  'IOG GREGO': 'Iogurte Grego',
+  'QUEIJ MIN': 'Queijo Minas',
+  'QUEIJO MINAS': 'Queijo Minas',
+  'QUEIJ PRAT': 'Queijo Prato',
+  'QUEIJO PRATO': 'Queijo Prato',
+  'QUEIJ MUSSA': 'Queijo Mussarela',
+  'QUEIJO MUSSARELA': 'Queijo Mussarela',
+  'QUEIJ PARM': 'Queijo Parmesão',
+  'QUEIJO PARMESAO': 'Queijo Parmesão',
+  'QUEIJ COALH': 'Queijo Coalho',
+  'QUEIJO COALHO': 'Queijo Coalho',
+  'REQUEIJ CREM': 'Requeijão Cremoso',
+  'MANTEIG C/SAL': 'Manteiga com Sal',
+  'MANTEIG S/SAL': 'Manteiga sem Sal',
+  'LAV PERF': 'Lavagem Perfeita',
+  'LAVAGEM PERF': 'Lavagem Perfeita',
 };
 
 export const ABBREV_MAP: Record<string, string> = {
@@ -140,6 +240,11 @@ export const ABBREV_MAP: Record<string, string> = {
   SBRM: 'Sobremesa', GELAT: 'Gelatina', GELE: 'Geleia', GELEIA: 'Geleia',
   ADOC: 'Adoçante', ADOCANT: 'Adoçante', MEL: 'Mel', PUD: 'Pudim', PUDIM: 'Pudim',
   REFRIG: 'Refrigerante', REF: 'Refrigerante', REFRI: 'Refrigerante',
+  CAFE: 'Café', CAFÉ: 'Café', PILAO: 'Pilão', PILÃO: 'Pilão',
+  FEIJAO: 'Feijão', FEIJÃO: 'Feijão', ACUCAR: 'Açúcar', AÇUCAR: 'Açúcar',
+  PAO: 'Pão', PÃO: 'Pão', SABAO: 'Sabão', SABÃO: 'Sabão',
+  AGUA: 'Água', ÁGUA: 'Água', MELAO: 'Melão', MELÃO: 'Melão',
+  YPE: 'Ypê', YPÊ: 'Ypê',
   CERV: 'Cerveja', CERVEJ: 'Cerveja', CHOP: 'Chopp', SUC: 'Suco',
   AG: 'Água', AGU: 'Água', MIN: 'Mineral', MINER: 'Mineral',
   'S/GAS': 'Sem Gás', SGAS: 'Sem Gás', 'C/GAS': 'Com Gás', CGAS: 'Com Gás',
@@ -177,7 +282,15 @@ export const ABBREV_MAP: Record<string, string> = {
   PAGUE: 'Pague', PROM: 'Promoção', PROMO: 'Promoção', TRAD: 'Tradicional',
   TRADIC: 'Tradicional', ORIG: 'Original', NAT: 'Natural', NATUR: 'Natural',
   SABOR: 'Sabor', LIQ: 'Líquido', LIQUID: 'Líquido', PO: 'Pó',
-  UN: 'Unidade', UND: 'Unidade', 'C/': 'Com', 'S/': 'Sem',
+  UN: 'Unidade', UND: 'Unidade', 'C/': 'Com', 'S/': 'Sem', 'P/': 'Para',
+  UHT: 'UHT', EV: 'Extra Virgem', VIRG: 'Virgem',
+  TOSC: 'Toscana', CALAB: 'Calabresa', CALABR: 'Calabresa', APRES: 'Apresuntado', APRESUNT: 'Apresuntado',
+  LAVAND: 'Lavanda', PINH: 'Pinho', EUCAL: 'Eucalipto', CITR: 'Cítrico',
+  MARAC: 'Maracujá', MORANG: 'Morango', PESSEG: 'Pêssego', GOIAB: 'Goiaba',
+  COCO: 'Coco', BAUN: 'Baunilha', BAUNILH: 'Baunilha', CANEL: 'Canela', CRAV: 'Cravo',
+  AMEND: 'Amendoim', GEL: 'Gel', SOLUV: 'Solúvel', CAPS: 'Cápsulas', SACH: 'Sachê', SACHE: 'Sachê', FLOC: 'Flocos',
+  TP: 'Tipo', T1: 'Tipo 1', T2: 'Tipo 2', INTENS: 'Intenso',
+  PERF: 'Perfeita', FRESC: 'Fresco',
   UALOR: 'Valor', VALOR: 'Valor',
 };
 
@@ -247,9 +360,12 @@ const KNOWN_SINGLE_WORDS: Set<string> = (() => {
   ]);
   for (const list of Object.values(DEFAULT_KEYWORD_DICTIONARY)) {
     for (const kw of list) {
-      const clean = normalizeWordForLookup(kw);
-      if (!clean.includes(' ') && clean.length >= 4) {
-        set.add(clean);
+      const trimmed = kw.trim();
+      if (!trimmed.includes(' ') && !trimmed.includes('-')) {
+        const clean = CategoryClassifier.normalize(trimmed);
+        if (clean.length >= 4) {
+          set.add(clean);
+        }
       }
     }
   }
@@ -257,7 +373,7 @@ const KNOWN_SINGLE_WORDS: Set<string> = (() => {
 })();
 
 function normalizeWordForLookup(word: string): string {
-  return CategoryClassifier.normalize(word).replace(/\s+/g, '');
+  return CategoryClassifier.normalize(word);
 }
 
 function escapeRegExp(str: string): string {
@@ -350,7 +466,7 @@ function shouldIgnoreReceiptLine(line: string): boolean {
   return false;
 }
 
-function isTotalProductName(name: string): boolean {
+export function isTotalProductName(name: string): boolean {
   let lower = name
     .toLowerCase()
     .trim()
@@ -377,6 +493,24 @@ function isTotalProductName(name: string): boolean {
   ]);
 
   if (totalExactNames.has(lower)) return true;
+
+  if (
+    lower.includes('tributo') ||
+    lower.includes('tributos') ||
+    lower.includes('imposto') ||
+    lower.includes('troco') ||
+    lower.includes('forma de pagamento') ||
+    lower.includes('cartao') ||
+    lower.includes('cartão') ||
+    lower.includes('dinheiro') ||
+    lower.includes('pix') ||
+    lower.includes('valor pago') ||
+    lower.includes('total pago') ||
+    lower.includes('total a pagar') ||
+    lower.includes('valor a pagar')
+  ) {
+    return true;
+  }
 
   if (
     lower.startsWith('total ') ||
@@ -419,7 +553,7 @@ function isTotalProductName(name: string): boolean {
   return false;
 }
 
-function repairReceiptWord(word: string): string {
+export function repairReceiptWord(word: string): string {
   if (!word) return word;
   const upperWord = word.toUpperCase();
   if (upperWord === 'OL' || upperWord === 'SC') return word;
@@ -434,6 +568,7 @@ function repairReceiptWord(word: string): string {
     return w.replace(/[Oo]/g, '0');
   }
 
+  // 1. Repair digit '0' to letter 'O' in words
   if (/[a-zA-ZÀ-ÿ]/.test(w) && w.includes('0')) {
     w = w.replace(
       /(?<=[a-zA-ZÀ-ÿ])0+|0+(?=[a-zA-ZÀ-ÿ])/g,
@@ -441,6 +576,33 @@ function repairReceiptWord(word: string): string {
     );
     if (w.startsWith('0') && w.length >= 2) w = `O${w.slice(1)}`;
     if (w.endsWith('0') && w.length >= 3) w = `${w.slice(0, -1)}O`;
+  }
+
+  // 2. Repair digit '1' to letter 'I' in alphabetical words (e.g. B1SCOITO, LE1TE, 1OGURTE)
+  if (/[a-zA-ZÀ-ÿ]{2,}/.test(w) && w.includes('1')) {
+    w = w.replace(
+      /(?<=[a-zA-ZÀ-ÿ])1+|1+(?=[a-zA-ZÀ-ÿ])/g,
+      (m) => 'I'.repeat(m.length),
+    );
+    if (w.startsWith('1') && w.length >= 3 && /[a-zA-ZÀ-ÿ]{2,}/.test(w)) {
+      w = `I${w.slice(1)}`;
+    }
+  }
+
+  // 3. Repair digit '5' to letter 'S' in alphabetical words (e.g. 5UCO, 5ABONETE, MA5SA)
+  if (/[a-zA-ZÀ-ÿ]{2,}/.test(w) && w.includes('5')) {
+    w = w.replace(
+      /(?<=[a-zA-ZÀ-ÿ])5+|5+(?=[a-zA-ZÀ-ÿ])/g,
+      (m) => 'S'.repeat(m.length),
+    );
+    if (w.startsWith('5') && w.length >= 3 && /[a-zA-ZÀ-ÿ]{2,}/.test(w)) {
+      w = `S${w.slice(1)}`;
+    }
+  }
+
+  // 4. Repair digit '8' to letter 'B' at start of words (e.g. 8ISCOITO, 8ANANA)
+  if (w.startsWith('8') && w.length >= 3 && /[a-zA-ZÀ-ÿ]{2,}/.test(w)) {
+    w = `B${w.slice(1)}`;
   }
 
   const upper = w.toUpperCase();
@@ -485,28 +647,47 @@ function repairReceiptWord(word: string): string {
   return w;
 }
 
-function mergeSplitWords(rawTokens: string[]): string[] {
+export function mergeSplitWords(rawTokens: string[]): string[] {
   if (rawTokens.length <= 1) return rawTokens;
   const result: string[] = [];
   let i = 0;
+  const minorPrepositions = new Set([
+    'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'e', 'para',
+  ]);
 
   while (i < rawTokens.length) {
+    const token = rawTokens[i];
+    const lowerToken = token.toLowerCase();
+
+    if (minorPrepositions.has(lowerToken)) {
+      result.push(token);
+      i++;
+      continue;
+    }
+
     if (i + 2 < rawTokens.length) {
-      const triple = `${rawTokens[i]}${rawTokens[i + 1]}${rawTokens[i + 2]}`;
-      const repairedTriple = repairReceiptWord(triple);
-      if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedTriple))) {
-        result.push(repairedTriple);
-        i += 3;
-        continue;
+      const t1 = rawTokens[i + 1].toLowerCase();
+      const t2 = rawTokens[i + 2].toLowerCase();
+      if (!minorPrepositions.has(t1) && !minorPrepositions.has(t2)) {
+        const triple = `${rawTokens[i]}${rawTokens[i + 1]}${rawTokens[i + 2]}`;
+        const repairedTriple = repairReceiptWord(triple);
+        if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedTriple))) {
+          result.push(repairedTriple);
+          i += 3;
+          continue;
+        }
       }
     }
     if (i + 1 < rawTokens.length) {
-      const pair = `${rawTokens[i]}${rawTokens[i + 1]}`;
-      const repairedPair = repairReceiptWord(pair);
-      if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedPair))) {
-        result.push(repairedPair);
-        i += 2;
-        continue;
+      const t1 = rawTokens[i + 1].toLowerCase();
+      if (!minorPrepositions.has(t1)) {
+        const pair = `${rawTokens[i]}${rawTokens[i + 1]}`;
+        const repairedPair = repairReceiptWord(pair);
+        if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedPair))) {
+          result.push(repairedPair);
+          i += 2;
+          continue;
+        }
       }
     }
     result.push(rawTokens[i]);
@@ -516,21 +697,29 @@ function mergeSplitWords(rawTokens: string[]): string[] {
   return result;
 }
 
-function cleanReceiptProductName(raw: string): string {
+export function cleanReceiptProductName(raw: string): string {
   let s = raw;
+
+  // 0. Remove bracketed / parenthesized codes e.g. (Código: 1234), (Cód: 5678), (Cod: 90), (PLU: 4011), (Ref: 99)
+  s = s.replace(/\s*\((?:c[óo]d(?:igo)?|plu|ref|ean|gtin|item)\s*:[^)]*\)\s*/gi, ' ');
+  s = s.replace(/\s*\[(?:c[óo]d(?:igo)?|plu|ref|ean|gtin|item)\s*:[^\]]*\]\s*/gi, ' ');
+  s = s.replace(/\b(?:c[óo]d(?:igo)?|plu|ref|ean|gtin)\s*:\s*\d+\b/gi, ' ');
+  s = s.replace(/\bNCM(?:\s*:)?\s*[\d.-]+\b/gi, ' ');
+
+  // 1. Remove leading item index, codes, and barcodes (e.g. "001 7891000315507 ", "ITEM 01 12345 ")
   s = s.replace(/^\s*(?:ITEM|IT|COD|CÓD)?\s*#?\s*\d{1,6}\s+\d{4,14}\s+/i, '');
   s = s.replace(/^\s*(?:ITEM|IT|COD|CÓD)?\s*#?\s*\d{1,14}[\s.-]+/i, '');
   s = s.replace(/^\s*\d{7,14}\s+/, '');
 
-  s = s.replace(
-    /\b\d+(?:[,.]\d+)?\s*(?:UN|KG|G|L|LT|ML|PC|PCT|CX|EMB)\b.*$/i,
-    '',
-  );
-  s = s.replace(
-    /\b(?:F\d+|T\d+(?:[,.]\d+)?%?|I\d+|N\d+|II|FF|NN)\b.*$/i,
-    '',
-  );
-  s = s.replace(/\s+(?:UN|KG|LT|PC|R\$)\s*$/i, '');
+  // 2. Remove trailing quantity multipliers, fiscal tags and unit markers
+  s = s.replace(/\s+\d+(?:[,.]\d+)?\s*(?:UN|KG|PC|PCT|CX|EMB)\s*[xX*]\s*[\d,.]+.*$/i, '');
+  s = s.replace(/\s*(?:UN|KG|LT|PC)\s*:\s*[A-Z0-9]+.*$/i, '');
+  s = s.replace(/\s*V(?:L|LR)?\.?\s*UNIT(?:\.|ÁRIO)?\s*:?.*$/i, '');
+  s = s.replace(/\s+(?:F\d+|T\d+(?:[,.]\d+)?%?|I\d+|N\d+|II|FF|NN|ST|ICMS(?:\s*\d+%)?|PIS|COFINS)\b.*$/gi, '');
+  s = s.replace(/\s+(?:UN|PC|R\$)\s*$/i, '');
+
+  // 3. Remove stray symbols like ***, ===, ---, >>>, <<<, #, |, ~
+  s = s.replace(/[*=_#|~<>]+/g, ' ');
 
   for (const [key, val] of Object.entries(PHRASE_ABBREV_MAP)) {
     const pattern = new RegExp(`\\b${escapeRegExp(key)}\\b`, 'gi');
@@ -567,9 +756,12 @@ function cleanReceiptProductName(raw: string): string {
     const trailingToken = trailingMatch[1].trim().toLowerCase();
     const validShortWords = new Set([
       'po', 'pó', 'cha', 'chá', 'sal', 'uva', 'mel', 'ovo', 'pao', 'pão',
-      'de', 'em', 'un', 'kg', 'ml', 'g', 'l',
+      'de', 'em', 'un', 'kg', 'ml', 'g', 'l', 'ev', '1', '2', '3', '4', '5', '6', '7', '8', '9', '12',
     ]);
-    if (!validShortWords.has(trailingToken)) {
+    if (
+      !validShortWords.has(trailingToken) &&
+      !/^\d+[a-z]{1,2}$/i.test(trailingToken)
+    ) {
       s = s.slice(0, trailingMatch.index).trim();
     }
   }
@@ -585,6 +777,7 @@ function cleanReceiptProductName(raw: string): string {
     .map((p) => {
       if (!p) return '';
       if (/^\d+(?:[,.]\d+)?[a-zA-Z]{1,3}$/.test(p)) return p.toLowerCase();
+      if (p.toUpperCase() === 'UHT' || p.toUpperCase() === 'EV') return p.toUpperCase();
       const lower = p.toLowerCase();
       if (minorPrepositions.has(lower)) return lower;
       return lower[0].toUpperCase() + lower.slice(1);
@@ -892,5 +1085,11 @@ async function preprocessImageForOcr(file: File): Promise<string> {
 export const ReceiptScannerService = {
   parseReceiptText,
   accumulateScannedItems,
+  cleanReceiptProductName,
+  repairReceiptWord,
+  mergeSplitWords,
+  isTotalProductName,
+  phraseAbbrevMap: PHRASE_ABBREV_MAP,
+  abbrevMap: ABBREV_MAP,
   recognizeTextFromImageFile,
 };

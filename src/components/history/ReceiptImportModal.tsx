@@ -117,6 +117,19 @@ export function ReceiptImportModal({
       const res = await NfceScannerService.fetchAndParseNfceViaProxy(clean);
       if (res.items.length > 0) {
         setScannedItems(res.items);
+        if (res.marketName) {
+          const trimmed = res.marketName.trim();
+          const match = markets.find(
+            (m) => m.name.trim().toLowerCase() === trimmed.toLowerCase(),
+          );
+          if (match) {
+            setMarketId(match.id);
+            setIsCreatingMarket(false);
+          } else {
+            setNewMarketName(trimmed);
+            setIsCreatingMarket(true);
+          }
+        }
       } else {
         setStatusError(
           res.errorMessage ??
@@ -169,6 +182,19 @@ export function ReceiptImportModal({
       const res = NfceScannerService.parseNfceHtml(raw);
       if (res.items.length > 0) {
         setScannedItems(res.items);
+        if (res.marketName) {
+          const trimmed = res.marketName.trim();
+          const match = markets.find(
+            (m) => m.name.trim().toLowerCase() === trimmed.toLowerCase(),
+          );
+          if (match) {
+            setMarketId(match.id);
+            setIsCreatingMarket(false);
+          } else {
+            setNewMarketName(trimmed);
+            setIsCreatingMarket(true);
+          }
+        }
         return;
       }
     }

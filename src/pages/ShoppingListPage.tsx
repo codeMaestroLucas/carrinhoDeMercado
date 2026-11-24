@@ -5,9 +5,11 @@ import {
   ClipboardPaste,
   Cloud,
   CloudOff,
-  Minus,
+  MoreVertical,
   PiggyBank,
   Plus,
+  RotateCcw,
+  ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
   Sparkles,
@@ -30,6 +32,7 @@ import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { PwaInstallBanner } from '../components/layout/PwaInstallBanner';
 import { EditItemModal } from '../components/list/EditItemModal';
 import { FiltersModal } from '../components/list/FiltersModal';
+import { SwipeableShoppingItemRow } from '../components/list/SwipeableShoppingItemRow';
 import {
   MarketSavingsModal,
   type MarketBargainGroup,
@@ -62,7 +65,10 @@ export function ShoppingListPage({
   );
   const toggleItemChecked = useShoppingStore((s) => s.toggleItemChecked);
   const updateItemQuantity = useShoppingStore((s) => s.updateItemQuantity);
+  const removeItem = useShoppingStore((s) => s.removeItem);
   const clearCheckedItems = useShoppingStore((s) => s.clearCheckedItems);
+  const uncheckAllItems = useShoppingStore((s) => s.uncheckAllItems);
+  const clearAllItems = useShoppingStore((s) => s.clearAllItems);
   const selectMarket = useShoppingStore((s) => s.selectMarket);
   const marketRecommendationsForProduct = useShoppingStore(
     (s) => s.marketRecommendationsForProduct,
@@ -76,6 +82,7 @@ export function ShoppingListPage({
   const [showFilters, setShowFilters] = useState(false);
   const [showSavings, setShowSavings] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
+  const [showListMenu, setShowListMenu] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -224,85 +231,154 @@ export function ShoppingListPage({
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-36 dark:bg-[#121417]">
-      {/* Stylized Top Banner */}
-      <div className="relative h-52 w-full overflow-hidden pt-safe">
-        <img
-          src="/assets/ListTop.jpg"
-          alt="Mercado"
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/30 to-[#F8F9FA] dark:to-[#121417]" />
+      {/* Stylized Top Banner with Wave Cut */}
+      <div className="relative w-full pt-safe">
+        <div className="relative h-56 w-full overflow-hidden sm:h-60">
+          <img
+            src="/assets/ListTop.jpg"
+            alt="Mercado"
+            className="h-full w-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/65" />
 
-        {/* Top action buttons */}
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-4 pt-safe">
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/30 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
-              <ShoppingCart size={14} className="text-[#00C853]" />
-              <span>{items.length} itens</span>
-            </div>
-            {sharedSpaceCode && (
-              <div
-                title={
-                  hasPendingCloudPush
-                    ? 'Aguardando conexão para sincronizar'
-                    : isSyncingCloud
-                      ? 'Sincronizando com a família...'
-                      : `Sincronizado (${sharedSpaceCode})`
-                }
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/30 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
-              >
-                {hasPendingCloudPush ? (
-                  <CloudOff size={13} className="text-amber-400" />
-                ) : (
-                  <Cloud
-                    size={13}
-                    className={`text-[#00C853] ${isSyncingCloud ? 'animate-pulse' : ''}`}
-                  />
-                )}
-                <span>{sharedSpaceCode}</span>
+          {/* Top action buttons */}
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pt-3 pt-safe">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
+                <ShoppingCart size={14} className="text-[#00C853]" />
+                <span>{items.length} {items.length === 1 ? 'item' : 'itens'}</span>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {checkedCount > 0 && (
-              <button
-                type="button"
-                onClick={clearCheckedItems}
-                title="Remover itens marcados"
-                className="flex h-10 items-center gap-1.5 rounded-full border border-white/25 bg-black/25 px-3 text-xs font-semibold text-white backdrop-blur-md transition active:scale-95"
-              >
-                <Trash2 size={14} />
-                <span>Limpar ({checkedCount})</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowFilters(true)}
-              aria-label="Filtros"
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/25 text-white backdrop-blur-md transition active:scale-95"
-            >
-              <SlidersHorizontal size={17} />
-              {(categoryFilter || !showCheckedItems) && (
-                <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-[#00C853]" />
+              {sharedSpaceCode && (
+                <div
+                  title={
+                    hasPendingCloudPush
+                      ? 'Aguardando conexão para sincronizar'
+                      : isSyncingCloud
+                        ? 'Sincronizando com a família...'
+                        : `Sincronizado (${sharedSpaceCode})`
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+                >
+                  {hasPendingCloudPush ? (
+                    <CloudOff size={13} className="text-amber-400" />
+                  ) : (
+                    <Cloud
+                      size={13}
+                      className={`text-[#00C853] ${isSyncingCloud ? 'animate-pulse' : ''}`}
+                    />
+                  )}
+                  <span>{sharedSpaceCode}</span>
+                </div>
               )}
-            </button>
-            <ThemeToggleButton variant="glass" />
-          </div>
-        </div>
+            </div>
 
-        <div className="absolute bottom-4 left-4 right-4">
-          <h1 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-sm">
-            Lista de Compras
-          </h1>
-          <p className="text-xs font-medium text-white/85 drop-shadow-xs">
-            Itens organizados na ordem de setores de {selectedMarket.name}
-          </p>
+            <div className="flex items-center gap-2">
+              {checkedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearCheckedItems}
+                  title="Remover itens marcados"
+                  className="flex h-9 items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 text-xs font-semibold text-white backdrop-blur-md transition active:scale-95"
+                >
+                  <Trash2 size={13} />
+                  <span>Limpar ({checkedCount})</span>
+                </button>
+              )}
+              <ThemeToggleButton variant="glass" />
+            </div>
+          </div>
+
+          {/* Frosted Glass "Add Items" Pill inside the image (as in image 1) */}
+          <div className="absolute inset-x-4 top-16 z-20">
+            <form onSubmit={handleAddSubmit} className="relative">
+              <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-black/50 p-1.5 pl-3.5 shadow-2xl backdrop-blur-md focus-within:border-[#00C853] dark:bg-[#1E2229]/85">
+                <textarea
+                  ref={inputRef}
+                  rows={detectedBulkItems.length > 1 ? 3 : 1}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      !e.shiftKey &&
+                      detectedBulkItems.length <= 1
+                    ) {
+                      e.preventDefault();
+                      handleAddSubmit();
+                    }
+                  }}
+                  placeholder="Adicionar itens (digite ou cole vários)..."
+                  className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-white placeholder-white/70 outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!inputText.trim()}
+                  className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-[#00C853] px-3.5 text-xs font-bold text-white shadow-xs transition active:scale-95 disabled:opacity-40"
+                >
+                  {detectedBulkItems.length > 1 ? (
+                    <>
+                      <ClipboardPaste size={14} />
+                      <span>Colar ({detectedBulkItems.length})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      <span>Adicionar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Autocomplete suggestions dropdown */}
+              {historicalSuggestions.length > 0 && (
+                <div className="absolute inset-x-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-white/15 bg-white shadow-2xl dark:border-[#2E3440] dark:bg-[#1E2229]">
+                  <div className="flex items-center gap-1.5 border-b border-[#E5E7EB] px-3 py-1.5 text-[11px] font-semibold text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]">
+                    <Sparkles size={12} className="text-[#00C853]" />
+                    <span>Sugestões do seu histórico</span>
+                  </div>
+                  {historicalSuggestions.map((agg) => (
+                    <button
+                      key={agg.normalizedKey}
+                      type="button"
+                      onClick={() => {
+                        addSingleItem(agg.displayName, {
+                          category: agg.category,
+                          price: agg.lastPrice > 0 ? agg.lastPrice : null,
+                        });
+                        setInputText('');
+                      }}
+                      className="flex w-full items-center justify-between px-3.5 py-2 text-left text-xs hover:bg-[#F3F4F6] dark:hover:bg-[#181B20]"
+                    >
+                      <span className="flex items-center gap-2 font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                        <CategoryIcon category={agg.category} size={14} />
+                        {agg.displayName}
+                      </span>
+                      <span className="font-bold text-[#00C853]">
+                        {AppFormatters.formatCurrency(agg.lastPrice)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Organic Wave Cut at the bottom of the image */}
+          <div className="pointer-events-none absolute -bottom-1 left-0 right-0 z-10 w-full overflow-hidden leading-none">
+            <svg
+              viewBox="0 0 1000 60"
+              preserveAspectRatio="none"
+              className="h-10 w-full fill-[#F8F9FA] transition-colors sm:h-12 dark:fill-[#121417]"
+            >
+              <path d="M 0 60 L 0 32 Q 260 12, 540 38 Q 800 64, 1000 42 L 1000 60 Z" />
+            </svg>
+          </div>
         </div>
       </div>
 
       <PwaInstallBanner />
 
-      <div className="mx-auto max-w-2xl space-y-3 px-4 pt-3">
+      <div className="mx-auto max-w-2xl space-y-3 px-4 pt-1">
         {/* Market Aisle Order Selector Chips */}
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
           {markets.map((m) => {
@@ -318,11 +394,104 @@ export function ShoppingListPage({
                     : 'border border-[#E5E7EB] bg-white text-[#6B7280] dark:border-[#2E3440] dark:bg-[#1E2229] dark:text-[#9CA3AF]'
                 }`}
               >
-                <Store size={13} />
+                {active ? <Check size={13} className="stroke-[3]" /> : <Store size={13} />}
                 <span>{m.name}</span>
               </button>
             );
           })}
+        </div>
+
+        {/* List Title Row (matching image 1) */}
+        <div className="flex items-center justify-between pt-1">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-[#111827] dark:text-[#F3F4F6]">
+              Lista • {selectedMarket.name}
+            </h1>
+            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+              Itens organizados na ordem de setores de {selectedMarket.name}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowFilters(true)}
+              aria-label="Filtros"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-black/5 dark:text-[#9CA3AF] dark:hover:bg-white/5 active:scale-95"
+            >
+              <SlidersHorizontal size={18} />
+              {(categoryFilter || !showCheckedItems) && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#00C853]" />
+              )}
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowListMenu(!showListMenu)}
+                aria-label="Mais opções"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-black/5 dark:text-[#9CA3AF] dark:hover:bg-white/5 active:scale-95"
+              >
+                <MoreVertical size={18} />
+              </button>
+
+              {showListMenu && (
+                <div className="absolute right-0 top-10 z-40 w-48 rounded-2xl border border-[#E5E7EB] bg-white p-1.5 shadow-xl dark:border-[#2E3440] dark:bg-[#1E2229]">
+                  {checkedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCheckedItems();
+                        setShowListMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10"
+                    >
+                      <Trash2 size={14} />
+                      <span>Limpar marcados ({checkedCount})</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      uncheckAllItems();
+                      setShowListMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#111827] hover:bg-black/5 dark:text-[#F3F4F6] dark:hover:bg-white/5"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Desmarcar todos</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          'Tem certeza que deseja apagar todos os itens da lista?',
+                        )
+                      ) {
+                        clearAllItems();
+                        setShowListMenu(false);
+                      }
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10"
+                  >
+                    <Trash2 size={14} />
+                    <span>Limpar toda a lista</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowFinish(true);
+                      setShowListMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#00C853] hover:bg-[#00C853]/10"
+                  >
+                    <ShoppingBag size={14} />
+                    <span>Finalizar Compra</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Market Bargain Banner */}
@@ -368,78 +537,7 @@ export function ShoppingListPage({
           </button>
         )}
 
-        {/* Quick Add / Paste List Bar */}
-        <form onSubmit={handleAddSubmit} className="relative">
-          <div className="flex items-end gap-2 rounded-2xl border border-[#E5E7EB] bg-white p-2 shadow-xs focus-within:border-[#00C853] dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <textarea
-              ref={inputRef}
-              rows={detectedBulkItems.length > 1 ? 3 : 1}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === 'Enter' &&
-                  !e.shiftKey &&
-                  detectedBulkItems.length <= 1
-                ) {
-                  e.preventDefault();
-                  handleAddSubmit();
-                }
-              }}
-              placeholder="Adicionar item (ex: 2kg Arroz) ou colar lista..."
-              className="max-h-32 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-[#111827] placeholder-[#6B7280] outline-none dark:text-[#F3F4F6] dark:placeholder-[#9CA3AF]"
-            />
-            <button
-              type="submit"
-              disabled={!inputText.trim()}
-              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-[#00C853] px-3.5 text-xs font-bold text-white transition active:scale-95 disabled:opacity-40"
-            >
-              {detectedBulkItems.length > 1 ? (
-                <>
-                  <ClipboardPaste size={15} />
-                  <span>Colar ({detectedBulkItems.length})</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={17} />
-                  <span>Adicionar</span>
-                </>
-              )}
-            </button>
-          </div>
 
-          {/* Autocomplete suggestions */}
-          {historicalSuggestions.length > 0 && (
-            <div className="mt-1.5 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-lg dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <div className="flex items-center gap-1.5 border-b border-[#E5E7EB] px-3 py-1.5 text-[11px] font-semibold text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]">
-                <Sparkles size={12} className="text-[#00C853]" />
-                <span>Sugestões do seu histórico</span>
-              </div>
-              {historicalSuggestions.map((agg) => (
-                <button
-                  key={agg.normalizedKey}
-                  type="button"
-                  onClick={() => {
-                    addSingleItem(agg.displayName, {
-                      category: agg.category,
-                      price: agg.lastPrice > 0 ? agg.lastPrice : null,
-                    });
-                    setInputText('');
-                  }}
-                  className="flex w-full items-center justify-between px-3.5 py-2 text-left text-xs hover:bg-[#F3F4F6] dark:hover:bg-[#181B20]"
-                >
-                  <span className="flex items-center gap-2 font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                    <CategoryIcon category={agg.category} size={14} />
-                    {agg.displayName}
-                  </span>
-                  <span className="font-bold text-[#00C853]">
-                    {AppFormatters.formatCurrency(agg.lastPrice)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </form>
 
         {/* Active category filter pill */}
         {categoryFilter && (
@@ -472,137 +570,44 @@ export function ShoppingListPage({
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {filteredAndSortedItems.map((item) => {
-              const catInfo = PRODUCT_CATEGORY_MAP[item.category];
-              const total = getEffectiveTotalAmount(item);
               const bestRec = recommendCheapestMarketForProduct(item.name);
 
               return (
-                <div
+                <SwipeableShoppingItemRow
                   key={item.id}
-                  className={`flex items-center gap-3 rounded-2xl border p-3 transition ${
-                    item.isChecked
-                      ? 'border-[#E5E7EB]/70 bg-white/60 opacity-65 dark:border-[#2E3440]/60 dark:bg-[#1E2229]/60'
-                      : 'border-[#E5E7EB] bg-white shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]'
-                  }`}
-                >
-                  {/* Checkbox */}
-                  <button
-                    type="button"
-                    onClick={() => toggleItemChecked(item.id)}
-                    aria-label={
-                      item.isChecked
-                        ? `Desmarcar ${item.name}`
-                        : `Marcar ${item.name}`
-                    }
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition ${
-                      item.isChecked
-                        ? 'border-[#00C853] bg-[#00C853] text-white'
-                        : 'border-[#D1D5DB] dark:border-[#4B5563]'
-                    }`}
-                  >
-                    {item.isChecked && <Check size={14} strokeWidth={3} />}
-                  </button>
-
-                  {/* Item Info (tappable to edit) */}
-                  <button
-                    type="button"
-                    onClick={() => setEditingItem(item)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: catInfo.color }}
-                      />
-                      <span
-                        className={`truncate text-sm font-bold ${
-                          item.isChecked
-                            ? 'text-[#6B7280] line-through dark:text-[#9CA3AF]'
-                            : 'text-[#111827] dark:text-[#F3F4F6]'
-                        }`}
-                      >
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                      <span>{catInfo.label}</span>
-                      {total > 0 ? (
-                        <span className="font-bold text-[#00C853]">
-                          · {AppFormatters.formatCurrency(total)}
-                        </span>
-                      ) : (
-                        <span className="text-[#10B981]">· Informar preço</span>
-                      )}
-                      {bestRec && (
-                        <span className="rounded-md bg-[#00C853]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#00C853]">
-                          + barato: {bestRec.market.name}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Quantity Stepper */}
-                  <div className="flex shrink-0 items-center gap-1 rounded-xl bg-[#F3F4F6] p-1 dark:bg-[#181B20]">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateItemQuantity(
-                          item.id,
-                          Math.max(1, item.quantity - 1),
-                        )
-                      }
-                      aria-label="Diminuir quantidade"
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-white dark:text-[#9CA3AF] dark:hover:bg-[#1E2229]"
-                    >
-                      <Minus size={13} />
-                    </button>
-                    <span className="min-w-[36px] text-center text-[11px] font-bold text-[#111827] dark:text-[#F3F4F6]">
-                      {item.quantity} {item.unit}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateItemQuantity(item.id, item.quantity + 1)
-                      }
-                      aria-label="Aumentar quantidade"
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-white dark:text-[#9CA3AF] dark:hover:bg-[#1E2229]"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                </div>
+                  item={item}
+                  cheapestMarketName={bestRec ? bestRec.market.name : null}
+                  onToggleChecked={toggleItemChecked}
+                  onOpenEdit={(it) => setEditingItem(it)}
+                  onRemove={(id) => {
+                    removeItem(id);
+                    showToast('Item removido da lista');
+                  }}
+                  onUpdateQuantity={updateItemQuantity}
+                />
               );
             })}
           </div>
         )}
       </div>
 
-      {/* Floating Bottom Summary & Finish Purchase Bar */}
+      {/* Floating Finalizar Compra Pill Button (matching Flutter UI) */}
       {items.length > 0 && (
-        <div className="fixed inset-x-0 bottom-16 z-20 mx-auto max-w-2xl px-4 pb-safe">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E5E7EB] bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur-md dark:border-[#2E3440] dark:bg-[#1E2229]/95">
-            <div>
-              <p className="text-[11px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">
-                No carrinho:{' '}
-                <strong className="text-[#00C853]">
-                  {AppFormatters.formatCurrency(checkedTotal)}
-                </strong>
-              </p>
-              <p className="text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                Total estimado: {AppFormatters.formatCurrency(totalEstimated)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowFinish(true)}
-              className="rounded-xl bg-[#00C853] px-4 py-2 text-xs font-bold text-white shadow-xs transition active:scale-95"
-            >
-              Finalizar Compra
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowFinish(true)}
+          title={`Total no carrinho: ${AppFormatters.formatCurrency(checkedTotal)} | Estimado: ${AppFormatters.formatCurrency(totalEstimated)}`}
+          className="fixed right-4 bottom-20 z-30 flex items-center gap-2.5 rounded-2xl bg-[#00C853] px-5 py-3.5 text-sm font-bold text-white shadow-xl transition active:scale-95 hover:bg-[#00b34a]"
+        >
+          <ShoppingBag size={18} />
+          <span>
+            {checkedCount > 0
+              ? `Finalizar (${checkedCount})`
+              : 'Finalizar Compra'}
+          </span>
+        </button>
       )}
 
       {/* Toast Feedback */}
