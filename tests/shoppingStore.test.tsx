@@ -230,4 +230,44 @@ describe('useShoppingStore & ShoppingListPage', () => {
 
     vi.useRealTimers();
   });
+
+  it('ignores browser-synthesized mouse events after pointer events and does not toggle on pointerCancel', () => {
+    const toggleChecked = vi.fn();
+    const mockItem = {
+      id: 'item-2',
+      name: 'Arroz Integral',
+      quantity: 1,
+      unit: 'un',
+      category: 'alimentos' as const,
+      isChecked: false,
+      marketId: null,
+      price: null,
+      isPriceTotal: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    render(
+      <SwipeableShoppingItemRow
+        item={mockItem}
+        onToggleChecked={toggleChecked}
+        onOpenEdit={vi.fn()}
+        onRemove={vi.fn()}
+        onUpdateQuantity={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByText('Arroz Integral');
+
+    // Pointer sequence followed by compatibility mouse events must toggle only once
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(card, { clientX: 100, clientY: 100 });
+    fireEvent.mouseDown(card, { clientX: 100, clientY: 100 });
+    fireEvent.mouseUp(card, { clientX: 100, clientY: 100 });
+    expect(toggleChecked).toHaveBeenCalledTimes(1);
+
+    // Scroll cancellation (pointerCancel) must not toggle checked
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 100 });
+    fireEvent.pointerCancel(card);
+    expect(toggleChecked).toHaveBeenCalledTimes(1);
+  });
 });

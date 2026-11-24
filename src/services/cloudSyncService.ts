@@ -11,6 +11,7 @@ import {
   persistentMultipleTabManager,
   serverTimestamp,
   setDoc,
+  updateDoc,
   type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -157,14 +158,13 @@ export const CloudSyncService = {
   async pushStateToSharedSpace(params: {
     spaceCode: string;
     stateMap: SharedSpaceStatePayload;
+    partialStateMap?: Partial<SharedSpaceStatePayload>;
     clientId: string;
     verifyServer?: boolean;
   }): Promise<void> {
     const db = ensureFirebase();
     const normalizedCode = this.normalizeSpaceCode(params.spaceCode);
-    const sanitizedState = sanitizeForFirestore(params.stateMap);
-    const payload = {
-      ...sanitizedState,
+    const metaFields = {
       spaceCode: normalizedCode,
       updatedByClientId: params.clientId,
       updatedAt: serverTimestamp(),
@@ -177,7 +177,29 @@ export const CloudSyncService = {
         await enableNetwork(db).catch(() => {});
       }
       const ref = doc(collection(db, 'shared_spaces'), normalizedCode);
-      await setDoc(ref, payload);
+
+      if (params.partialStateMap && !params.verifyServer) {
+        const sanitizedPartial = sanitizeForFirestore(params.partialStateMap);
+        try {
+          await updateDoc(ref, {
+            ...sanitizedPartial,
+            ...metaFields,
+          });
+          return;
+        } catch (updateErr) {
+          const code = (updateErr as { code?: string })?.code;
+          if (code !== 'not-found') {
+            throw updateErr;
+          }
+          // Document does not exist yet: fall through to full setDoc
+        }
+      }
+
+      const sanitizedState = sanitizeForFirestore(params.stateMap);
+      await setDoc(ref, {
+        ...sanitizedState,
+        ...metaFields,
+      });
     } catch (err) {
       throw new Error(this.formatFirestoreError(err));
     }

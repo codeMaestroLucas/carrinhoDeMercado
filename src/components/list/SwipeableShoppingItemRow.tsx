@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import { Check, Minus, Plus, Tag, Trash2 } from 'lucide-react';
 import {
   PRODUCT_CATEGORY_MAP,
@@ -17,7 +17,7 @@ interface SwipeableShoppingItemRowProps {
   onUpdateQuantity: (id: string, qty: number) => void;
 }
 
-export function SwipeableShoppingItemRow({
+export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
   item,
   cheapestMarketName,
   onToggleChecked,
@@ -34,6 +34,8 @@ export function SwipeableShoppingItemRow({
   const currentDeltaXRef = useRef<number>(0);
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
   const isLongPressTriggeredRef = useRef(false);
+  const isPressActiveRef = useRef(false);
+  const lastPointerEventAtRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const catInfo = PRODUCT_CATEGORY_MAP[item.category];
@@ -47,23 +49,36 @@ export function SwipeableShoppingItemRow({
     }
   };
 
+  const isMouseDuplicateAfterPointer = (e: React.SyntheticEvent): boolean => {
+    return (
+      e.type.startsWith('mouse') &&
+      Date.now() - lastPointerEventAtRef.current < 1000
+    );
+  };
+
   const getCoords = (e: React.SyntheticEvent) => {
     const anyE = e as unknown as {
       clientX?: number;
       clientY?: number;
-      touches?: Array<{ clientX: number; clientY: number }>;
     };
-    if (anyE.touches && anyE.touches.length > 0) {
-      return { clientX: anyE.touches[0].clientX, clientY: anyE.touches[0].clientY };
-    }
     return {
       clientX: anyE.clientX ?? 0,
       clientY: anyE.clientY ?? 0,
     };
   };
 
-  const handlePointerDown = (e: React.SyntheticEvent) => {
-    if (isDismissed) return;
+  const handlePressStart = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      const pe = e as React.PointerEvent;
+      if (pe.pointerType === 'mouse' && pe.button !== 0) return;
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (isDismissed || isPressActiveRef.current) return;
+    isPressActiveRef.current = true;
+
     const { clientX, clientY } = getCoords(e);
     startXRef.current = clientX;
     startYRef.current = clientY;
@@ -83,8 +98,14 @@ export function SwipeableShoppingItemRow({
     }, 500);
   };
 
-  const handlePointerMove = (e: React.SyntheticEvent) => {
-    if (isDismissed) return;
+  const handlePressMove = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (isDismissed || !isPressActiveRef.current) return;
     const { clientX, clientY } = getCoords(e);
     const deltaX = clientX - startXRef.current;
     const deltaY = clientY - startYRef.current;
@@ -113,7 +134,15 @@ export function SwipeableShoppingItemRow({
     }
   };
 
-  const handlePointerUpOrCancel = () => {
+  const handlePressEnd = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (!isPressActiveRef.current) return;
+    isPressActiveRef.current = false;
     clearLongPressTimer();
 
     if (isLongPressTriggeredRef.current) {
@@ -142,6 +171,16 @@ export function SwipeableShoppingItemRow({
     onToggleChecked(item.id);
   };
 
+  const handlePressCancel = () => {
+    lastPointerEventAtRef.current = Date.now();
+    isPressActiveRef.current = false;
+    isLongPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    setIsSwiping(false);
+    setTranslateX(0);
+    currentDeltaXRef.current = 0;
+  };
+
   return (
     <div
       className={`relative overflow-hidden rounded-xl select-none transition-[opacity,transform] duration-200 ease-ui ${
@@ -162,16 +201,13 @@ export function SwipeableShoppingItemRow({
 
       {/* Foreground product card */}
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUpOrCancel}
-        onPointerCancel={handlePointerUpOrCancel}
-        onMouseDown={handlePointerDown}
-        onMouseMove={handlePointerMove}
-        onMouseUp={handlePointerUpOrCancel}
-        onTouchStart={handlePointerDown}
-        onTouchMove={handlePointerMove}
-        onTouchEnd={handlePointerUpOrCancel}
+        onPointerDown={handlePressStart}
+        onPointerMove={handlePressMove}
+        onPointerUp={handlePressEnd}
+        onPointerCancel={handlePressCancel}
+        onMouseDown={handlePressStart}
+        onMouseMove={handlePressMove}
+        onMouseUp={handlePressEnd}
         onContextMenu={(e) => e.preventDefault()}
         style={{
           transform: `translateX(${translateX}px)`,
@@ -283,4 +319,4 @@ export function SwipeableShoppingItemRow({
       </div>
     </div>
   );
-}
+});

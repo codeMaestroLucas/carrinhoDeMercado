@@ -152,4 +152,47 @@ describe('Cross-device cloud synchronization', () => {
       'Arroz',
     ]);
   });
+
+  it('pushes only dirty items slice when toggling items after debounce', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(CloudSyncService, 'isFirebaseReady').mockReturnValue(true);
+    const pushSpy = vi
+      .spyOn(CloudSyncService, 'pushStateToSharedSpace')
+      .mockResolvedValue(undefined);
+
+    useShoppingStore.setState({
+      items: [
+        {
+          id: 'item_toggle_1',
+          name: 'Leite',
+          category: 'alimentos',
+          marketId: null,
+          price: null,
+          quantity: 1,
+          unit: 'un',
+          isPriceTotal: false,
+          isChecked: false,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    useShoppingStore.getState().toggleItemChecked('item_toggle_1');
+    useShoppingStore.getState().toggleItemChecked('item_toggle_1');
+    useShoppingStore.getState().toggleItemChecked('item_toggle_1');
+
+    // Before the 2.5s cloud debounce expires, no cloud push has been sent yet
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(pushSpy).not.toHaveBeenCalled();
+
+    // After the 2.5s debounce, a single partial push containing only `items` is sent
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    const callArg = pushSpy.mock.calls[0][0];
+    expect(callArg.partialStateMap).toBeDefined();
+    expect(Object.keys(callArg.partialStateMap ?? {})).toEqual(['items']);
+    expect(callArg.partialStateMap?.items?.[0]?.isChecked).toBe(true);
+
+    vi.useRealTimers();
+  });
 });

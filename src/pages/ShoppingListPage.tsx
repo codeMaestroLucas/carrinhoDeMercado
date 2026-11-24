@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronRight,
@@ -18,8 +18,11 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
+  PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_MAP,
   getEffectiveTotalAmount,
+  type MarketPriceRecommendation,
+  type MarketProfile,
   type ProductCategoryId,
   type ShoppingItem,
 } from '../types/shopping';
@@ -70,12 +73,6 @@ export function ShoppingListPage({
   const uncheckAllItems = useShoppingStore((s) => s.uncheckAllItems);
   const clearAllItems = useShoppingStore((s) => s.clearAllItems);
   const selectMarket = useShoppingStore((s) => s.selectMarket);
-  const marketRecommendationsForProduct = useShoppingStore(
-    (s) => s.marketRecommendationsForProduct,
-  );
-  const recommendCheapestMarketForProduct = useShoppingStore(
-    (s) => s.recommendCheapestMarketForProduct,
-  );
 
   const [inputText, setInputText] = useState('');
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
@@ -86,6 +83,7 @@ export function ShoppingListPage({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (autoFocusQuickAdd) {
@@ -94,10 +92,36 @@ export function ShoppingListPage({
     }
   }, [autoFocusQuickAdd, onQuickAddConsumed]);
 
-  const showToast = (msg: string) => {
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2800);
-  };
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      setToastMsg(null);
+    }, 2800);
+  }, []);
+
+  const handleOpenEdit = useCallback((it: ShoppingItem) => {
+    setEditingItem(it);
+  }, []);
+
+  const handleRemoveItem = useCallback(
+    (id: string) => {
+      removeItem(id);
+      showToast('Item removido da lista');
+    },
+    [removeItem, showToast],
+  );
 
   const selectedMarket = useMemo(
     () => markets.find((m) => m.id === selectedMarketId) ?? markets[0],
@@ -145,11 +169,78 @@ export function ShoppingListPage({
       });
   }, [items, selectedMarket, showCheckedItems, categoryFilter]);
 
+  // Precompute market price recommendations once per history/markets change
+  // so checking/unchecking items never re-scans the entire purchase history.
+  const recommendationsByProduct = useMemo(() => {
+    const byId = new Map<string, MarketProfile>();
+    const byNormName = new Map<string, MarketProfile>();
+    for (const m of markets) {
+      byId.set(m.id, m);
+      byNormName.set(CategoryClassifier.normalize(m.name), m);
+    }
+
+    const pricesByProduct = new Map<string, Map<string, number[]>>();
+    const fallbackMarketNames = new Map<string, string>();
+    const allCategoryIds = PRODUCT_CATEGORIES.map((c) => c.id);
+
+    for (const record of history) {
+      const matchedMarket =
+        byId.get(record.marketId) ??
+        byNormName.get(CategoryClassifier.normalize(record.marketName));
+      const marketKey = matchedMarket?.id ?? record.marketId;
+      if (!fallbackMarketNames.has(marketKey)) {
+        fallbackMarketNames.set(
+          marketKey,
+          matchedMarket?.name ?? record.marketName,
+        );
+      }
+
+      for (const histItem of record.items) {
+        if (histItem.price <= 0) continue;
+        const prodKey = CategoryClassifier.normalize(histItem.name);
+        if (!prodKey) continue;
+
+        let marketPrices = pricesByProduct.get(prodKey);
+        if (!marketPrices) {
+          marketPrices = new Map<string, number[]>();
+          pricesByProduct.set(prodKey, marketPrices);
+        }
+        const arr = marketPrices.get(marketKey);
+        if (arr) {
+          arr.push(histItem.price);
+        } else {
+          marketPrices.set(marketKey, [histItem.price]);
+        }
+      }
+    }
+
+    const result = new Map<string, MarketPriceRecommendation[]>();
+    for (const [prodKey, marketPrices] of pricesByProduct.entries()) {
+      const recs: MarketPriceRecommendation[] = [];
+      for (const [marketId, prices] of marketPrices.entries()) {
+        const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+        const market =
+          byId.get(marketId) ??
+          ({
+            id: marketId,
+            name: fallbackMarketNames.get(marketId) ?? 'Mercado',
+            categoryOrder: allCategoryIds,
+          } satisfies MarketProfile);
+        recs.push({ market, averagePrice: avg, lastPrice: prices[0] });
+      }
+      recs.sort((a, b) => a.averagePrice - b.averagePrice);
+      result.set(prodKey, recs);
+    }
+    return result;
+  }, [history, markets]);
+
   const bargainGroups = useMemo<MarketBargainGroup[]>(() => {
     const groupsMap = new Map<string, MarketBargainGroup>();
     for (const item of items) {
-      const recs = marketRecommendationsForProduct(item.name);
-      if (recs.length < 2) continue;
+      const recs = recommendationsByProduct.get(
+        CategoryClassifier.normalize(item.name),
+      );
+      if (!recs || recs.length < 2) continue;
       const cheapest = recs[0];
       const highest = recs[recs.length - 1];
       if (highest.averagePrice <= cheapest.averagePrice) continue;
@@ -178,7 +269,7 @@ export function ShoppingListPage({
     return Array.from(groupsMap.values()).sort(
       (a, b) => b.bargains.length - a.bargains.length,
     );
-  }, [items, marketRecommendationsForProduct]);
+  }, [items, recommendationsByProduct]);
 
   const activeMarketBargainGroup = useMemo(() => {
     return bargainGroups.find((g) => g.market.id === selectedMarketId) ?? null;
@@ -561,7 +652,10 @@ export function ShoppingListPage({
         ) : (
           <div className="space-y-2">
             {filteredAndSortedItems.map((item) => {
-              const bestRec = recommendCheapestMarketForProduct(item.name);
+              const bestRec =
+                recommendationsByProduct.get(
+                  CategoryClassifier.normalize(item.name),
+                )?.[0] ?? null;
 
               return (
                 <SwipeableShoppingItemRow
@@ -569,11 +663,8 @@ export function ShoppingListPage({
                   item={item}
                   cheapestMarketName={bestRec ? bestRec.market.name : null}
                   onToggleChecked={toggleItemChecked}
-                  onOpenEdit={(it) => setEditingItem(it)}
-                  onRemove={(id) => {
-                    removeItem(id);
-                    showToast('Item removido da lista');
-                  }}
+                  onOpenEdit={handleOpenEdit}
+                  onRemove={handleRemoveItem}
                   onUpdateQuantity={updateItemQuantity}
                 />
               );

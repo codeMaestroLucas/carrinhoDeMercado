@@ -62,24 +62,27 @@ export async function loadPersistedState(): Promise<PersistedAppState | null> {
 
 /**
  * Dual persistence strategy:
- * 1. Synchronously updates localStorage mirror for instantaneous zero-latency boot.
- * 2. Asynchronously writes full payload to IndexedDB.
+ * 1. Synchronously updates a lightweight localStorage mirror for instantaneous t=0 boot
+ *    (capping old history so JSON.stringify stays fast on every list interaction).
+ * 2. Asynchronously writes the full, unrestricted payload to IndexedDB.
  */
 export async function savePersistedState(state: PersistedAppState): Promise<void> {
-  // 1. Immediate mirror update for t=0 next boot
+  // 1. Immediate lightweight mirror update for t=0 next boot
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const mirror: PersistedAppState =
+        Array.isArray(state.history) && state.history.length > 25
+          ? { ...state, history: state.history.slice(0, 25) }
+          : state;
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mirror));
     }
   } catch {
-    // If state exceeds 5MB localStorage quota, store lightweight mirror without old history
+    // If state still exceeds localStorage quota, store mirror without history
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const lightweight: PersistedAppState = {
           ...state,
-          history: Array.isArray(state.history)
-            ? state.history.slice(0, 25)
-            : state.history,
+          history: [],
         };
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight));
       }
@@ -93,6 +96,39 @@ export async function savePersistedState(state: PersistedAppState): Promise<void
     await set(STORAGE_KEY, state);
   } catch {
     // IndexedDB fallback handled
+  }
+}
+
+/**
+ * Updates only cloud sync metadata in persisted storage without rebuilding or
+ * re-serializing the full state when nothing else changed.
+ */
+export async function updatePersistedSyncMetadata(meta: {
+  hasPendingCloudPush?: boolean;
+  lastSyncedAtIso?: string | null;
+  lastAppliedRemoteTimestampMs?: number;
+}): Promise<void> {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const current = loadPersistedStateSync();
+      if (current) {
+        window.localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...current, ...meta }),
+        );
+      }
+    }
+  } catch {
+    // Ignore localStorage metadata write failures
+  }
+
+  try {
+    const existing = await get<PersistedAppState>(STORAGE_KEY);
+    if (existing && typeof existing === 'object') {
+      await set(STORAGE_KEY, { ...existing, ...meta });
+    }
+  } catch {
+    // Ignore IndexedDB metadata write failures
   }
 }
 

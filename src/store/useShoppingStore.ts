@@ -23,9 +23,11 @@ import {
   loadPersistedState,
   loadPersistedStateSync,
   savePersistedState,
+  updatePersistedSyncMetadata,
 } from '../services/storageService';
 import {
   buildHomeSnapshot,
+  loadHomeSnapshotSync,
   saveHomeSnapshot,
 } from '../services/homeSnapshotService';
 
@@ -74,9 +76,16 @@ function createDefaultMarkets(): MarketProfile[] {
   ];
 }
 
+const LOCAL_SAVE_DEBOUNCE_MS = 400;
+const CLOUD_PUSH_DEBOUNCE_MS = 2500;
+
 let cloudUnsubscribe: Unsubscribe | null = null;
-let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let localSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let cloudPushTimer: ReturnType<typeof setTimeout> | null = null;
 let lastAppliedRemoteTimestampMs = 0;
+let dirtyCloudFields = new Set<keyof SharedSpaceStatePayload>();
+let forceFullCloudPush = false;
+let needsSnapshotRebuild = true;
 
 export interface ShoppingState {
   isHydrated: boolean;
@@ -291,47 +300,70 @@ function parseRemoteState(
   return patch;
 }
 
-async function persistAndPush(
-  get: () => ShoppingState,
-  set: (partial: Partial<ShoppingState>) => void,
-  pushCloud: boolean,
-) {
+async function persistLocalState(get: () => ShoppingState) {
   const state = get();
   const stateMap = buildStateMap(state);
-  const shouldQueuePush = pushCloud && Boolean(state.sharedSpaceCode);
-
-  if (shouldQueuePush) {
-    set({ hasPendingCloudPush: true });
-  }
 
   await savePersistedState({
     ...stateMap,
     sharedSpaceCode: state.sharedSpaceCode,
     isDarkMode: state.isDarkMode,
     lastAppliedRemoteTimestampMs,
-    hasPendingCloudPush: shouldQueuePush ? true : state.hasPendingCloudPush,
+    hasPendingCloudPush: state.hasPendingCloudPush,
     lastSyncedAtIso: state.lastSyncedAtIso,
   });
 
   try {
-    const snapshot = buildHomeSnapshot(
-      state.history,
-      state.markets,
-      state.items.filter((i) => !i.isChecked).length,
-    );
-    saveHomeSnapshot(snapshot);
+    const pendingCount = state.items.filter((i) => !i.isChecked).length;
+    const existingSnapshot = !needsSnapshotRebuild ? loadHomeSnapshotSync() : null;
+    if (existingSnapshot) {
+      if (existingSnapshot.pendingItemsCount !== pendingCount) {
+        saveHomeSnapshot({
+          ...existingSnapshot,
+          pendingItemsCount: pendingCount,
+          updatedAtMs: Date.now(),
+        });
+      }
+    } else {
+      needsSnapshotRebuild = false;
+      const snapshot = buildHomeSnapshot(
+        state.history,
+        state.markets,
+        pendingCount,
+      );
+      saveHomeSnapshot(snapshot);
+    }
   } catch {
     // Ignore snapshot write failures
   }
+}
 
-  if (!shouldQueuePush || !state.sharedSpaceCode) return;
+async function pushCloudState(
+  get: () => ShoppingState,
+  set: (partial: Partial<ShoppingState>) => void,
+) {
+  const state = get();
+  if (!state.sharedSpaceCode) return;
 
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    set({
-      hasPendingCloudPush: true,
-      cloudError: null,
-    });
+    if (!state.hasPendingCloudPush) {
+      set({ hasPendingCloudPush: true, cloudError: null });
+    }
     return;
+  }
+
+  const fieldsToSync = new Set(dirtyCloudFields);
+  const isFullPush = forceFullCloudPush || fieldsToSync.size === 0;
+  dirtyCloudFields.clear();
+  forceFullCloudPush = false;
+
+  const stateMap = buildStateMap(state);
+  let partialStateMap: Partial<SharedSpaceStatePayload> | undefined;
+  if (!isFullPush) {
+    partialStateMap = {};
+    for (const field of fieldsToSync) {
+      (partialStateMap as Record<string, unknown>)[field] = stateMap[field];
+    }
   }
 
   try {
@@ -342,25 +374,33 @@ async function persistAndPush(
     await CloudSyncService.pushStateToSharedSpace({
       spaceCode: state.sharedSpaceCode,
       stateMap,
+      partialStateMap,
       clientId: state.clientId,
     });
     const nowIso = new Date().toISOString();
-    const stillHasQueuedDebounce = saveDebounceTimer !== null;
+    const stillHasQueuedPush =
+      cloudPushTimer !== null ||
+      dirtyCloudFields.size > 0 ||
+      forceFullCloudPush;
     set({
       isSyncingCloud: false,
-      hasPendingCloudPush: stillHasQueuedDebounce,
+      hasPendingCloudPush: stillHasQueuedPush,
       lastSyncedAtIso: nowIso,
       cloudError: null,
     });
-    await savePersistedState({
-      ...buildStateMap(get()),
-      sharedSpaceCode: get().sharedSpaceCode,
-      isDarkMode: get().isDarkMode,
+    await updatePersistedSyncMetadata({
       lastAppliedRemoteTimestampMs,
-      hasPendingCloudPush: stillHasQueuedDebounce,
+      hasPendingCloudPush: stillHasQueuedPush,
       lastSyncedAtIso: nowIso,
     });
   } catch (err) {
+    if (isFullPush) {
+      forceFullCloudPush = true;
+    } else {
+      for (const field of fieldsToSync) {
+        dirtyCloudFields.add(field);
+      }
+    }
     const msg = err instanceof Error ? err.message : String(err);
     set({
       isSyncingCloud: false,
@@ -373,16 +413,53 @@ async function persistAndPush(
 function scheduleSave(
   get: () => ShoppingState,
   set: (partial: Partial<ShoppingState>) => void,
-  options?: { pushCloud?: boolean; immediate?: boolean },
+  options?: {
+    pushCloud?: boolean;
+    immediate?: boolean;
+    changedFields?: Array<keyof SharedSpaceStatePayload>;
+    rebuildSnapshot?: boolean;
+  },
 ) {
   const pushCloud = options?.pushCloud ?? true;
+  const changedFields = options?.changedFields;
+
+  const shouldRebuildSnapshot =
+    options?.rebuildSnapshot ??
+    (!changedFields ||
+      changedFields.length === 0 ||
+      changedFields.includes('history') ||
+      changedFields.includes('markets'));
+  if (shouldRebuildSnapshot) {
+    needsSnapshotRebuild = true;
+  }
+
+  if (pushCloud) {
+    if (changedFields && changedFields.length > 0) {
+      for (const field of changedFields) {
+        dirtyCloudFields.add(field);
+      }
+    } else {
+      forceFullCloudPush = true;
+    }
+  }
 
   if (options?.immediate) {
-    if (saveDebounceTimer) {
-      clearTimeout(saveDebounceTimer);
-      saveDebounceTimer = null;
+    if (localSaveTimer) {
+      clearTimeout(localSaveTimer);
+      localSaveTimer = null;
     }
-    void persistAndPush(get, set, pushCloud);
+    if (pushCloud && cloudPushTimer) {
+      clearTimeout(cloudPushTimer);
+      cloudPushTimer = null;
+    }
+    if (pushCloud && get().sharedSpaceCode && !get().hasPendingCloudPush) {
+      set({ hasPendingCloudPush: true });
+    }
+    void persistLocalState(get).then(() => {
+      if (pushCloud && get().sharedSpaceCode) {
+        return pushCloudState(get, set);
+      }
+    });
     return;
   }
 
@@ -390,11 +467,19 @@ function scheduleSave(
     set({ hasPendingCloudPush: true });
   }
 
-  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(() => {
-    saveDebounceTimer = null;
-    void persistAndPush(get, set, pushCloud);
-  }, 300);
+  if (localSaveTimer) clearTimeout(localSaveTimer);
+  localSaveTimer = setTimeout(() => {
+    localSaveTimer = null;
+    void persistLocalState(get);
+  }, LOCAL_SAVE_DEBOUNCE_MS);
+
+  if (pushCloud && get().sharedSpaceCode) {
+    if (cloudPushTimer) clearTimeout(cloudPushTimer);
+    cloudPushTimer = setTimeout(() => {
+      cloudPushTimer = null;
+      void pushCloudState(get, set);
+    }, CLOUD_PUSH_DEBOUNCE_MS);
+  }
 }
 
 function startCloudListener(
@@ -411,7 +496,7 @@ function startCloudListener(
     onData: (data) => {
       const state = get();
       if (data.updatedByClientId === state.clientId) return;
-      if (saveDebounceTimer !== null || state.hasPendingCloudPush) return;
+      if (cloudPushTimer !== null || state.hasPendingCloudPush) return;
 
       const remoteTs = CloudSyncService.getRemoteTimestampMs(data);
       if (remoteTs != null && remoteTs < lastAppliedRemoteTimestampMs) {
@@ -677,18 +762,18 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
 
   setShowCheckedItems(value) {
     set({ showCheckedItems: value });
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['showCheckedItems'] });
   },
 
   toggleDarkMode() {
     set((s) => ({ isDarkMode: !s.isDarkMode }));
-    scheduleSave(get, set, { pushCloud: false });
+    scheduleSave(get, set, { pushCloud: false, rebuildSnapshot: false });
   },
 
   setDarkMode(value) {
     if (get().isDarkMode === value) return;
     set({ isDarkMode: value });
-    scheduleSave(get, set, { pushCloud: false });
+    scheduleSave(get, set, { pushCloud: false, rebuildSnapshot: false });
   },
 
   predictCategory(name) {
@@ -839,7 +924,11 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       items: [...s.items, item],
       learnedCategories: nextLearned,
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: options?.category
+        ? ['items', 'learnedCategories']
+        : ['items'],
+    });
     return item;
   },
 
@@ -896,7 +985,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
 
     if (addedCount > 0) {
       set((s) => ({ items: [...s.items, ...newItems] }));
-      scheduleSave(get, set);
+      scheduleSave(get, set, { changedFields: ['items'] });
     }
 
     return { addedCount, skippedDuplicatesCount };
@@ -908,7 +997,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         item.id === id ? { ...item, isChecked: !item.isChecked } : item,
       ),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   updateItem(id, updates) {
@@ -975,7 +1064,11 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         };
       }),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: updates.category
+        ? ['items', 'categoryDictionary', 'learnedCategories']
+        : ['items'],
+    });
     return true;
   },
 
@@ -986,29 +1079,29 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         item.id === id ? { ...item, quantity } : item,
       ),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   removeItem(id) {
     set((s) => ({ items: s.items.filter((i) => i.id !== id) }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   clearCheckedItems() {
     set((s) => ({ items: s.items.filter((i) => !i.isChecked) }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   uncheckAllItems() {
     set((s) => ({
       items: s.items.map((i) => ({ ...i, isChecked: false })),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   clearAllItems() {
     set({ items: [] });
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['items'] });
   },
 
   addKeywordToCategory(category, rawKeyword) {
@@ -1040,7 +1133,9 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       learnedCategories: nextLearned,
       items: nextItems,
     });
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: ['categoryDictionary', 'learnedCategories', 'items'],
+    });
     return true;
   },
 
@@ -1056,7 +1151,9 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
     delete nextLearned[normalizedTarget];
 
     set({ categoryDictionary: nextDict, learnedCategories: nextLearned });
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: ['categoryDictionary', 'learnedCategories'],
+    });
   },
 
   editKeywordInCategory(category, oldKeyword, newKeyword) {
@@ -1088,7 +1185,9 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       },
       learnedCategories: nextLearned,
     });
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: ['categoryDictionary', 'learnedCategories'],
+    });
     return true;
   },
 
@@ -1104,7 +1203,9 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
     } else {
       set({ categoryDictionary: defaults, learnedCategories: {} });
     }
-    scheduleSave(get, set);
+    scheduleSave(get, set, {
+      changedFields: ['categoryDictionary', 'learnedCategories'],
+    });
   },
 
   finishPurchase(options) {
@@ -1138,7 +1239,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       history: [record, ...s.history],
       items: onlyChecked ? s.items.filter((e) => !e.isChecked) : [],
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['history', 'items'] });
     return record;
   },
 
@@ -1156,13 +1257,13 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
     };
 
     set((s) => ({ history: [record, ...s.history] }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['history'] });
     return record;
   },
 
   deletePurchaseRecord(recordId) {
     set((s) => ({ history: s.history.filter((r) => r.id !== recordId) }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['history'] });
   },
 
   restorePurchaseRecord(record, atIndex) {
@@ -1175,7 +1276,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       }
       return { history: next };
     });
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['history'] });
   },
 
   updatePurchaseRecordItem(recordId, itemIndex, updatedItem) {
@@ -1188,14 +1289,14 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         return { ...r, items: nextItems };
       }),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['history'] });
   },
 
   selectMarket(marketId) {
     if (get().markets.some((m) => m.id === marketId)) {
       set({ selectedMarketId: marketId });
       // Local preference: choosing which market's aisles to view should not overwrite other devices
-      scheduleSave(get, set, { pushCloud: false });
+      scheduleSave(get, set, { pushCloud: false, rebuildSnapshot: false });
     }
   },
 
@@ -1213,7 +1314,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       markets: [...s.markets, market],
       selectedMarketId: market.id,
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['markets', 'selectedMarketId'] });
     return market;
   },
 
@@ -1225,7 +1326,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         m.id === marketId ? { ...m, name: trimmed } : m,
       ),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['markets'] });
   },
 
   deleteMarket(marketId) {
@@ -1244,7 +1345,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         item.marketId === marketId ? { ...item, marketId: null } : item,
       ),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['markets', 'items'] });
     return true;
   },
 
@@ -1266,7 +1367,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         return { ...m, categoryOrder: order };
       }),
     }));
-    scheduleSave(get, set);
+    scheduleSave(get, set, { changedFields: ['markets'] });
   },
 
   async createNewSharedSpace() {
@@ -1344,6 +1445,12 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
   async disconnectSharedSpace() {
     cloudUnsubscribe?.();
     cloudUnsubscribe = null;
+    if (cloudPushTimer) {
+      clearTimeout(cloudPushTimer);
+      cloudPushTimer = null;
+    }
+    dirtyCloudFields.clear();
+    forceFullCloudPush = false;
     lastAppliedRemoteTimestampMs = 0;
     set({
       sharedSpaceCode: null,
@@ -1357,12 +1464,17 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
   async flushPendingSync() {
     const code = get().sharedSpaceCode;
     if (!code) return;
-    if (saveDebounceTimer) {
-      clearTimeout(saveDebounceTimer);
-      saveDebounceTimer = null;
+    if (localSaveTimer) {
+      clearTimeout(localSaveTimer);
+      localSaveTimer = null;
+      await persistLocalState(get);
+    }
+    if (cloudPushTimer) {
+      clearTimeout(cloudPushTimer);
+      cloudPushTimer = null;
     }
     if (get().hasPendingCloudPush) {
-      await persistAndPush(get, set, true);
+      await pushCloudState(get, set);
     }
   },
 
