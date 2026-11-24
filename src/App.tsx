@@ -82,7 +82,7 @@ export function App() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', onPageHide);
     };
-  }, [initializeApp, refreshCloudSync, flushPendingSync, isHydrated]);
+  }, [initializeApp, refreshCloudSync, flushPendingSync]);
 
   useEffect(() => {
     const root = document.documentElement;

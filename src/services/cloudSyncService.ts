@@ -1,10 +1,9 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   collection,
-  disableNetwork,
   doc,
   enableNetwork,
-  getDoc,
+  getDocFromServer,
   getFirestore,
   initializeFirestore,
   onSnapshot,
@@ -75,6 +74,7 @@ function ensureFirebase(): Firestore {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager(),
         }),
+        experimentalAutoDetectLongPolling: true,
       });
     } catch {
       firestoreInstance = getFirestore(appInstance);
@@ -124,6 +124,19 @@ export const CloudSyncService = {
     return raw.trim().toUpperCase().replace(/\s+/g, '');
   },
 
+  getRemoteTimestampMs(data: Record<string, unknown>): number | null {
+    const serverTs = data.updatedAt as
+      | { toMillis?: () => number; seconds?: number }
+      | undefined;
+    if (serverTs && typeof serverTs.toMillis === 'function') {
+      return serverTs.toMillis();
+    }
+    if (serverTs && typeof serverTs.seconds === 'number') {
+      return serverTs.seconds * 1000;
+    }
+    return typeof data.updatedAtMs === 'number' ? data.updatedAtMs : null;
+  },
+
   async fetchSharedSpace(
     spaceCode: string,
   ): Promise<Record<string, unknown> | null> {
@@ -134,7 +147,7 @@ export const CloudSyncService = {
         collection(db, 'shared_spaces'),
         this.normalizeSpaceCode(spaceCode),
       );
-      const snap = await getDoc(ref);
+      const snap = await getDocFromServer(ref);
       return snap.exists() ? (snap.data() as Record<string, unknown>) : null;
     } catch (err) {
       throw new Error(this.formatFirestoreError(err));
@@ -161,11 +174,10 @@ export const CloudSyncService = {
 
     try {
       if (params.verifyServer) {
-        await disableNetwork(db).catch(() => {});
         await enableNetwork(db).catch(() => {});
       }
       const ref = doc(collection(db, 'shared_spaces'), normalizedCode);
-      await setDoc(ref, payload, { merge: true });
+      await setDoc(ref, payload);
     } catch (err) {
       throw new Error(this.formatFirestoreError(err));
     }
@@ -184,6 +196,7 @@ export const CloudSyncService = {
     return onSnapshot(
       ref,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         const data = snapshot.data();
         if (data) {
           params.onData(data as Record<string, unknown>);

@@ -11,6 +11,7 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: [
         'favicon.png',
+        'apple-touch-icon.png',
         'icons/*.png',
         'assets/*.jpg',
         'assets/*.png',

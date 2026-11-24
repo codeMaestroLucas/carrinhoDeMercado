@@ -206,7 +206,9 @@ function buildStateMap(state: ShoppingState): SharedSpaceStatePayload {
 function parseRemoteState(
   data: Record<string, unknown>,
   current: ShoppingState,
+  options?: { isRemoteSync?: boolean },
 ): Partial<ShoppingState> {
+  const isRemoteSync = options?.isRemoteSync ?? false;
   const patch: Partial<ShoppingState> = {};
 
   if (Array.isArray(data.items)) {
@@ -234,7 +236,13 @@ function parseRemoteState(
   }
 
   if (typeof data.selectedMarketId === 'string') {
-    if (effectiveMarkets.some((m) => m.id === data.selectedMarketId)) {
+    const currentStillValid = effectiveMarkets.some(
+      (m) => m.id === current.selectedMarketId,
+    );
+    if (
+      (!isRemoteSync || !currentStillValid) &&
+      effectiveMarkets.some((m) => m.id === data.selectedMarketId)
+    ) {
       patch.selectedMarketId = data.selectedMarketId;
     }
   }
@@ -276,7 +284,7 @@ function parseRemoteState(
     patch.categoryDictionary = dict;
   }
 
-  if (typeof data.showCheckedItems === 'boolean') {
+  if (!isRemoteSync && typeof data.showCheckedItems === 'boolean') {
     patch.showCheckedItems = data.showCheckedItems;
   }
 
@@ -337,9 +345,10 @@ async function persistAndPush(
       clientId: state.clientId,
     });
     const nowIso = new Date().toISOString();
+    const stillHasQueuedDebounce = saveDebounceTimer !== null;
     set({
       isSyncingCloud: false,
-      hasPendingCloudPush: false,
+      hasPendingCloudPush: stillHasQueuedDebounce,
       lastSyncedAtIso: nowIso,
       cloudError: null,
     });
@@ -348,7 +357,7 @@ async function persistAndPush(
       sharedSpaceCode: get().sharedSpaceCode,
       isDarkMode: get().isDarkMode,
       lastAppliedRemoteTimestampMs,
-      hasPendingCloudPush: false,
+      hasPendingCloudPush: stillHasQueuedDebounce,
       lastSyncedAtIso: nowIso,
     });
   } catch (err) {
@@ -377,6 +386,10 @@ function scheduleSave(
     return;
   }
 
+  if (pushCloud && get().sharedSpaceCode && !get().hasPendingCloudPush) {
+    set({ hasPendingCloudPush: true });
+  }
+
   if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
@@ -398,9 +411,9 @@ function startCloudListener(
     onData: (data) => {
       const state = get();
       if (data.updatedByClientId === state.clientId) return;
+      if (saveDebounceTimer !== null || state.hasPendingCloudPush) return;
 
-      const remoteTs =
-        typeof data.updatedAtMs === 'number' ? data.updatedAtMs : null;
+      const remoteTs = CloudSyncService.getRemoteTimestampMs(data);
       if (remoteTs != null && remoteTs < lastAppliedRemoteTimestampMs) {
         return;
       }
@@ -408,7 +421,7 @@ function startCloudListener(
         lastAppliedRemoteTimestampMs = remoteTs;
       }
 
-      const patch = parseRemoteState(data, state);
+      const patch = parseRemoteState(data, state, { isRemoteSync: true });
       set({
         ...patch,
         lastSyncedAtIso: new Date().toISOString(),
@@ -562,10 +575,11 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
 
       // Strategy 3: Parallelize space fetch and pending push using Promise.allSettled
       set({ isSyncingCloud: true });
+      const hadPendingPush = get().hasPendingCloudPush;
 
       const tasks: [Promise<Record<string, unknown> | null>, Promise<void> | null] = [
         CloudSyncService.fetchSharedSpace(spaceCode),
-        get().hasPendingCloudPush ? get().flushPendingSync() : null,
+        hadPendingPush ? get().flushPendingSync() : null,
       ];
 
       const [fetchResult, pushResult] = await Promise.allSettled([
@@ -609,30 +623,40 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       if (fetchResult.status === 'fulfilled') {
         const data = fetchResult.value;
         if (!data) {
-          clearPersistedSessionSync();
-          cloudUnsubscribe?.();
-          cloudUnsubscribe = null;
+          if (!hadPendingPush || pushResult.status !== 'fulfilled') {
+            clearPersistedSessionSync();
+            cloudUnsubscribe?.();
+            cloudUnsubscribe = null;
+            set({
+              sharedSpaceCode: null,
+              hasPendingCloudPush: false,
+              cloudError: `O espaço "${spaceCode}" não foi encontrado no servidor. Conectando em modo local.`,
+            });
+            scheduleSave(get, set, { pushCloud: false, immediate: true });
+            return;
+          }
+        } else if (hadPendingPush && pushResult.status === 'fulfilled') {
+          // Local pending changes were just pushed; do not overwrite them with the pre-push fetch
           set({
-            sharedSpaceCode: null,
-            hasPendingCloudPush: false,
-            cloudError: `O espaço "${spaceCode}" não foi encontrado no servidor. Conectando em modo local.`,
-          });
-          scheduleSave(get, set, { pushCloud: false, immediate: true });
-          return;
-        }
-
-        // Stale-While-Revalidate: Reconcile fresh server data with local state
-        const remoteTs =
-          typeof data.updatedAtMs === 'number' ? data.updatedAtMs : null;
-        if (remoteTs == null || remoteTs >= lastAppliedRemoteTimestampMs) {
-          if (remoteTs != null) lastAppliedRemoteTimestampMs = remoteTs;
-          const patch = parseRemoteState(data, get());
-          set({
-            ...patch,
             lastSyncedAtIso: new Date().toISOString(),
             cloudError: null,
           });
-          scheduleSave(get, set, { pushCloud: false, immediate: true });
+        } else if (
+          !hadPendingPush ||
+          get().items.length === 0
+        ) {
+          // Stale-While-Revalidate: Reconcile fresh server data with local state
+          const remoteTs = CloudSyncService.getRemoteTimestampMs(data);
+          if (remoteTs == null || remoteTs >= lastAppliedRemoteTimestampMs) {
+            if (remoteTs != null) lastAppliedRemoteTimestampMs = remoteTs;
+            const patch = parseRemoteState(data, get(), { isRemoteSync: true });
+            set({
+              ...patch,
+              lastSyncedAtIso: new Date().toISOString(),
+              cloudError: null,
+            });
+            scheduleSave(get, set, { pushCloud: false, immediate: true });
+          }
         }
       }
 
@@ -1281,10 +1305,13 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       CloudSyncService.initializeFirebase();
       const existingData = await CloudSyncService.fetchSharedSpace(code);
       if (existingData) {
-        if (typeof existingData.updatedAtMs === 'number') {
-          lastAppliedRemoteTimestampMs = existingData.updatedAtMs;
+        const remoteTs = CloudSyncService.getRemoteTimestampMs(existingData);
+        if (remoteTs != null) {
+          lastAppliedRemoteTimestampMs = remoteTs;
         }
-        const patch = parseRemoteState(existingData, get());
+        const patch = parseRemoteState(existingData, get(), {
+          isRemoteSync: true,
+        });
         set({
           ...patch,
           sharedSpaceCode: code,
@@ -1355,11 +1382,10 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
       }
       const data = await CloudSyncService.fetchSharedSpace(code);
       if (data && data.updatedByClientId !== get().clientId) {
-        const remoteTs =
-          typeof data.updatedAtMs === 'number' ? data.updatedAtMs : null;
+        const remoteTs = CloudSyncService.getRemoteTimestampMs(data);
         if (remoteTs == null || remoteTs >= lastAppliedRemoteTimestampMs) {
           if (remoteTs != null) lastAppliedRemoteTimestampMs = remoteTs;
-          const patch = parseRemoteState(data, get());
+          const patch = parseRemoteState(data, get(), { isRemoteSync: true });
           set({
             ...patch,
             lastSyncedAtIso: new Date().toISOString(),
@@ -1371,7 +1397,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         set({ lastSyncedAtIso: new Date().toISOString(), cloudError: null });
       }
 
-      if (!cloudUnsubscribe && CloudSyncService.isFirebaseReady()) {
+      if (CloudSyncService.isFirebaseReady()) {
         startCloudListener(code, get, set);
       }
     } catch (err) {
