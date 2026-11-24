@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { PRODUCT_CATEGORIES } from '../../types/shopping';
 import { useShoppingStore } from '../../store/useShoppingStore';
-import { CategoryIcon } from '../common/CategoryIcon';
+import { CategoryDot, CategoryIcon } from '../common/CategoryIcon';
 
 interface FiltersModalProps {
   onClose: () => void;
@@ -21,48 +21,50 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 shadow-2xl dark:bg-[#1E2229] sm:rounded-3xl"
+        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
-            Filtros da Lista
+          <h2 className="text-base font-medium text-[var(--text-primary)]">
+            Filtros da lista
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+            aria-label="Fechar filtros"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={20} />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
-        <div className="mb-4 flex items-center justify-between rounded-2xl bg-[#F3F4F6] px-4 py-3 dark:bg-[#181B20]">
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-[#111827] dark:text-[#F3F4F6]">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
               Mostrar itens no carrinho
             </p>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            <p className="text-xs text-[var(--text-muted)]">
               Exibir itens já marcados durante a compra
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowCheckedItems(!showCheckedItems)}
-            className={`relative h-7 w-12 rounded-full transition-colors ${
+            aria-label="Alternar exibição de itens marcados"
+            className={`relative h-7 w-12 rounded-full transition-colors duration-150 ease-ui ${
               showCheckedItems
-                ? 'bg-[#00C853]'
-                : 'bg-gray-300 dark:bg-gray-700'
+                ? 'bg-[var(--accent)]'
+                : 'bg-[var(--bg-subtle)] ring-1 ring-[var(--border-hairline)]'
             }`}
           >
             <span
-              className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white transition-transform ${
+              className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-[var(--bg-surface)] shadow-2xs transition-transform duration-150 ease-ui ${
                 showCheckedItems ? 'translate-x-5' : ''
               }`}
             />
           </button>
         </div>
 
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="mb-2 text-xs font-medium text-[var(--text-secondary)]">
           Filtrar por categoria
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -72,14 +74,14 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
               setCategoryFilter(null);
               onClose();
             }}
-            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition ${
+            className={`flex h-10 items-center justify-between rounded-lg border px-3 text-left text-xs font-medium transition-colors duration-150 ease-ui ${
               categoryFilter === null
-                ? 'border-[#00C853] bg-[#00C853]/12 text-[#00C853]'
-                : 'border-[#E5E7EB] bg-[#F8F9FA] text-[#111827] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]'
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
             <span>Todas</span>
-            <span className="opacity-70">{items.length}</span>
+            <span className="font-mono-tabular opacity-75">{items.length}</span>
           </button>
 
           {PRODUCT_CATEGORIES.map((cat) => {
@@ -93,17 +95,18 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
                   setCategoryFilter(active ? null : cat.id);
                   onClose();
                 }}
-                className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition ${
+                className={`flex h-10 items-center justify-between rounded-lg border px-3 text-left text-xs font-medium transition-colors duration-150 ease-ui ${
                   active
-                    ? 'border-[#00C853] bg-[#00C853]/12 text-[#00C853]'
-                    : 'border-[#E5E7EB] bg-[#F8F9FA] text-[#111827] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]'
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                    : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >
                 <span className="flex items-center gap-2 truncate">
+                  <CategoryDot category={cat.id} />
                   <CategoryIcon category={cat.id} size={15} />
                   <span className="truncate">{cat.label}</span>
                 </span>
-                <span className="ml-1 opacity-70">{count}</span>
+                <span className="font-mono-tabular ml-1 opacity-75">{count}</span>
               </button>
             );
           })}

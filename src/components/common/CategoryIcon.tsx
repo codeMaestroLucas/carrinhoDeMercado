@@ -43,12 +43,28 @@ export function CategoryIcon({
   className = '',
 }: CategoryIconProps) {
   const Icon = ICON_MAP[category] ?? Grid;
-  const info = PRODUCT_CATEGORY_MAP[category];
   return (
     <Icon
       size={size}
-      className={className}
-      style={{ color: info?.color ?? '#90A4AE' }}
+      strokeWidth={1.5}
+      className={`text-[var(--text-muted)] ${className}`}
+    />
+  );
+}
+
+export function CategoryDot({
+  category,
+  className = '',
+}: {
+  category: ProductCategoryId;
+  className?: string;
+}) {
+  const info = PRODUCT_CATEGORY_MAP[category];
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block h-2 w-2 shrink-0 rounded-full ${className}`}
+      style={{ backgroundColor: info?.color ?? '#8A847A' }}
     />
   );
 }

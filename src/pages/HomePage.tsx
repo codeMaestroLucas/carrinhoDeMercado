@@ -7,7 +7,6 @@ import {
   Search,
   TrendingDown,
   TrendingUp,
-  Wallet,
 } from 'lucide-react';
 import {
   PRODUCT_CATEGORY_MAP,
@@ -27,7 +26,7 @@ import {
   saveHomeSnapshot,
 } from '../services/homeSnapshotService';
 import { AppFormatters } from '../utils/formatters';
-import { CategoryIcon } from '../components/common/CategoryIcon';
+import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { ProductAnalyticsModal } from '../components/history/ProductAnalyticsModal';
 import { ProductComparisonModal } from '../components/history/ProductComparisonModal';
@@ -64,7 +63,6 @@ export function HomePage() {
     );
   }, [allAggregates, searchQuery]);
 
-  // Stale-While-Revalidate: Instant cached snapshot on initial mount
   const cachedSnapshot = useMemo(() => loadHomeSnapshotSync(), []);
 
   const monthlyStats = useMemo(() => {
@@ -130,7 +128,6 @@ export function HomePage() {
     return Array.from(set).sort();
   }, [markets, history, cachedSnapshot]);
 
-  // Update snapshot when fresh history or markets arrive
   useEffect(() => {
     if (history.length > 0) {
       const timer = setTimeout(() => {
@@ -150,15 +147,15 @@ export function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-24 pt-safe dark:bg-[#121417]">
-      <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/90 px-4 py-3.5 backdrop-blur-md dark:border-[#2E3440] dark:bg-[#1E2229]/90">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-24 pt-safe">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+            <h1 className="text-lg font-medium tracking-tight text-[var(--text-primary)]">
               Início &amp; Análises
             </h1>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Acompanhe gastos, inflação e economia por mercado
+            <p className="text-xs text-[var(--text-secondary)]">
+              Gastos mensais, inflação pessoal e comparativo por mercado
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -172,9 +169,9 @@ export function HomePage() {
                     itemB: allAggregates[1],
                   })
                 }
-                className="flex h-9 items-center gap-1.5 rounded-full bg-[#00C853]/12 px-3 text-xs font-bold text-[#00C853]"
+                className="flex h-9 items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-app)] active:scale-[0.98]"
               >
-                <GitCompareArrows size={15} />
+                <GitCompareArrows size={16} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
                 <span>Comparar</span>
               </button>
             )}
@@ -183,101 +180,95 @@ export function HomePage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
-        {/* Monthly Spending Summary Card with decorative gocery.jpg background */}
-        <section className="relative overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white p-5 shadow-xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-          {/* Decorative gocery.jpg image on the right with smooth gradient mask */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-36 sm:w-48 overflow-hidden rounded-r-3xl">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
+        {/* Monthly Spending Summary */}
+        <section className="relative overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 shadow-2xs">
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-36 overflow-hidden sm:w-48">
             <img
               src="/assets/gocery.jpg"
               alt=""
-              className="h-full w-full object-cover object-center opacity-25 dark:opacity-20 [mask-image:linear-gradient(to_right,transparent,black)] [-webkit-mask-image:linear-gradient(to_right,transparent,black)]"
+              className="h-full w-full object-cover object-center opacity-15 dark:opacity-10 [mask-image:linear-gradient(to_right,transparent,black)] [-webkit-mask-image:linear-gradient(to_right,transparent,black)]"
             />
           </div>
 
           <div className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00C853]/15 text-[#00C853]">
-                  <Wallet size={17} />
-                </div>
-                <span className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Gastos em {currentMonthName}
-                </span>
-              </div>
-              <span className="rounded-full bg-[#F3F4F6] px-3 py-1 text-xs font-semibold text-[#4B5563] dark:bg-[#121417] dark:text-[#9CA3AF]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-[var(--text-secondary)]">
+                Gastos em {currentMonthName}
+              </span>
+              <span className="font-mono-tabular rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
                 {monthlyStats.currentMonthCount}{' '}
                 {monthlyStats.currentMonthCount === 1 ? 'compra' : 'compras'}
               </span>
             </div>
 
-            <p className="mt-3 text-3xl font-extrabold tracking-tight text-[#111827] dark:text-[#F3F4F6]">
+            <p className="font-mono-tabular mt-3 text-3xl font-medium tracking-tight text-[var(--text-primary)]">
               {AppFormatters.formatCurrency(monthlyStats.currentMonthTotal)}
             </p>
 
             {monthlyStats.diffPercent != null ? (
-              <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                 {monthlyStats.diffPercent <= 0 ? (
-                  <ArrowDownRight size={15} className="text-[#00C853]" />
+                  <ArrowDownRight size={15} strokeWidth={1.5} className="text-[var(--positive)]" />
                 ) : (
-                  <ArrowUpRight size={15} className="text-rose-500" />
+                  <ArrowUpRight size={15} strokeWidth={1.5} className="text-[var(--negative)]" />
                 )}
                 <span
-                  className={
+                  className={`font-mono-tabular font-medium ${
                     monthlyStats.diffPercent <= 0
-                      ? 'text-[#00C853]'
-                      : 'text-rose-500'
-                  }
+                      ? 'text-[var(--positive)]'
+                      : 'text-[var(--negative)]'
+                  }`}
                 >
                   {Math.abs(monthlyStats.diffPercent).toFixed(1)}%
-                </span>{' '}
-                {monthlyStats.diffPercent <= 0 ? 'a menos' : 'a mais'} que no mês anterior ({AppFormatters.formatCurrency(monthlyStats.previousMonthTotal)})
+                </span>
+                <span>
+                  {monthlyStats.diffPercent <= 0 ? 'a menos' : 'a mais'} vs mês anterior (
+                  <span className="font-mono-tabular">
+                    {AppFormatters.formatCurrency(monthlyStats.previousMonthTotal)}
+                  </span>
+                  )
+                </span>
               </p>
             ) : (
-              <p className="mt-2 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                Finalize compras ou importe cupons fiscais para acompanhar seus gastos.
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Finalize compras ou importe cupons fiscais para comparar com o mês anterior
               </p>
             )}
           </div>
         </section>
 
         {history.length === 0 ? (
-          <section className="overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white p-5 text-center shadow-xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <div className="relative mx-auto mb-4 h-28 w-full overflow-hidden rounded-2xl border border-[#E5E7EB] dark:border-[#2E3440]">
-              <img
-                src="/assets/gocery.jpg"
-                alt=""
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-                <BarChart3 size={38} className="text-white drop-shadow-md" />
-              </div>
+          <section className="rounded-2xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-surface)] px-6 py-10 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)]">
+              <BarChart3 size={22} strokeWidth={1.5} />
             </div>
-            <h2 className="text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <h2 className="mt-4 text-base font-medium text-[var(--text-primary)]">
               Suas análises aparecerão aqui
             </h2>
-            <p className="mx-auto mt-1 max-w-sm text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Finalize uma lista de compras ou importe uma NFC-e na aba{' '}
-              <strong>Histórico</strong> para liberar gráficos de variação de preços e recomendações de mercado.
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[var(--text-secondary)]">
+              Finalize uma lista ou importe uma NFC-e na aba{' '}
+              <strong className="font-medium text-[var(--text-primary)]">Histórico</strong> para acompanhar variação de preços e recomendações de mercado
             </p>
           </section>
         ) : (
           <>
-            {/* Personal Price Index / Inflation */}
-            <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <div className="mb-3 flex items-center justify-between">
+            {/* Personal Price Index */}
+            <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                    Índice de Preços Pessoal
+                  <h2 className="text-sm font-medium text-[var(--text-primary)]">
+                    Índice de preços pessoal
                   </h2>
-                  <p className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                    {priceIndex.totalComparedItems} itens comparados ({priceIndex.periodLabel})
+                  <p className="text-xs text-[var(--text-muted)]">
+                    <span className="font-mono-tabular">{priceIndex.totalComparedItems}</span> itens comparados ({priceIndex.periodLabel})
                   </p>
                 </div>
                 <select
                   value={priceIndexDays}
                   onChange={(e) => setPriceIndexDays(Number(e.target.value))}
-                  className="rounded-xl border border-[#E5E7EB] bg-[#F8F9FA] px-2.5 py-1 text-xs font-bold text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  aria-label="Período do índice de preços"
+                  className="h-8 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-xs font-medium text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent)]"
                 >
                   <option value={30}>30 dias</option>
                   <option value={60}>60 dias</option>
@@ -285,36 +276,36 @@ export function HomePage() {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FA] p-3 dark:bg-[#181B20]">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3">
+                <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg ${
                       priceIndex.overallVariationPercent <= 0
-                        ? 'bg-[#00C853]/12 text-[#00C853]'
-                        : 'bg-red-500/12 text-red-500'
+                        ? 'bg-[var(--accent-soft)] text-[var(--positive)]'
+                        : 'bg-[var(--negative-soft)] text-[var(--negative)]'
                     }`}
                   >
                     {priceIndex.overallVariationPercent <= 0 ? (
-                      <TrendingDown size={20} />
+                      <TrendingDown size={18} strokeWidth={1.5} />
                     ) : (
-                      <TrendingUp size={20} />
+                      <TrendingUp size={18} strokeWidth={1.5} />
                     )}
                   </div>
                   <div>
-                    <p className="text-lg font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+                    <p className="font-mono-tabular text-xl font-medium leading-tight text-[var(--text-primary)]">
                       {priceIndex.overallVariationPercent > 0 ? '+' : ''}
                       {priceIndex.overallVariationPercent.toFixed(1)}%
                     </p>
-                    <p className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                      Variação média da sua cesta
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Variação média da cesta
                     </p>
                   </div>
                 </div>
-                <div className="text-right text-[11px] font-semibold">
-                  <p className="text-[#00C853]">
+                <div className="font-mono-tabular text-right text-xs font-medium">
+                  <p className="text-[var(--positive)]">
                     {priceIndex.decreasedCount} caíram
                   </p>
-                  <p className="text-red-500">
+                  <p className="text-[var(--negative)]">
                     {priceIndex.increasedCount} subiram
                   </p>
                 </div>
@@ -323,53 +314,53 @@ export function HomePage() {
               {(priceIndex.topDecreases.length > 0 ||
                 priceIndex.topIncreases.length > 0) && (
                 <div className="mt-3">
-                  <div className="mb-2 flex gap-2">
+                  <div className="mb-3 inline-flex rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1">
                     <button
                       type="button"
                       onClick={() => setVariationTab('down')}
-                      className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
                         variationTab === 'down'
-                          ? 'bg-[#00C853] text-white'
-                          : 'bg-[#F3F4F6] text-[#6B7280] dark:bg-[#181B20] dark:text-[#9CA3AF]'
+                          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      Maiores Quedas ({priceIndex.topDecreases.length})
+                      Quedas (<span className="font-mono-tabular">{priceIndex.topDecreases.length}</span>)
                     </button>
                     <button
                       type="button"
                       onClick={() => setVariationTab('up')}
-                      className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
                         variationTab === 'up'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-[#F3F4F6] text-[#6B7280] dark:bg-[#181B20] dark:text-[#9CA3AF]'
+                          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      Maiores Altas ({priceIndex.topIncreases.length})
+                      Altas (<span className="font-mono-tabular">{priceIndex.topIncreases.length}</span>)
                     </button>
                   </div>
 
                   {highlightedVariations.length > 0 && (
-                    <div className="no-scrollbar flex gap-2.5 overflow-x-auto pb-1">
+                    <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
                       {highlightedVariations.map((v) => (
                         <div
                           key={`${v.productName}_${v.marketName}`}
-                          className="w-44 shrink-0 rounded-2xl border border-[#E5E7EB] bg-[#F8F9FA] p-3 dark:border-[#2E3440] dark:bg-[#181B20]"
+                          className="w-44 shrink-0 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3"
                         >
-                          <p className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
+                          <p className="truncate text-xs font-medium text-[var(--text-primary)]">
                             {v.productName}
                           </p>
-                          <p className="truncate text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                          <p className="truncate text-xs text-[var(--text-muted)]">
                             {v.marketName}
                           </p>
-                          <div className="mt-2 flex items-baseline justify-between">
-                            <span className="text-xs font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+                          <div className="mt-2 flex items-baseline justify-between gap-2">
+                            <span className="font-mono-tabular text-xs font-medium text-[var(--text-primary)]">
                               {AppFormatters.formatCurrency(v.currentPrice)}
                             </span>
                             <span
-                              className={`text-[11px] font-extrabold ${
+                              className={`font-mono-tabular text-xs font-medium ${
                                 v.variationPercent < 0
-                                  ? 'text-[#00C853]'
-                                  : 'text-red-500'
+                                  ? 'text-[var(--positive)]'
+                                  : 'text-[var(--negative)]'
                               }`}
                             >
                               {v.variationPercent > 0 ? '+' : ''}
@@ -386,33 +377,36 @@ export function HomePage() {
 
             {/* Category Spending */}
             {categorySpending.length > 0 && (
-              <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-                <h2 className="mb-3 text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Gastos por Categoria
+              <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+                <h2 className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+                  Gastos por categoria
                 </h2>
-                <div className="space-y-2.5">
-                  {categorySpending.slice(0, 6).map((cs) => {
+                <div className="space-y-3">
+                  {categorySpending.slice(0, 6).map((cs, idx) => {
                     const info = PRODUCT_CATEGORY_MAP[cs.category];
                     return (
-                      <div key={cs.category} className="space-y-1">
+                      <div key={cs.category} className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="flex items-center gap-1.5 font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                            <CategoryIcon category={cs.category} size={14} />
+                          <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+                            <CategoryDot category={cs.category} />
                             {info.label}
                           </span>
-                          <span className="font-bold text-[#111827] dark:text-[#F3F4F6]">
+                          <span className="font-mono-tabular font-medium text-[var(--text-primary)]">
                             {AppFormatters.formatCurrency(cs.totalSpent)}{' '}
-                            <span className="font-normal text-[#6B7280] dark:text-[#9CA3AF]">
+                            <span className="font-normal text-[var(--text-muted)]">
                               ({cs.percentage.toFixed(0)}%)
                             </span>
                           </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6] dark:bg-[#181B20]">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
                           <div
-                            className="h-full rounded-full"
+                            className={`h-full rounded-full ${
+                              idx === 0
+                                ? 'bg-[var(--accent)]'
+                                : 'bg-[var(--text-primary)]/25'
+                            }`}
                             style={{
                               width: `${Math.min(100, cs.percentage)}%`,
-                              backgroundColor: info.color,
                             }}
                           />
                         </div>
@@ -424,26 +418,27 @@ export function HomePage() {
             )}
 
             {/* Product Price Explorer */}
-            <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <h2 className="mb-3 text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                Análise por Produto ({filteredAggregates.length})
+            <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+              <h2 className="mb-3 text-sm font-medium text-[var(--text-primary)]">
+                Análise por produto (<span className="font-mono-tabular">{filteredAggregates.length}</span>)
               </h2>
 
               <div className="mb-3 flex gap-2">
-                <div className="flex flex-1 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 dark:border-[#2E3440] dark:bg-[#181B20]">
-                  <Search size={15} className="text-[#6B7280]" />
+                <div className="flex h-9 flex-1 items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 focus-within:border-[var(--accent)]">
+                  <Search size={16} strokeWidth={1.5} className="text-[var(--text-muted)]" />
                   <input
                     type="text"
-                    placeholder="Buscar produto comprado..."
+                    placeholder="Buscar produto"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent text-xs text-[#111827] outline-none dark:text-[#F3F4F6]"
+                    className="w-full bg-transparent text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
                   />
                 </div>
                 <select
                   value={marketFilter}
                   onChange={(e) => setMarketFilter(e.target.value)}
-                  className="max-w-[130px] rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-2.5 py-2 text-xs font-semibold text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  aria-label="Filtrar por mercado"
+                  className="h-9 max-w-[140px] rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-xs font-medium text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent)]"
                 >
                   <option value="">Todos mercados</option>
                   {availableMarketNames.map((name) => (
@@ -460,27 +455,29 @@ export function HomePage() {
                     key={agg.normalizedKey}
                     type="button"
                     onClick={() => setSelectedAggregate(agg)}
-                    className="flex w-full items-center justify-between rounded-2xl bg-[#F8F9FA] px-3.5 py-2.5 text-left transition hover:bg-[#F3F4F6] dark:bg-[#181B20] dark:hover:bg-[#181B20]/80"
+                    className="flex w-full items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2.5 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <CategoryIcon category={agg.category} size={17} />
+                      <CategoryIcon category={agg.category} size={18} />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
+                        <p className="truncate text-xs font-medium text-[var(--text-primary)]">
                           {agg.displayName}
                         </p>
-                        <p className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                        <p className="truncate text-xs text-[var(--text-muted)]">
                           Menor:{' '}
-                          {agg.minPriceOccurrence
-                            ? `${AppFormatters.formatCurrency(agg.minPriceOccurrence.price)} (${agg.minPriceOccurrence.marketName})`
-                            : '--'}
+                          <span className="font-mono-tabular">
+                            {agg.minPriceOccurrence
+                              ? `${AppFormatters.formatCurrency(agg.minPriceOccurrence.price)} (${agg.minPriceOccurrence.marketName})`
+                              : '--'}
+                          </span>
                         </p>
                       </div>
                     </div>
-                    <div className="ml-2 shrink-0 text-right">
-                      <p className="text-xs font-extrabold text-[#00C853]">
+                    <div className="ml-3 shrink-0 text-right">
+                      <p className="font-mono-tabular text-xs font-medium text-[var(--accent-fg)]">
                         {AppFormatters.formatCurrency(agg.lastPrice)}
                       </p>
-                      <p className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                      <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
                         Média {AppFormatters.formatCurrency(agg.averagePrice)}
                       </p>
                     </div>

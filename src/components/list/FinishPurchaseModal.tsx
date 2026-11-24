@@ -43,35 +43,34 @@ export function FinishPurchaseModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 shadow-2xl dark:bg-[#1E2229] sm:rounded-3xl"
+        className="w-full max-w-md rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
-              <CheckCircle2 size={20} />
-            </div>
-            <h2 className="text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
-              Finalizar Compra
+            <CheckCircle2 size={18} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+            <h2 className="text-base font-medium text-[var(--text-primary)]">
+              Finalizar compra
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+            aria-label="Fechar"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={20} />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
               Onde você realizou esta compra?
             </label>
             <select
               value={marketId}
               onChange={(e) => setMarketId(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none focus:border-[#00C853] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+              className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
             >
               {markets.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -86,37 +85,37 @@ export function FinishPurchaseModal({
               type="button"
               disabled={checkedItems.length === 0}
               onClick={() => setOnlyChecked(true)}
-              className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold transition disabled:opacity-40 ${
+              className={`h-9 flex-1 rounded-lg border px-3 text-xs font-medium transition-colors duration-150 ease-ui disabled:opacity-40 ${
                 onlyChecked
-                  ? 'border-[#00C853] bg-[#00C853]/12 text-[#00C853]'
-                  : 'border-[#E5E7EB] text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]'
+                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                  : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)]'
               }`}
             >
-              Só no carrinho ({checkedItems.length})
+              Só no carrinho (<span className="font-mono-tabular">{checkedItems.length}</span>)
             </button>
             <button
               type="button"
               onClick={() => setOnlyChecked(false)}
-              className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+              className={`h-9 flex-1 rounded-lg border px-3 text-xs font-medium transition-colors duration-150 ease-ui ${
                 !onlyChecked
-                  ? 'border-[#00C853] bg-[#00C853]/12 text-[#00C853]'
-                  : 'border-[#E5E7EB] text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]'
+                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                  : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)]'
               }`}
             >
-              Lista inteira ({items.length})
+              Lista inteira (<span className="font-mono-tabular">{items.length}</span>)
             </button>
           </div>
 
-          <div className="rounded-2xl bg-[#F3F4F6] p-3.5 dark:bg-[#181B20]">
-            <div className="flex items-center justify-between text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-4">
+            <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
               <span>Itens salvos no histórico</span>
-              <span className="font-bold text-[#111827] dark:text-[#F3F4F6]">
+              <span className="font-mono-tabular font-medium text-[var(--text-primary)]">
                 {targetItems.length}
               </span>
             </div>
-            <div className="mt-1.5 flex items-center justify-between text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <div className="mt-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)]">
               <span>Total da compra</span>
-              <span className="text-[#00C853]">
+              <span className="font-mono-tabular text-[var(--accent-fg)]">
                 {AppFormatters.formatCurrency(total)}
               </span>
             </div>
@@ -126,9 +125,9 @@ export function FinishPurchaseModal({
             type="button"
             disabled={targetItems.length === 0}
             onClick={handleConfirm}
-            className="w-full rounded-xl bg-[#00C853] py-3 text-sm font-bold text-white shadow-sm transition active:scale-98 disabled:opacity-40"
+            className="h-10 w-full rounded-lg bg-[var(--accent)] text-sm font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-40"
           >
-            Salvar no Histórico
+            Salvar no histórico
           </button>
         </div>
       </div>

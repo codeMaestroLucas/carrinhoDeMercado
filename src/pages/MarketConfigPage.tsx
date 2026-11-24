@@ -39,7 +39,7 @@ import {
   type ProductCategoryId,
 } from '../types/shopping';
 import { useShoppingStore } from '../store/useShoppingStore';
-import { CategoryIcon } from '../components/common/CategoryIcon';
+import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 
 function SortableCategoryRow({
@@ -68,10 +68,10 @@ function SortableCategoryRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition ${
+      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-ui ${
         isDragging
-          ? 'z-10 border-[#00C853] bg-white shadow-lg dark:bg-[#1E2229]'
-          : 'border-[#E5E7EB] bg-[#F8F9FA] dark:border-[#2E3440] dark:bg-[#181B20]'
+          ? 'z-10 border-[var(--accent)] bg-[var(--bg-surface)] shadow-md'
+          : 'border-[var(--border-hairline)] bg-[var(--bg-app)]'
       }`}
     >
       <button
@@ -79,15 +79,16 @@ function SortableCategoryRow({
         {...attributes}
         {...listeners}
         aria-label={`Arrastar ${info.label}`}
-        className="cursor-grab touch-none text-[#6B7280] active:cursor-grabbing dark:text-[#9CA3AF]"
+        className="cursor-grab touch-none text-[var(--text-muted)] active:cursor-grabbing"
       >
-        <GripVertical size={17} />
+        <GripVertical size={16} strokeWidth={1.5} />
       </button>
-      <span className="w-5 text-center text-xs font-bold text-[#6B7280] dark:text-[#9CA3AF]">
+      <span className="font-mono-tabular w-5 text-center text-xs font-medium text-[var(--text-muted)]">
         {index + 1}
       </span>
-      <CategoryIcon category={id} size={17} />
-      <span className="flex-1 text-xs font-semibold text-[#111827] dark:text-[#F3F4F6]">
+      <CategoryDot category={id} />
+      <CategoryIcon category={id} size={16} />
+      <span className="flex-1 text-xs font-medium text-[var(--text-primary)]">
         {info.label}
       </span>
       <div className="flex items-center gap-1">
@@ -96,18 +97,18 @@ function SortableCategoryRow({
           disabled={index === 0}
           onClick={onMoveUp}
           aria-label="Mover para cima"
-          className="rounded-lg p-1 text-[#6B7280] hover:bg-black/5 disabled:opacity-25 dark:text-[#9CA3AF] dark:hover:bg-white/10"
+          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-25"
         >
-          <ArrowUp size={14} />
+          <ArrowUp size={15} strokeWidth={1.5} />
         </button>
         <button
           type="button"
           disabled={index === total - 1}
           onClick={onMoveDown}
           aria-label="Mover para baixo"
-          className="rounded-lg p-1 text-[#6B7280] hover:bg-black/5 disabled:opacity-25 dark:text-[#9CA3AF] dark:hover:bg-white/10"
+          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-25"
         >
-          <ArrowDown size={14} />
+          <ArrowDown size={15} strokeWidth={1.5} />
         </button>
       </div>
     </div>
@@ -159,6 +160,11 @@ export function MarketConfigPage() {
     typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false,
   );
 
+  const notify = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 3000);
+  };
+
   const toggleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
@@ -189,11 +195,6 @@ export function MarketConfigPage() {
     }),
   );
 
-  const notify = (msg: string) => {
-    setFeedback(msg);
-    setTimeout(() => setFeedback(null), 3000);
-  };
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -211,7 +212,7 @@ export function MarketConfigPage() {
   const handleCreateSpace = async () => {
     try {
       const code = await createNewSharedSpace();
-      notify(`Espaço ${code} criado!`);
+      notify(`Espaço ${code} criado`);
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Erro ao criar espaço');
     }
@@ -223,75 +224,71 @@ export function MarketConfigPage() {
     try {
       await joinExistingSharedSpace(joinCodeInput);
       setJoinCodeInput('');
-      notify('Conectado ao espaço familiar!');
+      notify('Conectado ao espaço familiar');
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Erro ao conectar');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-24 pt-safe dark:bg-[#121417]">
-      <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/90 px-4 py-3.5 backdrop-blur-md dark:border-[#2E3440] dark:bg-[#1E2229]/90">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-24 pt-safe">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+            <h1 className="text-lg font-medium tracking-tight text-[var(--text-primary)]">
               Mercados &amp; Ajustes
             </h1>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Corredores, dicionário inteligente e nuvem
+            <p className="text-xs text-[var(--text-secondary)]">
+              Corredores, dicionário de classificação e nuvem
             </p>
           </div>
           <ThemeToggleButton />
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-5 px-4 pt-4">
-        {/* Cloud Sync Section */}
-        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-xl ${
-                  sharedSpaceCode
-                    ? 'bg-[#00C853]/12 text-[#00C853]'
-                    : 'bg-[#F3F4F6] text-[#6B7280] dark:bg-[#181B20] dark:text-[#9CA3AF]'
-                }`}
-              >
-                {sharedSpaceCode ? <Cloud size={19} /> : <CloudOff size={19} />}
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Sincronização em Família
-                </h2>
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                  {sharedSpaceCode
-                    ? hasPendingCloudPush
-                      ? 'Alterações locais pendentes de envio (aguardando rede)'
-                      : isSyncingCloud
-                        ? 'Sincronizando com a nuvem...'
-                        : lastSyncedAtIso
-                          ? `Sincronizado às ${new Date(lastSyncedAtIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                          : 'Conectado ao Firestore em tempo real'
-                    : 'Compartilhe listas e preços entre celulares'}
-                </p>
-              </div>
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
+        {/* Cloud Sync */}
+        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+          <div className="mb-3 flex items-start gap-2.5">
+            <span className="mt-0.5 text-[var(--text-muted)]">
+              {sharedSpaceCode ? (
+                <Cloud size={18} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+              ) : (
+                <CloudOff size={18} strokeWidth={1.5} />
+              )}
+            </span>
+            <div>
+              <h2 className="text-sm font-medium text-[var(--text-primary)]">
+                Sincronização em família
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                {sharedSpaceCode
+                  ? hasPendingCloudPush
+                    ? 'Alterações locais pendentes de envio'
+                    : isSyncingCloud
+                      ? 'Sincronizando com a nuvem'
+                      : lastSyncedAtIso
+                        ? `Sincronizado às ${new Date(lastSyncedAtIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                        : 'Conectado em tempo real'
+                  : 'Compartilhe listas e preços entre celulares'}
+              </p>
             </div>
           </div>
 
           {cloudError && (
-            <div className="mb-3 rounded-xl bg-red-500/10 p-3 text-xs font-medium text-red-600 dark:text-red-400">
+            <div className="mb-3 rounded-xl border border-[var(--negative)]/25 bg-[var(--negative-soft)] p-3 text-xs font-medium text-[var(--negative)]">
               {cloudError}
             </div>
           )}
 
           {sharedSpaceCode ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl border border-[#00C853]/30 bg-[#00C853]/8 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3">
                 <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-[#9CA3AF]">
-                    Código da Família
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Código da família
                   </span>
-                  <p className="text-lg font-extrabold tracking-widest text-[#00C853]">
+                  <p className="font-mono-tabular mt-0.5 text-lg font-medium tracking-wider text-[var(--accent-fg)]">
                     {sharedSpaceCode}
                   </p>
                 </div>
@@ -299,11 +296,11 @@ export function MarketConfigPage() {
                   type="button"
                   onClick={() => {
                     void navigator.clipboard?.writeText(sharedSpaceCode);
-                    notify('Código copiado!');
+                    notify('Código copiado');
                   }}
-                  className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#111827] shadow-2xs dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                 >
-                  <Copy size={14} />
+                  <Copy size={15} strokeWidth={1.5} />
                   Copiar
                 </button>
               </div>
@@ -313,17 +310,17 @@ export function MarketConfigPage() {
                   type="button"
                   onClick={() => {
                     void refreshCloudSync();
-                    notify('Sincronizado!');
+                    notify('Sincronizado');
                   }}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-[#F8F9FA] py-2.5 text-xs font-bold text-[#111827] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-app)]"
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={15} strokeWidth={1.5} />
                   Atualizar agora
                 </button>
                 <button
                   type="button"
                   onClick={() => void disconnectSharedSpace()}
-                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400"
+                  className="h-9 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                 >
                   Desconectar
                 </button>
@@ -335,24 +332,24 @@ export function MarketConfigPage() {
                 type="button"
                 disabled={isSyncingCloud}
                 onClick={() => void handleCreateSpace()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00C853] py-2.5 text-xs font-bold text-white transition active:scale-98 disabled:opacity-50"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,opacity,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-50"
               >
-                <Users size={16} />
-                {isSyncingCloud ? 'Conectando...' : 'Criar Novo Código Familiar'}
+                <Users size={16} strokeWidth={1.5} />
+                {isSyncingCloud ? 'Conectando' : 'Criar novo código familiar'}
               </button>
 
               <form onSubmit={handleJoinSpace} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Ou digite um código (ex: CASA-4829)"
+                  placeholder="Digite um código (ex: CASA-4829)"
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  className="flex-1 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs font-bold uppercase text-[#111827] outline-none focus:border-[#00C853] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="font-mono-tabular h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="submit"
                   disabled={isSyncingCloud || !joinCodeInput.trim()}
-                  className="rounded-xl bg-[#111827] px-4 py-2 text-xs font-bold text-white disabled:opacity-40 dark:bg-[#F3F4F6] dark:text-[#111827]"
+                  className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] transition-opacity duration-150 ease-ui disabled:opacity-40"
                 >
                   Entrar
                 </button>
@@ -361,18 +358,18 @@ export function MarketConfigPage() {
           )}
         </section>
 
-        {/* Market Profile & Aisle Order Section */}
-        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
-                <Store size={19} />
-              </div>
+        {/* Market Profile & Aisle Order */}
+        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 text-[var(--text-muted)]">
+                <Store size={18} strokeWidth={1.5} />
+              </span>
               <div>
-                <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Ordem dos Corredores por Mercado
+                <h2 className="text-sm font-medium text-[var(--text-primary)]">
+                  Ordem dos corredores por mercado
                 </h2>
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Arraste para definir o trajeto dentro da loja
                 </p>
               </div>
@@ -380,9 +377,9 @@ export function MarketConfigPage() {
             <button
               type="button"
               onClick={() => setShowAddMarket((v) => !v)}
-              className="flex items-center gap-1 rounded-xl bg-[#00C853]/12 px-2.5 py-1.5 text-xs font-bold text-[#00C853]"
+              className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-app)]"
             >
-              <Plus size={14} />
+              <Plus size={14} strokeWidth={1.5} />
               Novo
             </button>
           </div>
@@ -395,7 +392,7 @@ export function MarketConfigPage() {
                 addMarket(newMarketName);
                 setNewMarketName('');
                 setShowAddMarket(false);
-                notify('Mercado adicionado!');
+                notify('Mercado adicionado');
               }}
               className="mb-3 flex gap-2"
             >
@@ -404,11 +401,11 @@ export function MarketConfigPage() {
                 placeholder="Nome do mercado (ex: Carrefour)"
                 value={newMarketName}
                 onChange={(e) => setNewMarketName(e.target.value)}
-                className="flex-1 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs font-medium text-[#111827] outline-none focus:border-[#00C853] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
               />
               <button
                 type="submit"
-                className="rounded-xl bg-[#00C853] px-3.5 py-2 text-xs font-bold text-white"
+                className="h-9 rounded-lg bg-[var(--accent)] px-3.5 text-xs font-medium text-[var(--accent-ink)]"
               >
                 Criar
               </button>
@@ -424,10 +421,10 @@ export function MarketConfigPage() {
                   selectMarket(m.id);
                   setEditingMarketName(null);
                 }}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                className={`h-8 shrink-0 rounded-lg border px-3 text-xs font-medium transition-[background-color,color,border-color] duration-150 ease-ui ${
                   m.id === selectedMarket.id
-                    ? 'bg-[#00C853] text-white'
-                    : 'border border-[#E5E7EB] bg-[#F8F9FA] text-[#6B7280] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#9CA3AF]'
+                    ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                    : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >
                 {m.name}
@@ -435,8 +432,7 @@ export function MarketConfigPage() {
             ))}
           </div>
 
-          {/* Edit/Delete selected market bar */}
-          <div className="mb-3 flex items-center justify-between rounded-xl bg-[#F3F4F6] px-3 py-2 dark:bg-[#181B20]">
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-2">
             {editingMarketName !== null ? (
               <form
                 onSubmit={(e) => {
@@ -450,40 +446,40 @@ export function MarketConfigPage() {
                   type="text"
                   value={editingMarketName}
                   onChange={(e) => setEditingMarketName(e.target.value)}
-                  className="flex-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-[#111827] outline-none dark:bg-[#1E2229] dark:text-[#F3F4F6]"
+                  className="h-8 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2.5 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="submit"
-                  className="rounded-lg bg-[#00C853] px-2.5 py-1 text-xs font-bold text-white"
+                  className="h-8 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)]"
                 >
                   Salvar
                 </button>
               </form>
             ) : (
               <>
-                <span className="text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
+                <span className="text-xs font-medium text-[var(--text-primary)]">
                   {selectedMarket.name}
                 </span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setEditingMarketName(selectedMarket.name)}
-                    className="rounded-lg p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+                    className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
                     title="Renomear mercado"
                   >
-                    <Edit3 size={14} />
+                    <Edit3 size={15} strokeWidth={1.5} />
                   </button>
                   {markets.length > 1 && (
                     <button
                       type="button"
                       onClick={() => {
                         deleteMarket(selectedMarket.id);
-                        notify('Mercado removido.');
+                        notify('Mercado removido');
                       }}
-                      className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/10"
+                      className="rounded-lg p-1.5 text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                       title="Excluir mercado"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={15} strokeWidth={1.5} />
                     </button>
                   )}
                 </div>
@@ -500,7 +496,7 @@ export function MarketConfigPage() {
               items={selectedMarket.categoryOrder}
               strategy={verticalListSortingStrategy}
             >
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {selectedMarket.categoryOrder.map((catId, index) => (
                   <SortableCategoryRow
                     key={catId}
@@ -520,46 +516,50 @@ export function MarketConfigPage() {
           </DndContext>
         </section>
 
-        {/* Immersive Fullscreen Mode Section */}
-        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
-                <Maximize2 size={18} />
-              </div>
+        {/* Fullscreen Mode */}
+        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 text-[var(--text-muted)]">
+                <Maximize2 size={18} strokeWidth={1.5} />
+              </span>
               <div>
-                <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Modo Tela Cheia Imersivo
+                <h2 className="text-sm font-medium text-[var(--text-primary)]">
+                  Modo tela cheia
                 </h2>
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                  Oculta a barra de notificações e barras do sistema
+                <p className="text-xs text-[var(--text-muted)]">
+                  Oculta barras do navegador durante as compras
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 rounded-xl bg-[#00C853] px-3.5 py-2 text-xs font-bold text-white transition active:scale-95"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-app)] active:scale-[0.98]"
             >
-              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {isFullscreen ? (
+                <Minimize2 size={15} strokeWidth={1.5} />
+              ) : (
+                <Maximize2 size={15} strokeWidth={1.5} />
+              )}
               <span>{isFullscreen ? 'Sair' : 'Ativar'}</span>
             </button>
           </div>
         </section>
 
         {/* Smart Category Dictionary */}
-        <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
-                <BookOpen size={19} />
-              </div>
+        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 text-[var(--text-muted)]">
+                <BookOpen size={18} strokeWidth={1.5} />
+              </span>
               <div>
-                <h2 className="text-sm font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Dicionário de Categorias
+                <h2 className="text-sm font-medium text-[var(--text-primary)]">
+                  Dicionário de categorias
                 </h2>
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                  Palavras-chave usadas na classificação automática
+                <p className="text-xs text-[var(--text-muted)]">
+                  Palavras usadas na classificação automática
                 </p>
               </div>
             </div>
@@ -567,11 +567,11 @@ export function MarketConfigPage() {
               type="button"
               onClick={() => {
                 resetCategoryDictionary();
-                notify('Dicionário restaurado ao padrão.');
+                notify('Dicionário restaurado ao padrão');
               }}
-              className="flex items-center gap-1 rounded-xl border border-[#E5E7EB] px-2.5 py-1.5 text-[11px] font-bold text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]"
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-2.5 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
             >
-              <RotateCcw size={12} />
+              <RotateCcw size={13} strokeWidth={1.5} />
               Resetar
             </button>
           </div>
@@ -584,7 +584,7 @@ export function MarketConfigPage() {
               return (
                 <div
                   key={cat.id}
-                  className="overflow-hidden rounded-2xl border border-[#E5E7EB] dark:border-[#2E3440]"
+                  className="overflow-hidden rounded-xl border border-[var(--border-hairline)]"
                 >
                   <button
                     type="button"
@@ -592,19 +592,20 @@ export function MarketConfigPage() {
                       setExpandedCategory(isOpen ? null : cat.id);
                       setNewKeywordInput('');
                     }}
-                    className="flex w-full items-center justify-between bg-[#F8F9FA] px-3.5 py-2.5 text-left dark:bg-[#181B20]"
+                    className="flex w-full items-center justify-between bg-[var(--bg-app)] px-3 py-2.5 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                   >
-                    <span className="flex items-center gap-2 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                      <CategoryIcon category={cat.id} size={15} />
+                    <span className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
+                      <CategoryDot category={cat.id} />
+                      <CategoryIcon category={cat.id} size={16} />
                       {cat.label}
                     </span>
-                    <span className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+                    <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
                       {keywords.length} termos
                     </span>
                   </button>
 
                   {isOpen && (
-                    <div className="space-y-2.5 bg-white p-3 dark:bg-[#1E2229]">
+                    <div className="space-y-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3">
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
@@ -616,14 +617,14 @@ export function MarketConfigPage() {
                       >
                         <input
                           type="text"
-                          placeholder="Nova palavra-chave..."
+                          placeholder="Nova palavra-chave"
                           value={newKeywordInput}
                           onChange={(e) => setNewKeywordInput(e.target.value)}
-                          className="flex-1 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-1.5 text-xs text-[#111827] outline-none focus:border-[#00C853] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                          className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
                         />
                         <button
                           type="submit"
-                          className="rounded-xl bg-[#00C853] px-3 py-1.5 text-xs font-bold text-white"
+                          className="h-9 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)]"
                         >
                           Adicionar
                         </button>
@@ -633,7 +634,7 @@ export function MarketConfigPage() {
                         {keywords.slice(0, 40).map((kw) => (
                           <span
                             key={kw}
-                            className="inline-flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[11px] font-medium text-[#111827] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-1 text-xs text-[var(--text-primary)]"
                           >
                             {kw}
                             <button
@@ -642,15 +643,15 @@ export function MarketConfigPage() {
                                 removeKeywordFromCategory(cat.id, kw)
                               }
                               aria-label={`Remover ${kw}`}
-                              className="text-[#6B7280] hover:text-red-500"
+                              className="text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:text-[var(--negative)]"
                             >
-                              <X size={11} />
+                              <X size={12} strokeWidth={1.5} />
                             </button>
                           </span>
                         ))}
                         {keywords.length > 40 && (
-                          <span className="px-2 py-1 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                            +{keywords.length - 40} termos...
+                          <span className="font-mono-tabular px-2 py-1 text-xs text-[var(--text-muted)]">
+                            +{keywords.length - 40} termos
                           </span>
                         )}
                       </div>
@@ -664,7 +665,7 @@ export function MarketConfigPage() {
       </div>
 
       {feedback && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111827] px-4 py-2 text-xs font-semibold text-white shadow-xl dark:bg-[#F3F4F6] dark:text-[#111827]">
+        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2 text-xs font-medium text-[var(--bg-app)] shadow-lg">
           {feedback}
         </div>
       )}

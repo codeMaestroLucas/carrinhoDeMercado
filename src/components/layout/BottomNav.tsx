@@ -28,9 +28,9 @@ export function BottomNav({
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E5E7EB] bg-white/95 backdrop-blur-md pb-safe dark:border-[#282D37] dark:bg-[#1E2229]/95"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 backdrop-blur-md pb-safe"
     >
-      <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-2">
+      <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-4">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -39,27 +39,27 @@ export function BottomNav({
               key={tab.id}
               type="button"
               onClick={() => onChangeTab(tab.id)}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-1.5 transition-colors ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1.5 transition-[color,background-color] duration-150 ease-ui focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${
                 active
-                  ? 'text-[#00C853]'
-                  : 'text-[#6B7280] hover:text-[#111827] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6]'
+                  ? 'text-[var(--accent-fg)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
             >
               <div
-                className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${
-                  active ? 'bg-[#00C853]/12' : ''
+                className={`relative flex h-7 w-12 items-center justify-center rounded-lg transition-[background-color] duration-150 ease-ui ${
+                  active ? 'bg-[var(--accent-soft)]' : ''
                 }`}
               >
-                <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
+                <Icon size={18} strokeWidth={1.5} />
                 {tab.badge != null && tab.badge > 0 && (
-                  <span className="absolute -top-0.5 right-2 flex min-w-[18px] items-center justify-center rounded-full bg-[#00C853] px-1 text-[10px] font-bold leading-4 text-white">
+                  <span className="font-mono-tabular absolute -top-1 right-0.5 rounded bg-[var(--bg-subtle)] px-1 text-[10px] font-medium leading-4 text-[var(--text-primary)] ring-1 ring-[var(--border-hairline)]">
                     {tab.badge > 99 ? '99+' : tab.badge}
                   </span>
                 )}
               </div>
               <span
-                className={`text-[11px] ${
-                  active ? 'font-bold' : 'font-medium'
+                className={`text-xs leading-4 ${
+                  active ? 'font-medium' : 'font-normal'
                 }`}
               >
                 {tab.label}

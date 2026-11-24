@@ -94,7 +94,7 @@ export function App() {
 
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', isDarkMode ? '#121417' : '#F8F9FA');
+      metaTheme.setAttribute('content', isDarkMode ? '#161513' : '#F7F4EE');
     }
   }, [isDarkMode]);
 
@@ -107,21 +107,21 @@ export function App() {
       )}
 
       {isOffline && (
-        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-1.5 bg-amber-500 px-3 py-1 text-[11px] font-bold text-white">
-          <WifiOff size={13} />
-          <span>Modo offline ativo — alterações salvas localmente</span>
+        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 border-b border-[var(--border-hairline)] bg-[#B45309] px-4 py-1.5 text-xs font-medium text-[#FDFBF7]">
+          <WifiOff size={14} strokeWidth={1.5} />
+          <span>Modo offline ativo, alterações salvas localmente</span>
         </div>
       )}
 
       {needRefresh && (
-        <div className="fixed inset-x-4 top-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#111827] px-4 py-2.5 text-xs text-white shadow-xl dark:bg-[#F3F4F6] dark:text-[#111827]">
-          <span className="font-semibold">Nova versão do app disponível</span>
+        <div className="fixed inset-x-4 top-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2.5 text-xs text-[var(--bg-app)] shadow-lg">
+          <span className="font-medium">Nova versão disponível</span>
           <button
             type="button"
             onClick={() => void updateServiceWorker(true)}
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-[#00C853] px-3 py-1.5 font-bold text-white"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui active:scale-[0.98]"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={14} strokeWidth={1.5} />
             Atualizar
           </button>
         </div>

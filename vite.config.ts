@@ -21,8 +21,8 @@ export default defineConfig({
         short_name: 'Carrinho',
         description:
           'Aplicativo inteligente de lista e carrinho de compras com leitura de cupom fiscal, comparação de preços e sincronização em família.',
-        theme_color: '#F8F9FA',
-        background_color: '#F8F9FA',
+        theme_color: '#F7F4EE',
+        background_color: '#F7F4EE',
         display: 'fullscreen',
         display_override: ['fullscreen', 'standalone'],
         orientation: 'portrait',

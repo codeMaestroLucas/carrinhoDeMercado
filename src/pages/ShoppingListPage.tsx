@@ -5,6 +5,7 @@ import {
   ClipboardPaste,
   Cloud,
   CloudOff,
+  History,
   MoreVertical,
   PiggyBank,
   Plus,
@@ -12,7 +13,6 @@ import {
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
-  Sparkles,
   Store,
   Tag,
   Trash2,
@@ -126,8 +126,6 @@ export function ShoppingListPage({
       .slice(0, 5);
   }, [inputText, detectedBulkItems.length, history]);
 
-  // All items are ALWAYS displayed (unless filtered by category or checked status),
-  // organized according to the selected market's aisle/corridor order.
   const filteredAndSortedItems = useMemo(() => {
     const orderMap = new Map<ProductCategoryId, number>();
     selectedMarket.categoryOrder.forEach((cat, idx) => orderMap.set(cat, idx));
@@ -211,12 +209,12 @@ export function ShoppingListPage({
         showToast(
           `${report.addedCount} ${report.addedCount === 1 ? 'item adicionado' : 'itens adicionados'}${
             report.skippedDuplicatesCount > 0
-              ? ` (${report.skippedDuplicatesCount} duplicado(s) ignorado(s))`
+              ? ` (${report.skippedDuplicatesCount} já na lista)`
               : ''
           }`,
         );
       } else {
-        showToast('Todos os itens colados já estavam na lista.');
+        showToast('Todos os itens colados já estavam na lista');
       }
       return;
     }
@@ -225,49 +223,52 @@ export function ShoppingListPage({
     if (added) {
       setInputText('');
     } else {
-      showToast('Este item já está na sua lista.');
+      showToast('Este item já está na sua lista');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-36 dark:bg-[#121417]">
-      {/* Stylized Top Banner with Wave Cut */}
-      <div className="relative w-full pt-safe">
-        <div className="relative h-56 w-full overflow-hidden sm:h-60">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-36 pt-safe">
+      {/* Top Hero Moment: natural kraft bag photograph blended seamlessly into warm surface */}
+      <div className="relative overflow-hidden border-b border-[var(--border-hairline)]">
+        <div className="pointer-events-none absolute inset-0">
           <img
             src="/assets/ListTop.jpg"
-            alt="Mercado"
-            className="h-full w-full object-cover object-center"
+            alt="Sacola de compras com hortifrúti"
+            className="h-full w-full object-cover object-right opacity-85 dark:opacity-30"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/65" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-app)] via-[var(--bg-app)]/85 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[var(--bg-app)] to-transparent" />
+        </div>
 
-          {/* Top action buttons */}
-          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pt-3 pt-safe">
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
-                <ShoppingCart size={14} className="text-[#00C853]" />
-                <span>{items.length} {items.length === 1 ? 'item' : 'itens'}</span>
+        <div className="relative z-10 mx-auto max-w-2xl px-4 pt-3 pb-4">
+          {/* Top quiet utility bar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-3 text-xs font-medium text-[var(--text-primary)] shadow-2xs backdrop-blur-sm">
+                <ShoppingCart size={16} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+                <span className="font-mono-tabular">
+                  {items.length} {items.length === 1 ? 'item' : 'itens'}
+                </span>
               </div>
+
               {sharedSpaceCode && (
                 <div
                   title={
                     hasPendingCloudPush
                       ? 'Aguardando conexão para sincronizar'
                       : isSyncingCloud
-                        ? 'Sincronizando com a família...'
+                        ? 'Sincronizando com a família'
                         : `Sincronizado (${sharedSpaceCode})`
                   }
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-2.5 text-xs font-medium text-[var(--text-secondary)] shadow-2xs backdrop-blur-sm"
                 >
                   {hasPendingCloudPush ? (
-                    <CloudOff size={13} className="text-amber-400" />
+                    <CloudOff size={14} strokeWidth={1.5} className="text-[#B45309] dark:text-[#FBBF24]" />
                   ) : (
-                    <Cloud
-                      size={13}
-                      className={`text-[#00C853] ${isSyncingCloud ? 'animate-pulse' : ''}`}
-                    />
+                    <Cloud size={14} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
                   )}
-                  <span>{sharedSpaceCode}</span>
+                  <span className="font-mono-tabular">{sharedSpaceCode}</span>
                 </div>
               )}
             </div>
@@ -278,108 +279,95 @@ export function ShoppingListPage({
                   type="button"
                   onClick={clearCheckedItems}
                   title="Remover itens marcados"
-                  className="flex h-9 items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 text-xs font-semibold text-white backdrop-blur-md transition active:scale-95"
+                  className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-3 text-xs font-medium text-[var(--text-primary)] shadow-2xs backdrop-blur-sm transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-subtle)] active:scale-[0.98]"
                 >
-                  <Trash2 size={13} />
-                  <span>Limpar ({checkedCount})</span>
+                  <Trash2 size={15} strokeWidth={1.5} className="text-[var(--text-muted)]" />
+                  <span className="font-mono-tabular">Limpar ({checkedCount})</span>
                 </button>
               )}
               <ThemeToggleButton variant="glass" />
             </div>
           </div>
 
-          {/* Frosted Glass "Add Items" Pill inside the image (as in image 1) */}
-          <div className="absolute inset-x-4 top-16 z-20">
-            <form onSubmit={handleAddSubmit} className="relative">
-              <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-black/50 p-1.5 pl-3.5 shadow-2xl backdrop-blur-md focus-within:border-[#00C853] dark:bg-[#1E2229]/85">
-                <textarea
-                  ref={inputRef}
-                  rows={detectedBulkItems.length > 1 ? 3 : 1}
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === 'Enter' &&
-                      !e.shiftKey &&
-                      detectedBulkItems.length <= 1
-                    ) {
-                      e.preventDefault();
-                      handleAddSubmit();
-                    }
-                  }}
-                  placeholder="Adicionar itens (digite ou cole vários)..."
-                  className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-white placeholder-white/70 outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputText.trim()}
-                  className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-[#00C853] px-3.5 text-xs font-bold text-white shadow-xs transition active:scale-95 disabled:opacity-40"
-                >
-                  {detectedBulkItems.length > 1 ? (
-                    <>
-                      <ClipboardPaste size={14} />
-                      <span>Colar ({detectedBulkItems.length})</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={16} />
-                      <span>Adicionar</span>
-                    </>
-                  )}
-                </button>
-              </div>
+          {/* Quick-add bar anchored in the calm left space */}
+          <form onSubmit={handleAddSubmit} className="relative mt-6">
+            <div className="flex items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-1.5 pl-3.5 shadow-sm transition-colors duration-150 ease-ui focus-within:border-[var(--accent)]">
+              <textarea
+                ref={inputRef}
+                rows={detectedBulkItems.length > 1 ? 3 : 1}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    detectedBulkItems.length <= 1
+                  ) {
+                    e.preventDefault();
+                    handleAddSubmit();
+                  }
+                }}
+                placeholder="Adicionar item ou colar lista"
+                className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!inputText.trim()}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,opacity,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-40"
+              >
+                {detectedBulkItems.length > 1 ? (
+                  <>
+                    <ClipboardPaste size={15} strokeWidth={1.5} />
+                    <span className="font-mono-tabular">Colar ({detectedBulkItems.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} strokeWidth={1.5} />
+                    <span>Adicionar</span>
+                  </>
+                )}
+              </button>
+            </div>
 
-              {/* Autocomplete suggestions dropdown */}
-              {historicalSuggestions.length > 0 && (
-                <div className="absolute inset-x-0 top-full z-40 mt-1.5 overflow-hidden rounded-2xl border border-white/15 bg-white shadow-2xl dark:border-[#2E3440] dark:bg-[#1E2229]">
-                  <div className="flex items-center gap-1.5 border-b border-[#E5E7EB] px-3 py-1.5 text-[11px] font-semibold text-[#6B7280] dark:border-[#2E3440] dark:text-[#9CA3AF]">
-                    <Sparkles size={12} className="text-[#00C853]" />
-                    <span>Sugestões do seu histórico</span>
-                  </div>
-                  {historicalSuggestions.map((agg) => (
-                    <button
-                      key={agg.normalizedKey}
-                      type="button"
-                      onClick={() => {
-                        addSingleItem(agg.displayName, {
-                          category: agg.category,
-                          price: agg.lastPrice > 0 ? agg.lastPrice : null,
-                        });
-                        setInputText('');
-                      }}
-                      className="flex w-full items-center justify-between px-3.5 py-2 text-left text-xs hover:bg-[#F3F4F6] dark:hover:bg-[#181B20]"
-                    >
-                      <span className="flex items-center gap-2 font-semibold text-[#111827] dark:text-[#F3F4F6]">
-                        <CategoryIcon category={agg.category} size={14} />
-                        {agg.displayName}
-                      </span>
-                      <span className="font-bold text-[#00C853]">
-                        {AppFormatters.formatCurrency(agg.lastPrice)}
-                      </span>
-                    </button>
-                  ))}
+            {/* Autocomplete suggestions dropdown */}
+            {historicalSuggestions.length > 0 && (
+              <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] shadow-lg">
+                <div className="flex items-center gap-2 border-b border-[var(--border-hairline)] px-3 py-2 text-xs font-medium text-[var(--text-muted)]">
+                  <History size={14} strokeWidth={1.5} />
+                  <span>Sugestões do seu histórico</span>
                 </div>
-              )}
-            </form>
-          </div>
-
-          {/* Organic Wave Cut at the bottom of the image */}
-          <div className="pointer-events-none absolute -bottom-1 left-0 right-0 z-10 w-full overflow-hidden leading-none">
-            <svg
-              viewBox="0 0 1000 60"
-              preserveAspectRatio="none"
-              className="h-10 w-full fill-[#F8F9FA] transition-colors sm:h-12 dark:fill-[#121417]"
-            >
-              <path d="M 0 60 L 0 32 Q 260 12, 540 38 Q 800 64, 1000 42 L 1000 60 Z" />
-            </svg>
-          </div>
+                {historicalSuggestions.map((agg) => (
+                  <button
+                    key={agg.normalizedKey}
+                    type="button"
+                    onClick={() => {
+                      addSingleItem(agg.displayName, {
+                        category: agg.category,
+                        price: agg.lastPrice > 0 ? agg.lastPrice : null,
+                      });
+                      setInputText('');
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                  >
+                    <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+                      <CategoryIcon category={agg.category} size={16} />
+                      {agg.displayName}
+                    </span>
+                    <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
+                      {AppFormatters.formatCurrency(agg.lastPrice)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </form>
         </div>
       </div>
 
       <PwaInstallBanner />
 
-      <div className="mx-auto max-w-2xl space-y-3 px-4 pt-1">
-        {/* Market Aisle Order Selector Chips */}
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
+        {/* Market Aisle Order Selector */}
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
           {markets.map((m) => {
             const active = selectedMarket.id === m.id;
@@ -388,39 +376,43 @@ export function ShoppingListPage({
                 key={m.id}
                 type="button"
                 onClick={() => selectMarket(m.id)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-[color,background-color,border-color,transform] duration-150 ease-ui active:scale-[0.98] ${
                   active
-                    ? 'bg-[#00C853] text-white shadow-xs'
-                    : 'border border-[#E5E7EB] bg-white text-[#6B7280] dark:border-[#2E3440] dark:bg-[#1E2229] dark:text-[#9CA3AF]'
+                    ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                    : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                {active ? <Check size={13} className="stroke-[3]" /> : <Store size={13} />}
+                {active ? (
+                  <Check size={14} strokeWidth={1.75} />
+                ) : (
+                  <Store size={14} strokeWidth={1.5} />
+                )}
                 <span>{m.name}</span>
               </button>
             );
           })}
         </div>
 
-        {/* List Title Row (matching image 1) */}
-        <div className="flex items-center justify-between pt-1">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-[#111827] dark:text-[#F3F4F6]">
+        {/* List Title Row */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-medium tracking-tight text-[var(--text-primary)]">
               Lista • {selectedMarket.name}
             </h1>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
               Itens organizados na ordem de setores de {selectedMarket.name}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => setShowFilters(true)}
               aria-label="Filtros"
-              className="relative flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-black/5 dark:text-[#9CA3AF] dark:hover:bg-white/5 active:scale-95"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
             >
-              <SlidersHorizontal size={18} />
+              <SlidersHorizontal size={18} strokeWidth={1.5} />
               {(categoryFilter || !showCheckedItems) && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#00C853]" />
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--accent)]" />
               )}
             </button>
 
@@ -429,13 +421,13 @@ export function ShoppingListPage({
                 type="button"
                 onClick={() => setShowListMenu(!showListMenu)}
                 aria-label="Mais opções"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-black/5 dark:text-[#9CA3AF] dark:hover:bg-white/5 active:scale-95"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
               >
-                <MoreVertical size={18} />
+                <MoreVertical size={18} strokeWidth={1.5} />
               </button>
 
               {showListMenu && (
-                <div className="absolute right-0 top-10 z-40 w-48 rounded-2xl border border-[#E5E7EB] bg-white p-1.5 shadow-xl dark:border-[#2E3440] dark:bg-[#1E2229]">
+                <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-1.5 shadow-lg">
                   {checkedCount > 0 && (
                     <button
                       type="button"
@@ -443,9 +435,9 @@ export function ShoppingListPage({
                         clearCheckedItems();
                         setShowListMenu(false);
                       }}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={15} strokeWidth={1.5} />
                       <span>Limpar marcados ({checkedCount})</span>
                     </button>
                   )}
@@ -455,9 +447,9 @@ export function ShoppingListPage({
                       uncheckAllItems();
                       setShowListMenu(false);
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#111827] hover:bg-black/5 dark:text-[#F3F4F6] dark:hover:bg-white/5"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                   >
-                    <RotateCcw size={14} />
+                    <RotateCcw size={15} strokeWidth={1.5} />
                     <span>Desmarcar todos</span>
                   </button>
                   <button
@@ -472,9 +464,9 @@ export function ShoppingListPage({
                         setShowListMenu(false);
                       }
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={15} strokeWidth={1.5} />
                     <span>Limpar toda a lista</span>
                   </button>
                   <button
@@ -483,10 +475,10 @@ export function ShoppingListPage({
                       setShowFinish(true);
                       setShowListMenu(false);
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-[#00C853] hover:bg-[#00C853]/10"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
                   >
-                    <ShoppingBag size={14} />
-                    <span>Finalizar Compra</span>
+                    <ShoppingBag size={15} strokeWidth={1.5} />
+                    <span>Finalizar compra</span>
                   </button>
                 </div>
               )}
@@ -499,18 +491,18 @@ export function ShoppingListPage({
           <button
             type="button"
             onClick={() => setShowSavings(true)}
-            className="flex w-full items-center gap-3 rounded-2xl border border-[#00C853]/30 bg-[#00C853]/10 px-3.5 py-2.5 text-left transition active:scale-99"
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-3 text-left shadow-2xs transition-[background-color,border-color,transform] duration-150 ease-ui hover:bg-[var(--bg-subtle)] active:scale-[0.99]"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#00C853]/15 text-[#00C853]">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-fg)]">
               {activeMarketBargainGroup ? (
-                <Tag size={16} />
+                <Tag size={16} strokeWidth={1.5} />
               ) : (
-                <PiggyBank size={17} />
+                <PiggyBank size={16} strokeWidth={1.5} />
               )}
             </div>
             <div className="min-w-0 flex-1">
               {activeMarketBargainGroup ? (
-                <p className="truncate text-xs font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                <p className="truncate text-xs font-medium text-[var(--text-primary)]">
                   Mais baratos no {activeMarketBargainGroup.market.name}:{' '}
                   {activeMarketBargainGroup.bargains
                     .map((b) => b.item.name)
@@ -518,10 +510,10 @@ export function ShoppingListPage({
                 </p>
               ) : (
                 <>
-                  <p className="text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                    Veja onde seus itens estão mais baratos
+                  <p className="text-xs font-medium text-[var(--text-primary)]">
+                    Economia identificada no seu histórico
                   </p>
-                  <p className="truncate text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
+                  <p className="truncate text-xs text-[var(--text-muted)]">
                     {bargainGroups[0].market.name}:{' '}
                     {bargainGroups[0].bargains
                       .slice(0, 3)
@@ -531,24 +523,22 @@ export function ShoppingListPage({
                 </>
               )}
             </div>
-            <span className="flex shrink-0 items-center gap-0.5 rounded-lg bg-[#00C853] px-2.5 py-1 text-[11px] font-bold text-white">
-              Ver <ChevronRight size={13} />
+            <span className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)]">
+              Ver <ChevronRight size={14} strokeWidth={1.5} />
             </span>
           </button>
         )}
 
-
-
-        {/* Active category filter pill */}
+        {/* Active category filter strip */}
         {categoryFilter && (
-          <div className="flex items-center justify-between rounded-xl bg-[#00C853]/10 px-3 py-2 text-xs">
-            <span className="font-semibold text-[#111827] dark:text-[#F3F4F6]">
+          <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs">
+            <span className="font-medium text-[var(--text-primary)]">
               Categoria: {PRODUCT_CATEGORY_MAP[categoryFilter].label}
             </span>
             <button
               type="button"
               onClick={() => useShoppingStore.getState().setCategoryFilter(null)}
-              className="font-bold text-[#00C853]"
+              className="font-medium text-[var(--accent-fg)] hover:underline"
             >
               Limpar filtro
             </button>
@@ -557,20 +547,19 @@ export function ShoppingListPage({
 
         {/* Shopping Items List */}
         {filteredAndSortedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-[#E5E7EB] bg-white px-6 py-12 text-center dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00C853]/12 text-[#00C853]">
-              <ShoppingCart size={32} />
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-surface)] px-6 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)]">
+              <ShoppingCart size={22} strokeWidth={1.5} />
             </div>
-            <h2 className="mt-4 text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <h2 className="mt-4 text-base font-medium text-[var(--text-primary)]">
               Sua lista está vazia
             </h2>
-            <p className="mt-1 max-w-xs text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Digite um item acima ou cole uma lista inteira de supermercado (ex.:{' '}
-              <em>2kg Arroz, 3x Leite, Tomate</em>).
+            <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--text-secondary)]">
+              Digite um item acima ou cole uma lista inteira de supermercado, como 2kg Arroz, 3x Leite, Tomate
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {filteredAndSortedItems.map((item) => {
               const bestRec = recommendCheapestMarketForProduct(item.name);
 
@@ -593,26 +582,26 @@ export function ShoppingListPage({
         )}
       </div>
 
-      {/* Floating Finalizar Compra Pill Button (matching Flutter UI) */}
+      {/* Finish Purchase Action */}
       {items.length > 0 && (
         <button
           type="button"
           onClick={() => setShowFinish(true)}
           title={`Total no carrinho: ${AppFormatters.formatCurrency(checkedTotal)} | Estimado: ${AppFormatters.formatCurrency(totalEstimated)}`}
-          className="fixed right-4 bottom-20 z-30 flex items-center gap-2.5 rounded-2xl bg-[#00C853] px-5 py-3.5 text-sm font-bold text-white shadow-xl transition active:scale-95 hover:bg-[#00b34a]"
+          className="fixed right-4 bottom-20 z-30 flex h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-ink)] shadow-lg transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
         >
-          <ShoppingBag size={18} />
+          <ShoppingBag size={18} strokeWidth={1.5} />
           <span>
             {checkedCount > 0
               ? `Finalizar (${checkedCount})`
-              : 'Finalizar Compra'}
+              : 'Finalizar compra'}
           </span>
         </button>
       )}
 
       {/* Toast Feedback */}
       {toastMsg && (
-        <div className="fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111827] px-4 py-2 text-xs font-semibold text-white shadow-xl dark:bg-[#F3F4F6] dark:text-[#111827]">
+        <div className="fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2 text-xs font-medium text-[var(--bg-app)] shadow-lg">
           {toastMsg}
         </div>
       )}
@@ -635,7 +624,7 @@ export function ShoppingListPage({
         <FinishPurchaseModal
           onClose={() => setShowFinish(false)}
           onFinished={(mkt, count) =>
-            showToast(`Compra em ${mkt} (${count} itens) salva no histórico!`)
+            showToast(`Compra em ${mkt} (${count} itens) salva no histórico`)
           }
         />
       )}

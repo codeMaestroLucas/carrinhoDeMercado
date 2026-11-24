@@ -66,43 +66,49 @@ export function PwaInstallBanner() {
   };
 
   return (
-    <div className="mx-4 mt-3 flex items-start gap-3 rounded-2xl border border-[#00C853]/30 bg-[#00C853]/10 p-3 text-xs text-[#111827] dark:text-[#F3F4F6]">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#00C853] text-white">
-        {showIosGuide ? <Share size={16} /> : <Download size={16} />}
+    <div className="mx-auto mt-3 max-w-2xl px-4">
+      <div className="flex items-start gap-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-xs text-[var(--text-primary)] shadow-2xs">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-fg)]">
+          {showIosGuide ? (
+            <Share size={16} strokeWidth={1.5} />
+          ) : (
+            <Download size={16} strokeWidth={1.5} />
+          )}
+        </div>
+        <div className="flex-1">
+          {deferredPrompt ? (
+            <>
+              <p className="text-sm font-medium">Instalar Carrinho de Compras</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                Adicione à tela inicial para usar offline no mercado
+              </p>
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                className="mt-3 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+              >
+                Instalar app
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium">Instalar no iPhone</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                Toque em <strong>Compartilhar</strong> no Safari e escolha{' '}
+                <strong>Adicionar à Tela de Início</strong>
+              </p>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Fechar dica de instalação"
+          className="rounded-lg p-1 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+        >
+          <X size={16} strokeWidth={1.5} />
+        </button>
       </div>
-      <div className="flex-1">
-        {deferredPrompt ? (
-          <>
-            <p className="font-bold">Instalar Carrinho de Compras</p>
-            <p className="mt-0.5 text-[#6B7280] dark:text-[#9CA3AF]">
-              Adicione à tela inicial para usar offline no mercado como app nativo.
-            </p>
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              className="mt-2 rounded-lg bg-[#00C853] px-3 py-1.5 text-xs font-bold text-white transition active:scale-95"
-            >
-              Instalar App
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="font-bold">Instalar no iPhone / iPad</p>
-            <p className="mt-0.5 text-[#6B7280] dark:text-[#9CA3AF]">
-              Toque no botão <strong>Compartilhar</strong> da barra do Safari e escolha{' '}
-              <strong>&ldquo;Adicionar à Tela de Início&rdquo;</strong>.
-            </p>
-          </>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Fechar dica de instalação"
-        className="rounded-lg p-1 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF] dark:hover:bg-white/10"
-      >
-        <X size={15} />
-      </button>
     </div>
   );
 }

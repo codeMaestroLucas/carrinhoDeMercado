@@ -99,7 +99,7 @@ export function ReceiptImportModal({
     } catch (err) {
       setIsCameraActive(false);
       setStatusError(
-        `Não foi possível iniciar a câmera (${err instanceof Error ? err.message : String(err)}). Verifique a permissão ou cole o link/chave abaixo.`,
+        `Não foi possível iniciar a câmera (${err instanceof Error ? err.message : String(err)}). Verifique a permissão ou cole o link abaixo`,
       );
     }
   };
@@ -133,7 +133,7 @@ export function ReceiptImportModal({
       } else {
         setStatusError(
           res.errorMessage ??
-            'Não foi possível extrair os itens automaticamente.',
+            'Não foi possível extrair os itens automaticamente',
         );
       }
     } finally {
@@ -157,7 +157,7 @@ export function ReceiptImportModal({
         setPasteText(text);
         setMode('paste');
         setStatusError(
-          'OCR concluiu, mas nenhum item com preço claro foi detectado automaticamente. Revise o texto abaixo.',
+          'OCR concluiu sem detectar preços claros. Revise o texto abaixo',
         );
       } else {
         setScannedItems(items);
@@ -202,7 +202,7 @@ export function ReceiptImportModal({
     const items = ReceiptScannerService.parseReceiptText(raw);
     if (items.length === 0) {
       setStatusError(
-        'Nenhum item com preço válido encontrado no texto colado.',
+        'Nenhum item com preço válido encontrado no texto colado',
       );
     } else {
       setScannedItems(items);
@@ -274,15 +274,15 @@ export function ReceiptImportModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#F8F9FA] p-5 pb-8 shadow-2xl dark:bg-[#121417] sm:rounded-3xl"
+        className="max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-extrabold text-[#111827] dark:text-[#F3F4F6]">
-              Importar Compra / Cupom Fiscal
+            <h2 className="text-base font-medium text-[var(--text-primary)]">
+              Importar cupom fiscal
             </h2>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              QR Code NFC-e, Foto OCR ou colagem manual
+            <p className="text-xs text-[var(--text-muted)]">
+              QR Code NFC-e, foto OCR ou entrada manual
             </p>
           </div>
           <button
@@ -291,14 +291,15 @@ export function ReceiptImportModal({
               void stopCamera();
               onClose();
             }}
-            className="rounded-full p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+            aria-label="Fechar importação"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={20} />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         {/* Mode Tabs */}
-        <div className="mb-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-[#E5E7EB]/60 p-1 dark:bg-[#1E2229]">
+        <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1">
           {[
             { id: 'qr' as const, label: 'QR Code', icon: QrCode },
             { id: 'ocr' as const, label: 'Foto OCR', icon: Camera },
@@ -314,13 +315,13 @@ export function ReceiptImportModal({
                   if (mode === 'qr' && tab.id !== 'qr') void stopCamera();
                   setMode(tab.id);
                 }}
-                className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition ${
+                className={`flex h-8 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
                   active
-                    ? 'bg-white text-[#00C853] shadow-2xs dark:bg-[#121417]'
-                    : 'text-[#6B7280] dark:text-[#9CA3AF]'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                <Icon size={15} />
+                <Icon size={15} strokeWidth={1.5} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -329,32 +330,32 @@ export function ReceiptImportModal({
 
         <div className="space-y-4">
           {/* Target Market */}
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3.5 dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-xs font-bold text-[#6B7280] dark:text-[#9CA3AF]">
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-medium text-[var(--text-secondary)]">
                 Supermercado da compra
               </label>
               <button
                 type="button"
                 onClick={() => setIsCreatingMarket((v) => !v)}
-                className="text-[11px] font-bold text-[#00C853]"
+                className="text-xs font-medium text-[var(--accent-fg)] hover:underline"
               >
-                {isCreatingMarket ? 'Escolher existente' : '+ Novo mercado'}
+                {isCreatingMarket ? 'Escolher existente' : 'Novo mercado'}
               </button>
             </div>
             {isCreatingMarket ? (
               <input
                 type="text"
-                placeholder="Nome do novo supermercado..."
+                placeholder="Nome do supermercado"
                 value={newMarketName}
                 onChange={(e) => setNewMarketName(e.target.value)}
-                className="w-full rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs font-semibold text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
               />
             ) : (
               <select
                 value={marketId}
                 onChange={(e) => setMarketId(e.target.value)}
-                className="w-full rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs font-semibold text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               >
                 {markets.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -367,10 +368,10 @@ export function ReceiptImportModal({
 
           {/* QR Code Mode */}
           {mode === 'qr' && (
-            <div className="space-y-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
+            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
               <div
                 id={qrRegionId}
-                className={`overflow-hidden rounded-2xl bg-black ${
+                className={`overflow-hidden rounded-xl bg-black ${
                   isCameraActive ? 'block min-h-[240px]' : 'hidden'
                 }`}
               />
@@ -378,51 +379,51 @@ export function ReceiptImportModal({
                 <button
                   type="button"
                   onClick={() => void startQrCamera()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#00C853] py-2.5 text-xs font-bold text-white"
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
                 >
-                  <QrCode size={16} />
-                  Abrir Câmera para Ler QR Code NFC-e
+                  <QrCode size={16} strokeWidth={1.5} />
+                  Abrir câmera para ler QR Code
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => void stopCamera()}
-                  className="w-full rounded-xl border border-red-500/30 bg-red-500/10 py-2 text-xs font-bold text-red-600"
+                  className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--negative-soft)] text-xs font-medium text-[var(--negative)]"
                 >
-                  Parar Câmera
+                  Parar câmera
                 </button>
               )}
 
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Ou cole o link da SEFAZ / chave de 44 dígitos..."
+                  placeholder="Link da SEFAZ ou chave de 44 dígitos"
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
-                  className="flex-1 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="button"
                   disabled={!qrInput.trim() || isProcessing}
                   onClick={() => void handleProcessQrOrKey(qrInput)}
-                  className="rounded-xl bg-[#111827] px-3.5 py-2 text-xs font-bold text-white disabled:opacity-40 dark:bg-[#F3F4F6] dark:text-[#111827]"
+                  className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] disabled:opacity-40"
                 >
                   Ler
                 </button>
               </div>
 
               {resolvedSefazUrl && (
-                <div className="flex items-center justify-between rounded-xl bg-[#00C853]/10 px-3 py-2 text-[11px]">
-                  <span className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                <div className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2 text-xs">
+                  <span className="truncate font-medium text-[var(--text-primary)]">
                     Portal SEFAZ identificado
                   </span>
                   <a
                     href={resolvedSefazUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="ml-2 flex shrink-0 items-center gap-1 font-bold text-[#00C853] hover:underline"
+                    className="ml-2 flex shrink-0 items-center gap-1 font-medium text-[var(--accent-fg)] hover:underline"
                   >
-                    Abrir nota <ExternalLink size={12} />
+                    Abrir nota <ExternalLink size={13} strokeWidth={1.5} />
                   </a>
                 </div>
               )}
@@ -431,14 +432,14 @@ export function ReceiptImportModal({
 
           {/* OCR Photo Mode */}
           {mode === 'ocr' && (
-            <div className="space-y-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 text-center dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#00C853]/40 bg-[#00C853]/5 px-4 py-7 transition hover:bg-[#00C853]/10">
-                <Upload size={26} className="text-[#00C853]" />
-                <span className="text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-center">
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-8 transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]">
+                <Upload size={22} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+                <span className="text-xs font-medium text-[var(--text-primary)]">
                   Fotografar ou escolher imagem do cupom
                 </span>
-                <span className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                  Reconhecimento OCR direto no navegador (funciona offline)
+                <span className="text-xs text-[var(--text-muted)]">
+                  Reconhecimento direto no navegador
                 </span>
                 <input
                   type="file"
@@ -450,15 +451,15 @@ export function ReceiptImportModal({
               </label>
 
               {ocrProgress != null && (
-                <div className="space-y-1">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-[#2E3440]">
+                <div className="space-y-1.5">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
                     <div
-                      className="h-full bg-[#00C853] transition-all"
+                      className="h-full bg-[var(--accent)] transition-[width] duration-150 ease-ui"
                       style={{ width: `${ocrProgress}%` }}
                     />
                   </div>
-                  <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
-                    Lendo cupom fiscal... {ocrProgress}%
+                  <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                    Lendo cupom fiscal ({ocrProgress}%)
                   </p>
                 </div>
               )}
@@ -467,33 +468,33 @@ export function ReceiptImportModal({
 
           {/* Paste Text / HTML / Manual Mode */}
           {mode === 'paste' && (
-            <div className="space-y-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
+            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
               <textarea
                 rows={4}
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                placeholder="Cole aqui o texto copiado da página da SEFAZ ou do cupom fiscal..."
-                className="w-full rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] p-3 text-xs text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                placeholder="Cole aqui o texto copiado da página da SEFAZ ou do cupom fiscal"
+                className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
               />
               <button
                 type="button"
                 disabled={!pasteText.trim()}
                 onClick={handleParsePastedContent}
-                className="w-full rounded-xl bg-[#00C853] py-2 text-xs font-bold text-white disabled:opacity-40"
+                className="h-9 w-full rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] disabled:opacity-40"
               >
-                Extrair Itens do Texto
+                Extrair itens do texto
               </button>
 
               <form
                 onSubmit={handleAddManualItem}
-                className="flex gap-2 border-t border-[#E5E7EB] pt-3 dark:border-[#2E3440]"
+                className="flex gap-2 border-t border-[var(--border-hairline)] pt-3"
               >
                 <input
                   type="text"
-                  placeholder="Adicionar item manual..."
+                  placeholder="Item manual"
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
-                  className="flex-1 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-3 py-2 text-xs text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
                 />
                 <input
                   type="text"
@@ -501,33 +502,33 @@ export function ReceiptImportModal({
                   placeholder="Preço"
                   value={manualPrice}
                   onChange={(e) => setManualPrice(e.target.value)}
-                  className="w-20 rounded-xl border border-[#E5E7EB] bg-[#F3F4F6] px-2.5 py-2 text-xs font-bold text-[#111827] outline-none dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                  className="font-mono-tabular h-9 w-24 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="submit"
                   aria-label="Adicionar item manual"
-                  className="flex items-center justify-center rounded-xl bg-[#111827] px-3 text-white dark:bg-[#F3F4F6] dark:text-[#111827]"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text-primary)] text-[var(--bg-app)]"
                 >
-                  <Plus size={16} />
+                  <Plus size={16} strokeWidth={1.5} />
                 </button>
               </form>
             </div>
           )}
 
           {statusError && (
-            <div className="rounded-2xl bg-amber-500/12 p-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <div className="rounded-xl border border-[#B45309]/25 bg-[#FEF3C7]/60 p-3 text-xs font-medium text-[#92400E] dark:bg-[#78350F]/25 dark:text-[#FCD34D]">
               {statusError}
             </div>
           )}
 
-          {/* Extracted Items Preview & Editor */}
+          {/* Extracted Items Preview */}
           {scannedItems.length > 0 && (
-            <div className="space-y-2.5 rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
+            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-extrabold text-[#111827] dark:text-[#F3F4F6]">
-                  Itens Identificados ({scannedItems.length})
+                <h3 className="text-xs font-medium text-[var(--text-primary)]">
+                  Itens identificados (<span className="font-mono-tabular">{scannedItems.length}</span>)
                 </h3>
-                <span className="text-xs font-extrabold text-[#00C853]">
+                <span className="font-mono-tabular text-xs font-medium text-[var(--accent-fg)]">
                   Total: {AppFormatters.formatCurrency(totalExtracted)}
                 </span>
               </div>
@@ -536,7 +537,7 @@ export function ReceiptImportModal({
                 {scannedItems.map((item, idx) => (
                   <div
                     key={`${item.name}_${idx}`}
-                    className="flex items-center gap-2 rounded-xl bg-[#F8F9FA] p-2.5 text-xs dark:bg-[#181B20]"
+                    className="flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] p-2.5 text-xs"
                   >
                     <div className="min-w-0 flex-1 space-y-1">
                       <input
@@ -550,7 +551,7 @@ export function ReceiptImportModal({
                             ),
                           );
                         }}
-                        className="w-full bg-transparent font-bold text-[#111827] outline-none dark:text-[#F3F4F6]"
+                        className="w-full bg-transparent font-medium text-[var(--text-primary)] outline-none"
                       />
                       <div className="flex items-center gap-2">
                         <select
@@ -563,7 +564,7 @@ export function ReceiptImportModal({
                               ),
                             );
                           }}
-                          className="rounded-lg bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#6B7280] outline-none dark:bg-[#1E2229] dark:text-[#9CA3AF]"
+                          className="rounded border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)] outline-none"
                         >
                           {PRODUCT_CATEGORIES.map((c) => (
                             <option key={c.id} value={c.id}>
@@ -571,13 +572,13 @@ export function ReceiptImportModal({
                             </option>
                           ))}
                         </select>
-                        <span className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                        <span className="font-mono-tabular text-[11px] text-[var(--text-muted)]">
                           {AppFormatters.formatQuantity(item.quantity, item.unit)}
                         </span>
                       </div>
                     </div>
 
-                    <span className="shrink-0 font-bold text-[#00C853]">
+                    <span className="font-mono-tabular shrink-0 font-medium text-[var(--accent-fg)]">
                       {AppFormatters.formatCurrency(item.price)}
                     </span>
 
@@ -589,9 +590,9 @@ export function ReceiptImportModal({
                         )
                       }
                       aria-label="Remover item extraído"
-                      className="rounded-lg p-1 text-red-500 hover:bg-red-500/10"
+                      className="rounded-lg p-1 text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} strokeWidth={1.5} />
                     </button>
                   </div>
                 ))}
@@ -600,10 +601,10 @@ export function ReceiptImportModal({
               <button
                 type="button"
                 onClick={handleSavePurchase}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#00C853] py-3 text-xs font-bold text-white shadow-sm"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
               >
-                <Check size={16} />
-                Salvar Compra no Histórico
+                <Check size={16} strokeWidth={1.5} />
+                Salvar compra no histórico
               </button>
             </div>
           )}

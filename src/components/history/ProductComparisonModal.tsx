@@ -45,7 +45,7 @@ export function ProductComparisonModal({
     if (!itemA || !itemB || itemA.averagePrice <= 0 || itemB.averagePrice <= 0)
       return null;
     if (Math.abs(itemA.averagePrice - itemB.averagePrice) < 0.05) {
-      return 'Ambos possuem praticamente o mesmo preço médio histórico.';
+      return 'Ambos possuem praticamente o mesmo preço médio histórico';
     }
     const cheaper = itemA.averagePrice < itemB.averagePrice ? itemA : itemB;
     const expensive = cheaper === itemA ? itemB : itemA;
@@ -53,7 +53,7 @@ export function ProductComparisonModal({
       ((expensive.averagePrice - cheaper.averagePrice) /
         expensive.averagePrice) *
       100;
-    return `${cheaper.displayName} costuma ser ${pct.toFixed(0)}% mais barato na média do que ${expensive.displayName}.`;
+    return `${cheaper.displayName} costuma ser ${pct.toFixed(0)}% mais barato na média do que ${expensive.displayName}`;
   }, [itemA, itemB]);
 
   return (
@@ -63,36 +63,35 @@ export function ProductComparisonModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#F8F9FA] p-5 pb-8 shadow-2xl dark:bg-[#121417] sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#00C853]/12 text-[#00C853]">
-              <GitCompareArrows size={19} />
-            </div>
-            <h2 className="text-base font-extrabold text-[#111827] dark:text-[#F3F4F6]">
-              Comparar Produtos
+            <GitCompareArrows size={18} strokeWidth={1.5} className="text-[var(--text-muted)]" />
+            <h2 className="text-base font-medium text-[var(--text-primary)]">
+              Comparar produtos
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+            aria-label="Fechar comparação"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={20} />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-[#00C853]">
+              <label className="mb-1 block text-xs font-medium text-[var(--accent-fg)]">
                 Produto A
               </label>
               <select
                 value={keyA}
                 onChange={(e) => setKeyA(e.target.value)}
-                className="w-full rounded-xl border border-[#00C853]/40 bg-white px-3 py-2 text-xs font-semibold text-[#111827] outline-none dark:bg-[#1E2229] dark:text-[#F3F4F6]"
+                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               >
                 {allAggregates.map((agg) => (
                   <option key={agg.normalizedKey} value={agg.normalizedKey}>
@@ -103,13 +102,13 @@ export function ProductComparisonModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-bold text-blue-500">
+              <label className="mb-1 block text-xs font-medium text-[#B45309] dark:text-[#FBBF24]">
                 Produto B
               </label>
               <select
                 value={keyB}
                 onChange={(e) => setKeyB(e.target.value)}
-                className="w-full rounded-xl border border-blue-500/40 bg-white px-3 py-2 text-xs font-semibold text-[#111827] outline-none dark:bg-[#1E2229] dark:text-[#F3F4F6]"
+                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[#B45309]"
               >
                 {allAggregates.map((agg) => (
                   <option key={agg.normalizedKey} value={agg.normalizedKey}>
@@ -121,8 +120,8 @@ export function ProductComparisonModal({
           </div>
 
           {similarSuggestions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[var(--text-muted)]">
                 Similares a {itemA?.displayName}:
               </span>
               {similarSuggestions.map((s) => (
@@ -130,10 +129,10 @@ export function ProductComparisonModal({
                   key={s.product.normalizedKey}
                   type="button"
                   onClick={() => setKeyB(s.product.normalizedKey)}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors duration-150 ease-ui ${
                     keyB === s.product.normalizedKey
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white text-[#111827] dark:bg-[#1E2229] dark:text-[#F3F4F6]'
+                      ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                      : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                   }`}
                 >
                   {s.product.displayName}
@@ -143,8 +142,8 @@ export function ProductComparisonModal({
           )}
 
           {verdict && (
-            <div className="flex items-center gap-2.5 rounded-2xl border border-[#00C853]/30 bg-[#00C853]/10 p-3 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-              <Award size={18} className="shrink-0 text-[#00C853]" />
+            <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3 text-xs font-medium text-[var(--text-primary)]">
+              <Award size={16} strokeWidth={1.5} className="shrink-0 text-[var(--accent-fg)]" />
               <span>{verdict}</span>
             </div>
           )}
@@ -153,30 +152,26 @@ export function ProductComparisonModal({
             <>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { item: itemA, accent: 'border-[#00C853]/40 text-[#00C853]' },
-                  { item: itemB, accent: 'border-blue-500/40 text-blue-500' },
-                ].map(({ item, accent }) => (
+                  { item: itemA, colorClass: 'text-[var(--accent-fg)]' },
+                  { item: itemB, colorClass: 'text-[#B45309] dark:text-[#FBBF24]' },
+                ].map(({ item, colorClass }) => (
                   <div
                     key={item.normalizedKey}
-                    className={`rounded-2xl border bg-white p-3.5 dark:bg-[#1E2229] ${accent.split(' ')[0]}`}
+                    className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3.5"
                   >
-                    <p className="truncate text-xs font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+                    <p className="truncate text-xs font-medium text-[var(--text-primary)]">
                       {item.displayName}
                     </p>
                     <div className="mt-2 space-y-1 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-[#6B7280] dark:text-[#9CA3AF]">
-                          Média:
-                        </span>
-                        <strong className={accent.split(' ')[1]}>
+                        <span className="text-[var(--text-muted)]">Média</span>
+                        <strong className={`font-mono-tabular font-medium ${colorClass}`}>
                           {AppFormatters.formatCurrency(item.averagePrice)}
                         </strong>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#6B7280] dark:text-[#9CA3AF]">
-                          Menor:
-                        </span>
-                        <strong className="text-[#111827] dark:text-[#F3F4F6]">
+                        <span className="text-[var(--text-muted)]">Menor</span>
+                        <strong className="font-mono-tabular font-medium text-[var(--text-primary)]">
                           {item.minPriceOccurrence
                             ? AppFormatters.formatCurrency(
                                 item.minPriceOccurrence.price,
@@ -185,10 +180,8 @@ export function ProductComparisonModal({
                         </strong>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#6B7280] dark:text-[#9CA3AF]">
-                          Último:
-                        </span>
-                        <strong className="text-[#111827] dark:text-[#F3F4F6]">
+                        <span className="text-[var(--text-muted)]">Último</span>
+                        <strong className="font-mono-tabular font-medium text-[var(--text-primary)]">
                           {AppFormatters.formatCurrency(item.lastPrice)}
                         </strong>
                       </div>
@@ -197,9 +190,9 @@ export function ProductComparisonModal({
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
-                <h3 className="mb-2 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                  Evolução Comparativa
+              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+                <h3 className="mb-3 text-xs font-medium text-[var(--text-primary)]">
+                  Evolução comparativa
                 </h3>
                 <DualPriceComparisonChart itemA={itemA} itemB={itemB} />
               </div>

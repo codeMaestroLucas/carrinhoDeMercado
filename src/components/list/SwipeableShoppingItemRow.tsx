@@ -5,7 +5,7 @@ import {
   getEffectiveTotalAmount,
   type ShoppingItem,
 } from '../../types/shopping';
-import { CategoryIcon } from '../common/CategoryIcon';
+import { CategoryDot, CategoryIcon } from '../common/CategoryIcon';
 import { AppFormatters } from '../../utils/formatters';
 
 interface SwipeableShoppingItemRowProps {
@@ -72,7 +72,6 @@ export function SwipeableShoppingItemRow({
     isLongPressTriggeredRef.current = false;
     clearLongPressTimer();
 
-    // Long press: 500ms opens product configuration
     longPressTimerRef.current = setTimeout(() => {
       isLongPressTriggeredRef.current = true;
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -90,7 +89,6 @@ export function SwipeableShoppingItemRow({
     const deltaX = clientX - startXRef.current;
     const deltaY = clientY - startYRef.current;
 
-    // Detect direction if movement exceeds 8px
     if (isHorizontalSwipeRef.current === null) {
       if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
         isHorizontalSwipeRef.current = Math.abs(deltaX) > Math.abs(deltaY);
@@ -103,10 +101,8 @@ export function SwipeableShoppingItemRow({
     if (isHorizontalSwipeRef.current) {
       clearLongPressTimer();
       currentDeltaXRef.current = deltaX;
-      // Only drag from right to left (deltaX < 0)
       if (deltaX < 0) {
         setIsSwiping(true);
-        // Soft resistance damping past -120px
         const damped = deltaX < -120 ? -120 + (deltaX + 120) * 0.25 : deltaX;
         setTranslateX(damped);
       } else {
@@ -130,7 +126,6 @@ export function SwipeableShoppingItemRow({
 
     if (isSwiping || currentDeltaXRef.current < -15) {
       setIsSwiping(false);
-      // Swipe threshold: past -85px removes item
       if (currentDeltaXRef.current < -85) {
         setIsDismissed(true);
         setTranslateX(-500);
@@ -139,31 +134,29 @@ export function SwipeableShoppingItemRow({
         }, 220);
         return;
       }
-      // Snap back if released before threshold
       setTranslateX(0);
       currentDeltaXRef.current = 0;
       return;
     }
 
-    // Pure click/tap: toggle checked/unchecked
     onToggleChecked(item.id);
   };
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl select-none transition-all duration-200 ${
-        isDismissed ? 'max-h-0 opacity-0 my-0 py-0' : 'max-h-32 my-1'
+      className={`relative overflow-hidden rounded-xl select-none transition-[opacity,transform] duration-200 ease-ui ${
+        isDismissed ? 'pointer-events-none h-0 opacity-0' : 'opacity-100'
       }`}
     >
-      {/* Background red delete container revealed ONLY when dragging left */}
+      {/* Delete reveal layer */}
       <div
-        className={`absolute inset-0 flex items-center justify-end rounded-2xl bg-red-500 px-5 text-white transition-opacity ${
-          translateX < -5 ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`absolute inset-0 flex items-center justify-end rounded-xl bg-[var(--negative)] px-4 text-[#FDFBF7] transition-opacity duration-150 ease-ui ${
+          translateX < -5 ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
-        <div className="flex items-center gap-1.5 text-xs font-bold">
+        <div className="flex items-center gap-2 text-xs font-medium">
           <span>Remover</span>
-          <Trash2 size={18} />
+          <Trash2 size={16} strokeWidth={1.5} />
         </div>
       </div>
 
@@ -182,64 +175,61 @@ export function SwipeableShoppingItemRow({
         onContextMenu={(e) => e.preventDefault()}
         style={{
           transform: `translateX(${translateX}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.22s ease-out',
+          transition: isSwiping ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
-        className="relative flex items-center gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-2xs cursor-pointer touch-pan-y transition-colors dark:border-[#2E3440] dark:bg-[#1E2229]"
+        className={`relative flex cursor-pointer touch-pan-y items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3 shadow-2xs transition-colors duration-150 ease-ui ${
+          item.isChecked ? 'opacity-70' : ''
+        }`}
       >
-        {/* Category Icon Badge with Checkmark State */}
+        {/* Status / Category Box */}
         <div
-          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition"
-          style={{
-            backgroundColor: item.isChecked
-              ? 'rgba(0, 200, 83, 0.16)'
-              : `${catInfo.color}22`,
-            color: item.isChecked ? '#00C853' : catInfo.color,
-          }}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-150 ease-ui ${
+            item.isChecked
+              ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]'
+              : 'border-[var(--border-hairline)] bg-[var(--bg-subtle)]'
+          }`}
         >
-          <CategoryIcon category={item.category} size={20} />
-          {item.isChecked && (
-            <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#00C853] text-white shadow-xs">
-              <Check size={11} strokeWidth={3.5} />
-            </span>
+          {item.isChecked ? (
+            <Check size={16} strokeWidth={2} />
+          ) : (
+            <CategoryIcon category={item.category} size={18} />
           )}
         </div>
 
         {/* Product Information */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`truncate text-sm font-bold ${
-                item.isChecked
-                  ? 'text-[#6B7280] line-through dark:text-[#9CA3AF]'
-                  : 'text-[#111827] dark:text-[#F3F4F6]'
-              }`}
-            >
-              {item.name}
-            </span>
-          </div>
+          <p
+            className={`truncate text-sm font-medium leading-5 ${
+              item.isChecked
+                ? 'text-[var(--text-muted)] line-through'
+                : 'text-[var(--text-primary)]'
+            }`}
+          >
+            {item.name}
+          </p>
 
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-            <span className="font-semibold" style={{ color: catInfo.color }}>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs leading-4 text-[var(--text-muted)]">
+            <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
+              <CategoryDot category={item.category} />
               {catInfo.label}
             </span>
             {total > 0 ? (
-              <span className="font-bold text-[#00C853]">
-                · {AppFormatters.formatCurrency(total)}
+              <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
+                {AppFormatters.formatCurrency(total)}
               </span>
             ) : (
-              <span className="text-[#10B981]">· Informar preço</span>
+              <span>Sem preço</span>
             )}
             {cheapestMarketName && (
-              <span className="rounded-md bg-[#00C853]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#00C853]">
-                + barato: {cheapestMarketName}
+              <span className="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                Menor em {cheapestMarketName}
               </span>
             )}
           </div>
         </div>
 
-        {/* Right side controls: Tag/price status icon & Quantity stepper */}
+        {/* Right Controls */}
         <div className="flex shrink-0 items-center gap-2">
-          {/* Tag icon (quick edit button) */}
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
@@ -247,21 +237,21 @@ export function SwipeableShoppingItemRow({
               e.stopPropagation();
               onOpenEdit(item);
             }}
-            title={hasPrice ? 'Editar produto (precificado)' : 'Editar produto'}
-            className={`flex h-8 w-8 items-center justify-center rounded-full border transition active:scale-90 ${
+            title={hasPrice ? 'Editar produto e preço' : 'Informar preço'}
+            aria-label={`Editar ${item.name}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-[color,background-color,border-color,transform] duration-150 ease-ui active:scale-[0.98] ${
               hasPrice
-                ? 'border-[#00C853]/40 bg-[#00C853]/10 text-[#00C853]'
-                : 'border-[#E5E7EB] text-[#9CA3AF] hover:text-[#6B7280] dark:border-[#2E3440]'
+                ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                : 'border-[var(--border-hairline)] text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Tag size={13} />
+            <Tag size={15} strokeWidth={1.5} />
           </button>
 
-          {/* Quantity stepper (stopPropagation to prevent toggling check) */}
           <div
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 rounded-xl bg-[#F3F4F6] p-1 dark:bg-[#181B20]"
+            className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1"
           >
             <button
               type="button"
@@ -270,11 +260,11 @@ export function SwipeableShoppingItemRow({
                 onUpdateQuantity(item.id, Math.max(1, item.quantity - 1));
               }}
               aria-label="Diminuir quantidade"
-              className="flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-white dark:text-[#9CA3AF] dark:hover:bg-[#1E2229] transition active:scale-90"
+              className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-[background-color,color,transform] duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-[0.98]"
             >
-              <Minus size={13} />
+              <Minus size={14} strokeWidth={1.5} />
             </button>
-            <span className="min-w-[34px] text-center text-[11px] font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <span className="font-mono-tabular min-w-[40px] text-center text-xs font-medium text-[var(--text-primary)]">
               {item.quantity} {item.unit}
             </span>
             <button
@@ -284,9 +274,9 @@ export function SwipeableShoppingItemRow({
                 onUpdateQuantity(item.id, item.quantity + 1);
               }}
               aria-label="Aumentar quantidade"
-              className="flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-white dark:text-[#9CA3AF] dark:hover:bg-[#1E2229] transition active:scale-90"
+              className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-[background-color,color,transform] duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-[0.98]"
             >
-              <Plus size={13} />
+              <Plus size={14} strokeWidth={1.5} />
             </button>
           </div>
         </div>

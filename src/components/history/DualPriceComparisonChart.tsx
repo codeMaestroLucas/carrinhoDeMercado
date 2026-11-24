@@ -54,25 +54,46 @@ export function DualPriceComparisonChart({
   return (
     <div className="h-56 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#9CA3AF" strokeOpacity={0.2} />
+        <LineChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+          <CartesianGrid
+            vertical={false}
+            strokeDasharray="3 3"
+            stroke="#8A847A"
+            strokeOpacity={0.2}
+          />
           <XAxis
             dataKey="dateLabel"
-            tick={{ fontSize: 10, fill: '#9CA3AF' }}
+            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#9CA3AF' }}
+            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `R$${v.toFixed(0)}`}
           />
           <Tooltip
-            formatter={(value: number) => AppFormatters.formatCurrency(value)}
-            contentStyle={{
-              borderRadius: '12px',
-              fontSize: '12px',
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              return (
+                <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs shadow-md">
+                  <p className="font-mono-tabular mb-1 text-[11px] text-[var(--text-muted)]">
+                    {label}
+                  </p>
+                  {payload.map((entry) => (
+                    <p
+                      key={String(entry.dataKey)}
+                      className="flex items-center justify-between gap-3 text-[var(--text-primary)]"
+                    >
+                      <span>{entry.name}</span>
+                      <span className="font-mono-tabular font-medium">
+                        {AppFormatters.formatCurrency(Number(entry.value ?? 0))}
+                      </span>
+                    </p>
+                  ))}
+                </div>
+              );
             }}
           />
           <Legend wrapperStyle={{ fontSize: '11px' }} />
@@ -80,19 +101,19 @@ export function DualPriceComparisonChart({
             type="monotone"
             dataKey="priceA"
             name={itemA.displayName}
-            stroke="#00C853"
-            strokeWidth={2.5}
+            stroke="#15803D"
+            strokeWidth={2}
             connectNulls
-            dot={{ r: 3.5 }}
+            dot={{ r: 3 }}
           />
           <Line
             type="monotone"
             dataKey="priceB"
             name={itemB.displayName}
-            stroke="#3B82F6"
-            strokeWidth={2.5}
+            stroke="#B45309"
+            strokeWidth={2}
             connectNulls
-            dot={{ r: 3.5 }}
+            dot={{ r: 3 }}
           />
         </LineChart>
       </ResponsiveContainer>

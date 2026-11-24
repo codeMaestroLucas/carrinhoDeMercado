@@ -30,76 +30,74 @@ export function ProductAnalyticsModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-[#F8F9FA] p-5 pb-8 shadow-2xl dark:bg-[#121417] sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#00C853]/12">
-              <CategoryIcon category={aggregate.category} size={22} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]">
+              <CategoryIcon category={aggregate.category} size={18} />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+              <h2 className="text-base font-medium text-[var(--text-primary)]">
                 {aggregate.displayName}
               </h2>
-              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-                {aggregate.pricedOccurrences.length} registro(s) com preço
+              <p className="text-xs text-[var(--text-muted)]">
+                <span className="font-mono-tabular">{aggregate.pricedOccurrences.length}</span>{' '}
+                {aggregate.pricedOccurrences.length === 1
+                  ? 'registro com preço'
+                  : 'registros com preço'}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-[#6B7280] hover:bg-black/5 dark:text-[#9CA3AF]"
+            aria-label="Fechar análise"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={20} />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="space-y-4">
           {/* Metrics grid */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <p className="text-[10px] font-semibold uppercase text-[#6B7280] dark:text-[#9CA3AF]">
-                Menor Preço
-              </p>
-              <p className="mt-1 text-sm font-extrabold text-[#00C853]">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3">
+              <p className="text-xs text-[var(--text-muted)]">Menor preço</p>
+              <p className="font-mono-tabular mt-1 text-sm font-medium text-[var(--accent-fg)]">
                 {aggregate.minPriceOccurrence
                   ? AppFormatters.formatCurrency(aggregate.minPriceOccurrence.price)
                   : '--'}
               </p>
               {aggregate.minPriceOccurrence && (
-                <p className="truncate text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                <p className="truncate text-[11px] text-[var(--text-muted)]">
                   {aggregate.minPriceOccurrence.marketName}
                 </p>
               )}
             </div>
 
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <p className="text-[10px] font-semibold uppercase text-[#6B7280] dark:text-[#9CA3AF]">
-                Preço Médio
-              </p>
-              <p className="mt-1 text-sm font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3">
+              <p className="text-xs text-[var(--text-muted)]">Preço médio</p>
+              <p className="font-mono-tabular mt-1 text-sm font-medium text-[var(--text-primary)]">
                 {AppFormatters.formatCurrency(aggregate.averagePrice)}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <p className="text-[10px] font-semibold uppercase text-[#6B7280] dark:text-[#9CA3AF]">
-                Último Pago
-              </p>
-              <p className="mt-1 text-sm font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3">
+              <p className="text-xs text-[var(--text-muted)]">Último pago</p>
+              <p className="font-mono-tabular mt-1 text-sm font-medium text-[var(--text-primary)]">
                 {AppFormatters.formatCurrency(aggregate.lastPrice)}
               </p>
               {variation != null && Math.abs(variation) >= 0.5 && (
                 <span
-                  className={`inline-flex items-center text-[10px] font-bold ${
-                    variation < 0 ? 'text-[#00C853]' : 'text-red-500'
+                  className={`font-mono-tabular inline-flex items-center text-[11px] font-medium ${
+                    variation < 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
                   }`}
                 >
                   {variation < 0 ? (
-                    <ArrowDownRight size={11} />
+                    <ArrowDownRight size={12} strokeWidth={1.5} />
                   ) : (
-                    <ArrowUpRight size={11} />
+                    <ArrowUpRight size={12} strokeWidth={1.5} />
                   )}
                   {Math.abs(variation).toFixed(1)}%
                 </span>
@@ -108,17 +106,17 @@ export function ProductAnalyticsModal({
           </div>
 
           {aggregate.marketComparisonInsight && (
-            <div className="flex items-center gap-2.5 rounded-2xl border border-[#00C853]/30 bg-[#00C853]/10 p-3 text-xs font-semibold text-[#111827] dark:text-[#F3F4F6]">
-              <Award size={17} className="shrink-0 text-[#00C853]" />
+            <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3 text-xs font-medium text-[var(--text-primary)]">
+              <Award size={16} strokeWidth={1.5} className="shrink-0 text-[var(--accent-fg)]" />
               <span>{aggregate.marketComparisonInsight}</span>
             </div>
           )}
 
           {/* Price Trend Chart */}
           {aggregate.chronologicalPricedOccurrences.length >= 2 && (
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <h3 className="mb-2 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                Evolução de Preço
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <h3 className="mb-3 text-xs font-medium text-[var(--text-primary)]">
+                Evolução de preço
               </h3>
               <PriceTrendChart
                 occurrences={aggregate.chronologicalPricedOccurrences}
@@ -128,26 +126,32 @@ export function ProductAnalyticsModal({
 
           {/* Market Ranking */}
           {aggregate.marketRanking.length > 0 && (
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <h3 className="mb-2.5 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                Ranking de Mercados
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <h3 className="mb-3 text-xs font-medium text-[var(--text-primary)]">
+                Ranking de mercados
               </h3>
               <div className="space-y-2">
                 {aggregate.marketRanking.map((m, idx) => (
                   <div
                     key={m.marketName}
-                    className="flex items-center justify-between rounded-xl bg-[#F8F9FA] px-3 py-2 text-xs dark:bg-[#181B20]"
+                    className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2 text-xs"
                   >
-                    <span className="font-bold text-[#111827] dark:text-[#F3F4F6]">
-                      {idx === 0 ? '🏆 ' : `${idx + 1}. `}
+                    <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+                      <span
+                        className={`font-mono-tabular ${
+                          idx === 0 ? 'text-[var(--accent-fg)]' : 'text-[var(--text-muted)]'
+                        }`}
+                      >
+                        {idx + 1}.
+                      </span>
                       {m.marketName}
                     </span>
-                    <span className="text-[#6B7280] dark:text-[#9CA3AF]">
+                    <span className="text-[var(--text-muted)]">
                       Média{' '}
-                      <strong className="text-[#00C853]">
+                      <strong className="font-mono-tabular font-medium text-[var(--accent-fg)]">
                         {AppFormatters.formatCurrency(m.averagePrice)}
                       </strong>{' '}
-                      ({m.purchaseCount}x)
+                      <span className="font-mono-tabular">({m.purchaseCount}x)</span>
                     </span>
                   </div>
                 ))}
@@ -155,11 +159,11 @@ export function ProductAnalyticsModal({
             </div>
           )}
 
-          {/* Similar products to compare */}
+          {/* Similar products */}
           {similar.length > 0 && onCompareWith && (
-            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-                <GitCompareArrows size={15} className="text-[#00C853]" />
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
+                <GitCompareArrows size={15} strokeWidth={1.5} className="text-[var(--text-muted)]" />
                 <span>Comparar com produto similar</span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -168,10 +172,12 @@ export function ProductAnalyticsModal({
                     key={s.product.normalizedKey}
                     type="button"
                     onClick={() => onCompareWith(s.product)}
-                    className="rounded-xl border border-[#E5E7EB] bg-[#F8F9FA] px-3 py-1.5 text-xs font-semibold text-[#111827] hover:border-[#00C853] dark:border-[#2E3440] dark:bg-[#181B20] dark:text-[#F3F4F6]"
+                    className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:border-[var(--accent)] hover:bg-[var(--bg-subtle)]"
                   >
-                    {s.product.displayName} (
-                    {AppFormatters.formatCurrency(s.product.lastPrice)})
+                    {s.product.displayName}{' '}
+                    <span className="font-mono-tabular text-[var(--text-muted)]">
+                      ({AppFormatters.formatCurrency(s.product.lastPrice)})
+                    </span>
                   </button>
                 ))}
               </div>
@@ -179,25 +185,25 @@ export function ProductAnalyticsModal({
           )}
 
           {/* All occurrences */}
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <h3 className="mb-2 text-xs font-bold text-[#111827] dark:text-[#F3F4F6]">
-              Registros no Histórico
+          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+            <h3 className="mb-2 text-xs font-medium text-[var(--text-primary)]">
+              Registros no histórico
             </h3>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {aggregate.occurrences.map((occ, idx) => (
                 <div
                   key={`${occ.date}_${idx}`}
-                  className="flex items-center justify-between rounded-xl bg-[#F8F9FA] px-3 py-2 text-xs dark:bg-[#181B20]"
+                  className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2 text-xs"
                 >
                   <div>
-                    <p className="font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                    <p className="font-medium text-[var(--text-primary)]">
                       {occ.marketName}
                     </p>
-                    <p className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                    <p className="font-mono-tabular text-[11px] text-[var(--text-muted)]">
                       {AppFormatters.formatShortDate(occ.date)}
                     </p>
                   </div>
-                  <span className="font-bold text-[#00C853]">
+                  <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
                     {AppFormatters.formatCurrency(occ.price)}
                   </span>
                 </div>

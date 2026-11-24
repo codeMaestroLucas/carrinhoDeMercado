@@ -89,8 +89,8 @@ export function HistoryPage({
     }
     showToast(
       added > 0
-        ? `${added} item(ns) adicionado(s) à sua lista!`
-        : 'Todos os itens desta compra já estavam na lista.',
+        ? `${added} ${added === 1 ? 'item adicionado' : 'itens adicionados'} à lista`
+        : 'Todos os itens desta compra já estavam na lista',
     );
     if (added > 0 && onNavigateToList) {
       setTimeout(onNavigateToList, 700);
@@ -98,15 +98,15 @@ export function HistoryPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-24 pt-safe dark:bg-[#121417]">
-      <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/90 px-4 py-3.5 backdrop-blur-md dark:border-[#2E3440] dark:bg-[#1E2229]/90">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-24 pt-safe">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+            <h1 className="text-lg font-medium tracking-tight text-[var(--text-primary)]">
               Histórico &amp; Notas
             </h1>
-            <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              {history.length}{' '}
+            <p className="text-xs text-[var(--text-secondary)]">
+              <span className="font-mono-tabular">{history.length}</span>{' '}
               {history.length === 1
                 ? 'compra registrada'
                 : 'compras registradas'}
@@ -118,34 +118,34 @@ export function HistoryPage({
                 type="button"
                 onClick={() => setShowCompare(true)}
                 aria-label="Comparar produtos"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] dark:border-[#2E3440] dark:bg-[#1E2229] dark:text-[#F3F4F6]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--text-primary)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-app)] active:scale-[0.98]"
               >
-                <GitCompareArrows size={16} />
+                <GitCompareArrows size={17} strokeWidth={1.5} />
               </button>
             )}
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="flex h-9 items-center gap-1.5 rounded-full bg-[#00C853] px-3.5 text-xs font-bold text-white shadow-xs transition active:scale-95"
+              className="flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
             >
-              <QrCode size={15} />
-              <span>Ler Cupom</span>
+              <QrCode size={16} strokeWidth={1.5} />
+              <span>Ler cupom</span>
             </button>
             <ThemeToggleButton />
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
         {marketNames.length > 1 && (
           <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => setMarketFilter('')}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${
+              className={`h-8 shrink-0 rounded-lg border px-3 text-xs font-medium transition-[background-color,color,border-color] duration-150 ease-ui ${
                 !marketFilter
-                  ? 'bg-[#00C853] text-white'
-                  : 'border border-[#E5E7EB] bg-white text-[#6B7280] dark:border-[#2E3440] dark:bg-[#1E2229] dark:text-[#9CA3AF]'
+                  ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                  : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'
               }`}
             >
               Todos
@@ -155,10 +155,10 @@ export function HistoryPage({
                 key={name}
                 type="button"
                 onClick={() => setMarketFilter(name)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${
+                className={`h-8 shrink-0 rounded-lg border px-3 text-xs font-medium transition-[background-color,color,border-color] duration-150 ease-ui ${
                   marketFilter === name
-                    ? 'bg-[#00C853] text-white'
-                    : 'border border-[#E5E7EB] bg-white text-[#6B7280] dark:border-[#2E3440] dark:bg-[#1E2229] dark:text-[#9CA3AF]'
+                    ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                    : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >
                 {name}
@@ -168,24 +168,23 @@ export function HistoryPage({
         )}
 
         {filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-[#E5E7EB] bg-white px-6 py-12 text-center dark:border-[#2E3440] dark:bg-[#1E2229]">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00C853]/12 text-[#00C853]">
-              <ReceiptText size={32} />
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-surface)] px-6 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)]">
+              <ReceiptText size={22} strokeWidth={1.5} />
             </div>
-            <h2 className="mt-4 text-base font-bold text-[#111827] dark:text-[#F3F4F6]">
+            <h2 className="mt-4 text-base font-medium text-[var(--text-primary)]">
               Nenhuma compra no histórico
             </h2>
-            <p className="mt-1 max-w-xs text-xs text-[#6B7280] dark:text-[#9CA3AF]">
-              Importe seu cupom fiscal via QR Code da NFC-e, foto ou finalize
-              uma lista de compras.
+            <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--text-secondary)]">
+              Importe seu cupom fiscal via QR Code da NFC-e, foto ou finalize uma lista de compras
             </p>
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="mt-4 flex items-center gap-2 rounded-xl bg-[#00C853] px-4 py-2.5 text-xs font-bold text-white"
+              className="mt-4 flex h-10 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
             >
-              <QrCode size={16} />
-              Importar Cupom Fiscal
+              <QrCode size={16} strokeWidth={1.5} />
+              Importar cupom fiscal
             </button>
           </div>
         ) : (
@@ -197,37 +196,37 @@ export function HistoryPage({
               return (
                 <div
                   key={record.id}
-                  className="overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white shadow-2xs dark:border-[#2E3440] dark:bg-[#1E2229]"
+                  className="overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] shadow-2xs"
                 >
                   <button
                     type="button"
                     onClick={() => setExpandedId(isOpen ? null : record.id)}
-                    className="flex w-full items-center justify-between p-4 text-left"
+                    className="flex w-full items-center justify-between p-4 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-app)]"
                   >
                     <div>
-                      <p className="text-sm font-extrabold text-[#111827] dark:text-[#F3F4F6]">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {record.marketName}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
+                      <p className="mt-0.5 font-mono-tabular text-xs text-[var(--text-muted)]">
                         {AppFormatters.formatDate(record.date)} ·{' '}
                         {record.items.length}{' '}
                         {record.items.length === 1 ? 'item' : 'itens'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-extrabold text-[#00C853]">
+                      <span className="font-mono-tabular text-sm font-medium text-[var(--accent-fg)]">
                         {AppFormatters.formatCurrency(total)}
                       </span>
                       {isOpen ? (
-                        <ChevronUp size={18} className="text-[#6B7280]" />
+                        <ChevronUp size={18} strokeWidth={1.5} className="text-[var(--text-muted)]" />
                       ) : (
-                        <ChevronDown size={18} className="text-[#6B7280]" />
+                        <ChevronDown size={18} strokeWidth={1.5} className="text-[var(--text-muted)]" />
                       )}
                     </div>
                   </button>
 
                   {isOpen && (
-                    <div className="border-t border-[#E5E7EB] bg-[#F8F9FA] p-4 dark:border-[#2E3440] dark:bg-[#181B20]">
+                    <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-app)] p-4">
                       <div className="space-y-2">
                         {record.items.map((item, idx) => {
                           const matchingAgg = allAggregates.find((agg) =>
@@ -244,15 +243,15 @@ export function HistoryPage({
                                   setSelectedAggregate(matchingAgg);
                                 }
                               }}
-                              className="flex w-full items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs transition hover:bg-black/[0.02] dark:bg-[#1E2229]"
+                              className="flex w-full items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2.5 text-left text-xs transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                             >
-                              <div className="flex min-w-0 items-center gap-2">
-                                <CategoryIcon category={item.category} size={14} />
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <CategoryIcon category={item.category} size={16} />
                                 <div className="min-w-0">
-                                  <p className="truncate font-semibold text-[#111827] dark:text-[#F3F4F6]">
+                                  <p className="truncate font-medium text-[var(--text-primary)]">
                                     {item.name}
                                   </p>
-                                  <p className="text-[10px] text-[#6B7280] dark:text-[#9CA3AF]">
+                                  <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
                                     {AppFormatters.formatQuantity(
                                       item.quantity,
                                       item.unit,
@@ -260,7 +259,7 @@ export function HistoryPage({
                                   </p>
                                 </div>
                               </div>
-                              <span className="ml-2 shrink-0 font-bold text-[#111827] dark:text-[#F3F4F6]">
+                              <span className="font-mono-tabular ml-2 shrink-0 font-medium text-[var(--text-primary)]">
                                 {AppFormatters.formatCurrency(item.price)}
                               </span>
                             </button>
@@ -272,20 +271,20 @@ export function HistoryPage({
                         <button
                           type="button"
                           onClick={() => handleReusePurchase(record)}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#00C853]/12 py-2 text-xs font-bold text-[#00C853]"
+                          className="flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] text-xs font-medium text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
                         >
-                          <RotateCcw size={14} />
-                          Reaproveitar na Lista
+                          <RotateCcw size={15} strokeWidth={1.5} />
+                          Reaproveitar na lista
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             deletePurchaseRecord(record.id);
-                            showToast('Compra removida do histórico.');
+                            showToast('Compra removida do histórico');
                           }}
-                          className="flex items-center justify-center gap-1 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400"
+                          className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={15} strokeWidth={1.5} />
                           Excluir
                         </button>
                       </div>
@@ -299,7 +298,7 @@ export function HistoryPage({
       </div>
 
       {toastMsg && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111827] px-4 py-2 text-xs font-semibold text-white shadow-xl dark:bg-[#F3F4F6] dark:text-[#111827]">
+        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2 text-xs font-medium text-[var(--bg-app)] shadow-lg">
           {toastMsg}
         </div>
       )}
@@ -308,7 +307,7 @@ export function HistoryPage({
         <ReceiptImportModal
           onClose={() => setShowImportModal(false)}
           onImported={(mkt, count) =>
-            showToast(`Compra em ${mkt} (${count} itens) importada!`)
+            showToast(`Compra em ${mkt} (${count} itens) importada`)
           }
         />
       )}
