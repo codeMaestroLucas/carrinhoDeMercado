@@ -134,3 +134,69 @@ describe('CategoryClassifier Alimentos / Hortifruti / Congelados split', () => {
     expect(CategoryClassifier.classify('Arroz Tipo 1')).toBe('alimentos');
   });
 });
+
+describe('Product consolidation with measurement separation', () => {
+  it('consolidates OCR variants, truncations, and connector differences while keeping distinct sizes separate', () => {
+    const records: PurchaseRecord[] = [
+      {
+        id: 'rec-1',
+        marketId: 'm1',
+        marketName: 'Mercado A',
+        date: new Date(2026, 10, 1).toISOString(),
+        items: [
+          { name: 'Saco Alve Jado Charhe Ecot', category: 'limpeza', price: 9.9, quantity: 1, unit: 'un' },
+          { name: 'Saco Alve Jado Charme Ecot', category: 'limpeza', price: 10.5, quantity: 1, unit: 'un' },
+          { name: 'Saco Alvejado Charhe Ecot', category: 'limpeza', price: 9.5, quantity: 1, unit: 'un' },
+          { name: 'Saco Rlve Jado Charme Ecot', category: 'limpeza', price: 10.0, quantity: 1, unit: 'un' },
+          { name: 'Fita Isolante Tram 19hnx5', category: 'bazar', price: 7.0, quantity: 1, unit: 'un' },
+          { name: 'Fita Isolante Tram 19mmx5', category: 'bazar', price: 7.5, quantity: 1, unit: 'un' },
+          { name: 'Refri Coca Cola 2l Trad', category: 'bebidas', price: 10.9, quantity: 1, unit: 'un' },
+          { name: 'Coca Cola 2lt Tradiciona', category: 'bebidas', price: 11.2, quantity: 1, unit: 'un' },
+          { name: 'Coca Cola 1,5l Tradiciona', category: 'bebidas', price: 8.5, quantity: 1, unit: 'un' },
+          { name: 'Refri Coca Cola 600ml Zero', category: 'bebidas', price: 5.5, quantity: 1, unit: 'un' },
+          { name: 'Mussarela Deale', category: 'alimentos', price: 14.0, quantity: 1, unit: 'un' },
+          { name: 'Queijo Mussarela Deale', category: 'alimentos', price: 14.5, quantity: 1, unit: 'un' },
+          { name: 'Queijo T Mussarela Deale 150g', category: 'alimentos', price: 13.9, quantity: 1, unit: 'un' },
+          { name: 'Ralinho Para Pia Inox', category: 'bazar', price: 6.0, quantity: 1, unit: 'un' },
+          { name: 'Ralinho Pia', category: 'bazar', price: 5.5, quantity: 1, unit: 'un' },
+          { name: 'Pipoca Kod 90g Caramelo', category: 'alimentos', price: 4.5, quantity: 1, unit: 'un' },
+          { name: 'Pipoca Kod 90g Churros', category: 'alimentos', price: 4.7, quantity: 1, unit: 'un' },
+        ],
+      },
+    ];
+
+    const aggregates = buildAllProductAggregates(records);
+    const findByText = (term: string) =>
+      aggregates.filter((a) =>
+        a.occurrences.some((o) =>
+          o.productName.toLowerCase().includes(term.toLowerCase()),
+        ),
+      );
+
+    // 4 OCR variants of Saco Alvejado Charme -> 1 group
+    expect(findByText('Charhe').length).toBe(1);
+    expect(findByText('Charme').length).toBe(1);
+    expect(findByText('Charme')[0].occurrences).toHaveLength(4);
+
+    // Fita Isolante 19hnx5 & 19mmx5 -> 1 group
+    expect(findByText('Fita Isolante')).toHaveLength(1);
+    expect(findByText('Fita Isolante')[0].occurrences).toHaveLength(2);
+
+    // Coca Cola: 2L variants merged, 1.5L and 600ml kept separate (3 groups total)
+    const cocas = findByText('Coca Cola');
+    expect(cocas).toHaveLength(3);
+    const coca2l = cocas.find((c) => c.normalizedKey.includes('2l'));
+    expect(coca2l?.occurrences).toHaveLength(2);
+
+    // Queijo Mussarela Deale variants -> 1 group
+    expect(findByText('Mussarela Deale')).toHaveLength(1);
+    expect(findByText('Mussarela Deale')[0].occurrences).toHaveLength(3);
+
+    // Ralinho Pia variants -> 1 group
+    expect(findByText('Ralinho')).toHaveLength(1);
+    expect(findByText('Ralinho')[0].occurrences).toHaveLength(2);
+
+    // Distinct flavors stay separate
+    expect(findByText('Pipoca Kod')).toHaveLength(2);
+  });
+});

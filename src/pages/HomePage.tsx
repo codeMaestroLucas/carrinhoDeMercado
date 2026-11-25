@@ -25,6 +25,7 @@ import {
   loadHomeSnapshotSync,
   saveHomeSnapshot,
 } from '../services/homeSnapshotService';
+import { CategoryClassifier } from '../services/categoryClassifier';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
@@ -54,6 +55,11 @@ export function HomePage() {
         marketFilter: marketFilter || null,
       }),
     [history, marketFilter],
+  );
+
+  const fullAggregates = useMemo(
+    () => (marketFilter ? buildAllProductAggregates(history) : allAggregates),
+    [history, marketFilter, allAggregates],
   );
 
   const filteredAggregates = useMemo(() => {
@@ -341,34 +347,58 @@ export function HomePage() {
 
                   {highlightedVariations.length > 0 && (
                     <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-                      {highlightedVariations.map((v) => (
-                        <div
-                          key={`${v.productName}_${v.marketName}`}
-                          className="w-44 shrink-0 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3"
-                        >
-                          <p className="truncate text-xs font-medium text-[var(--text-primary)]">
-                            {v.productName}
-                          </p>
-                          <p className="truncate text-xs text-[var(--text-muted)]">
-                            {v.marketName}
-                          </p>
-                          <div className="mt-2 flex items-baseline justify-between gap-2">
-                            <span className="font-mono-tabular text-xs font-medium text-[var(--text-primary)]">
-                              {AppFormatters.formatCurrency(v.currentPrice)}
-                            </span>
-                            <span
-                              className={`font-mono-tabular text-xs font-medium ${
-                                v.variationPercent < 0
-                                  ? 'text-[var(--positive)]'
-                                  : 'text-[var(--negative)]'
-                              }`}
-                            >
-                              {v.variationPercent > 0 ? '+' : ''}
-                              {v.variationPercent.toFixed(0)}%
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                      {highlightedVariations.map((v) => {
+                        const targetAgg =
+                          fullAggregates.find((agg) =>
+                            agg.occurrences.some(
+                              (occ) => occ.productName === v.productName,
+                            ),
+                          ) ??
+                          fullAggregates.find(
+                            (agg) =>
+                              agg.normalizedKey ===
+                              CategoryClassifier.normalizeForComparison(
+                                v.productName,
+                              ),
+                          ) ??
+                          null;
+
+                        return (
+                          <button
+                            key={`${v.productName}_${v.marketName}`}
+                            type="button"
+                            disabled={!targetAgg}
+                            onClick={() => {
+                              if (targetAgg) {
+                                setSelectedAggregate(targetAgg);
+                              }
+                            }}
+                            className="w-44 shrink-0 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 text-left transition-[background-color,border-color,transform] duration-150 ease-ui hover:border-[var(--accent)] hover:bg-[var(--bg-subtle)] active:scale-[0.98] disabled:cursor-default disabled:opacity-80"
+                          >
+                            <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                              {v.productName}
+                            </p>
+                            <p className="truncate text-xs text-[var(--text-muted)]">
+                              {v.marketName}
+                            </p>
+                            <div className="mt-2 flex items-baseline justify-between gap-2">
+                              <span className="font-mono-tabular text-xs font-medium text-[var(--text-primary)]">
+                                {AppFormatters.formatCurrency(v.currentPrice)}
+                              </span>
+                              <span
+                                className={`font-mono-tabular text-xs font-medium ${
+                                  v.variationPercent < 0
+                                    ? 'text-[var(--positive)]'
+                                    : 'text-[var(--negative)]'
+                                }`}
+                              >
+                                {v.variationPercent > 0 ? '+' : ''}
+                                {v.variationPercent.toFixed(0)}%
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -252,6 +252,17 @@ export const COMMON_ABBREVIATIONS: Record<string, string> = {
   rechead: 'recheado',
   rech: 'recheado',
   trad: 'tradicional',
+  tradiciona: 'tradicional',
+  lv: 'longa vida',
+  bj: 'bandeja',
+  csl: 'casal',
+  forn: 'forno',
+  api: 'apis',
+  lay: 'lays',
+  chip: 'chips',
+  batav: 'batavo',
+  freegell: 'freegells',
+  churro: 'churros',
 
   // Higiene & Limpeza
   sab: 'sabonete',
@@ -266,6 +277,7 @@ export const COMMON_ABBREVIATIONS: Record<string, string> = {
   roll: 'roll-on',
   cr: 'creme',
   crem: 'creme',
+  cren: 'cremoso',
   dent: 'dental',
   escov: 'escova',
   hid: 'hidratante',
@@ -299,6 +311,18 @@ export const COMMON_ABBREVIATIONS: Record<string, string> = {
   tesou: 'tesoura',
   ft: 'fatiado',
   bco: 'branco',
+  scotc: 'scotch',
+  eucalipt: 'eucalipto',
+  laranj: 'laranja',
+  sapon: 'saponaceo',
+  arom: 'aromatizador',
+  ba: 'baby',
+  bab: 'baby',
+  cla: 'classic',
+  blu: 'blue',
+  johnsom: 'johnsons',
+  cohdor: 'condor',
+  charhe: 'charme',
 };
 
 export const DEFAULT_KEYWORD_DICTIONARY: Record<ProductCategoryId, string[]> = {
@@ -514,6 +538,167 @@ export function expandAbbreviations(normalizedText: string): string {
     .join(' ');
 }
 
+const SPLIT_OCR_WORD_PAIRS: Record<string, string> = {
+  'alve+jado': 'alvejado',
+  'rlve+jado': 'alvejado',
+};
+
+function canonicalizeUnitSuffix(rawUnit: string): string {
+  const u = rawUnit.toLowerCase();
+  if (u === 'lt' || u === 'litro' || u === 'litros' || u === 'l') return 'l';
+  if (u === 'gr' || u === 'grama' || u === 'gramas' || u === 'g') return 'g';
+  if (u === 'kilo' || u === 'kilos' || u === 'quilo' || u === 'quilos' || u === 'kg')
+    return 'kg';
+  return u;
+}
+
+function normalizeComparisonMeasurements(text: string): string {
+  // Join decimal quantities with units (e.g. "1,5lt" or "1 5l" -> "1.5l")
+  let out = text.replace(
+    /\b(\d+)[,.](\d+)\s*(lt|litros?|l|kg|kilos?|quilos?|gr|gramas?|g|ml)\b/g,
+    (_m, whole: string, frac: string, unit: string) =>
+      `${whole}.${frac}${canonicalizeUnitSuffix(unit)}`,
+  );
+  out = out.replace(
+    /\b(\d+)\s+(\d)\s*(lt|litros?|l|kg|kilos?|quilos?|gr|gramas?|g|ml)\b/g,
+    (_m, whole: string, frac: string, unit: string) =>
+      `${whole}.${frac}${canonicalizeUnitSuffix(unit)}`,
+  );
+  // Canonicalize integer or decimal unit forms (e.g. "2lt" -> "2l", "500 gr" -> "500g")
+  out = out.replace(
+    /\b(\d+(?:\.\d+)?)\s*(lt|litros?|l|kg|kilos?|quilos?|gr|gramas?|g|ml)\b/g,
+    (_m, num: string, unit: string) => `${num}${canonicalizeUnitSuffix(unit)}`,
+  );
+  return out;
+}
+
+export function extractMeasurementSignatures(normalizedText: string): string[] {
+  const signatures: string[] = [];
+  const regex = /\b(\d+(?:\.\d+)?)(ml|l|g|kg)\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(normalizedText)) !== null) {
+    const val = Number.parseFloat(match[1]);
+    const unit = match[2];
+    if (!Number.isFinite(val) || val <= 0) continue;
+    if (unit === 'l') {
+      signatures.push(`${Math.round(val * 1000)}ml`);
+    } else if (unit === 'ml') {
+      signatures.push(`${Math.round(val)}ml`);
+    } else if (unit === 'kg') {
+      signatures.push(`${Math.round(val * 1000)}g`);
+    } else if (unit === 'g') {
+      signatures.push(`${Math.round(val)}g`);
+    }
+  }
+  return Array.from(new Set(signatures)).sort();
+}
+
+export function areMeasurementsCompatible(
+  normalizedA: string,
+  normalizedB: string,
+): boolean {
+  const measA = extractMeasurementSignatures(normalizedA);
+  const measB = extractMeasurementSignatures(normalizedB);
+  if (measA.length === 0 || measB.length === 0) return true;
+  if (measA.length !== measB.length) return false;
+  return measA.every((m, idx) => m === measB[idx]);
+}
+
+const MEASUREMENT_TOKEN_REGEX = /^\d+(?:\.\d+)?(?:ml|l|g|kg)$/;
+
+function comparisonTokenScore(a: string, b: string): number {
+  if (a === b) return 1.0;
+  if (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a))) {
+    const minLen = Math.min(a.length, b.length);
+    const maxLen = Math.max(a.length, b.length);
+    if (minLen / maxLen >= 0.7) {
+      return 0.94;
+    }
+  }
+  const hasDigit = /\d/.test(a) || /\d/.test(b);
+  if (a.length >= 4 && b.length >= 4) {
+    const sim = stringSimilarity(a, b);
+    if (sim >= (hasDigit ? 0.65 : 0.75)) {
+      return sim;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Determines whether two normalized comparison keys represent variants of the
+ * same product (handling NFC-e truncations, OCR typos, and subset phrasing)
+ * while keeping distinct sizes/volumes and distinct product varieties apart.
+ */
+export function areComparisonKeysEquivalent(
+  keyA: string,
+  keyB: string,
+  options?: {
+    categoryA?: ProductCategoryId;
+    categoryB?: ProductCategoryId;
+  },
+): boolean {
+  if (!keyA || !keyB) return false;
+  if (keyA === keyB) return true;
+
+  if (!areMeasurementsCompatible(keyA, keyB)) return false;
+
+  if (
+    options?.categoryA &&
+    options?.categoryB &&
+    options.categoryA !== options.categoryB &&
+    options.categoryA !== 'diversos' &&
+    options.categoryB !== 'diversos'
+  ) {
+    return false;
+  }
+
+  const extractTokens = (key: string) =>
+    Array.from(
+      new Set(
+        key
+          .split(' ')
+          .filter(
+            (t) =>
+              t.length >= 2 &&
+              !CONNECTOR_WORDS.has(t) &&
+              !MEASUREMENT_TOKEN_REGEX.test(t),
+          ),
+      ),
+    );
+
+  const tokensA = extractTokens(keyA);
+  const tokensB = extractTokens(keyB);
+
+  if (tokensA.length < 2 || tokensB.length < 2) return false;
+
+  const [shorter, longer] =
+    tokensA.length <= tokensB.length ? [tokensA, tokensB] : [tokensB, tokensA];
+
+  const usedLonger = new Set<number>();
+  let totalScore = 0;
+
+  for (const ts of shorter) {
+    let bestIdx = -1;
+    let bestScore = 0;
+    for (let j = 0; j < longer.length; j++) {
+      if (usedLonger.has(j)) continue;
+      const score = comparisonTokenScore(ts, longer[j]);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = j;
+      }
+    }
+    if (bestIdx === -1) {
+      return false;
+    }
+    usedLonger.add(bestIdx);
+    totalScore += bestScore;
+  }
+
+  return totalScore / shorter.length >= 0.86;
+}
+
 export function normalizeForComparison(input: string): string {
   let cleaned = stripDiacritics(input);
   cleaned = cleaned.replace(
@@ -521,13 +706,26 @@ export function normalizeForComparison(input: string): string {
     ' ',
   );
   cleaned = cleaned.replace(/#\s*\d+\b/g, ' ');
-  cleaned = cleaned.replace(/[-_/()[\]{}:;.,#*]/g, ' ');
+  cleaned = normalizeComparisonMeasurements(cleaned);
+  cleaned = cleaned.replace(/[-_/()[\]{}:;,#*]|(?<!\d)\.(?!\d)/g, ' ');
 
   const rawTokens = cleaned.split(/\s+/).filter((t) => t.length > 0);
-  const filteredTokens: string[] = [];
+  const mergedTokens: string[] = [];
+  for (let i = 0; i < rawTokens.length; i++) {
+    const cur = rawTokens[i];
+    const next = rawTokens[i + 1];
+    if (next && SPLIT_OCR_WORD_PAIRS[`${cur}+${next}`]) {
+      mergedTokens.push(SPLIT_OCR_WORD_PAIRS[`${cur}+${next}`]);
+      i++;
+      continue;
+    }
+    mergedTokens.push(cur);
+  }
 
-  for (const token of rawTokens) {
+  const filteredTokens: string[] = [];
+  for (const token of mergedTokens) {
     if (RECEIPT_NOISE_TOKENS.has(token)) continue;
+    if (CONNECTOR_WORDS.has(token)) continue;
     if (/^\d{3,}$/.test(token)) continue;
     filteredTokens.push(token);
   }
@@ -937,6 +1135,8 @@ export const CategoryClassifier = {
   levenshteinDistance,
   stringSimilarity,
   productSimilarity,
+  areMeasurementsCompatible,
+  areComparisonKeysEquivalent,
   cloneDefaultDictionary,
   classify: classifyProduct,
   extractQuantityAndName,

@@ -140,35 +140,37 @@ export function createProductHistoryAggregate(
   };
 }
 
-export function buildAllProductAggregates(
+interface ProductBucket {
+  key: string;
+  displayName: string;
+  category: ProductCategoryId;
+  occurrences: ProductHistoryOccurrence[];
+}
+
+function choosePreferredDisplayName(current: string, candidate: string): string {
+  const currentHasCode = hasReceiptCode(current);
+  const candidateHasCode = hasReceiptCode(candidate);
+  if (currentHasCode && !candidateHasCode) return candidate;
+  if (!currentHasCode && candidateHasCode) return current;
+  return candidate.length > current.length ? candidate : current;
+}
+
+function groupHistoryOccurrences(
   records: PurchaseRecord[],
-  options?: { marketFilter?: string | null },
-): ProductHistoryAggregate[] {
-  const grouped = new Map<string, ProductHistoryOccurrence[]>();
-  const displayNames = new Map<string, string>();
-  const categories = new Map<string, ProductCategoryId>();
+  options?: { marketFilter?: string | null; onlyPriced?: boolean },
+): ProductBucket[] {
+  const exactMap = new Map<string, ProductBucket>();
 
   for (const record of records) {
     if (options?.marketFilter && record.marketName !== options.marketFilter) {
       continue;
     }
     for (const item of record.items) {
+      if (options?.onlyPriced && item.price <= 0) continue;
       const key = CategoryClassifier.normalizeForComparison(item.name);
       if (!key) continue;
 
-      const currentDisplay = displayNames.get(key);
-      if (
-        !currentDisplay ||
-        (hasReceiptCode(currentDisplay) && !hasReceiptCode(item.name))
-      ) {
-        displayNames.set(key, item.name);
-      }
-      if (!categories.has(key)) {
-        categories.set(key, item.category);
-      }
-
-      const list = grouped.get(key) ?? [];
-      list.push({
+      const occurrence: ProductHistoryOccurrence = {
         productName: item.name,
         category: item.category,
         price: item.price,
@@ -177,18 +179,79 @@ export function buildAllProductAggregates(
         unit: item.unit,
         marketName: record.marketName,
         date: record.date,
-      });
-      grouped.set(key, list);
+      };
+
+      const existing = exactMap.get(key);
+      if (existing) {
+        existing.displayName = choosePreferredDisplayName(
+          existing.displayName,
+          item.name,
+        );
+        if (existing.category === 'diversos' && item.category !== 'diversos') {
+          existing.category = item.category;
+        }
+        existing.occurrences.push(occurrence);
+      } else {
+        exactMap.set(key, {
+          key,
+          displayName: item.name,
+          category: item.category,
+          occurrences: [occurrence],
+        });
+      }
     }
   }
 
-  return Array.from(grouped.entries())
-    .map(([key, occurrences]) =>
+  // Sort most specific buckets first (those with explicit measurements, then most tokens)
+  const hasMeasRegex = /\b\d+(?:\.\d+)?(?:ml|l|g|kg)\b/;
+  const sortedBuckets = Array.from(exactMap.values()).sort((a, b) => {
+    const aHasMeas = hasMeasRegex.test(a.key) ? 1 : 0;
+    const bHasMeas = hasMeasRegex.test(b.key) ? 1 : 0;
+    if (bHasMeas !== aHasMeas) return bHasMeas - aHasMeas;
+    const aTokens = a.key.split(' ').length;
+    const bTokens = b.key.split(' ').length;
+    if (bTokens !== aTokens) return bTokens - aTokens;
+    return a.key.localeCompare(b.key);
+  });
+
+  const merged: ProductBucket[] = [];
+  for (const bucket of sortedBuckets) {
+    const target = merged.find((anchor) =>
+      CategoryClassifier.areComparisonKeysEquivalent(anchor.key, bucket.key, {
+        categoryA: anchor.category,
+        categoryB: bucket.category,
+      }),
+    );
+    if (target) {
+      target.displayName = choosePreferredDisplayName(
+        target.displayName,
+        bucket.displayName,
+      );
+      if (target.category === 'diversos' && bucket.category !== 'diversos') {
+        target.category = bucket.category;
+      }
+      target.occurrences.push(...bucket.occurrences);
+    } else {
+      merged.push(bucket);
+    }
+  }
+
+  return merged;
+}
+
+export function buildAllProductAggregates(
+  records: PurchaseRecord[],
+  options?: { marketFilter?: string | null },
+): ProductHistoryAggregate[] {
+  const buckets = groupHistoryOccurrences(records, options);
+
+  return buckets
+    .map((bucket) =>
       createProductHistoryAggregate(
-        key,
-        displayNames.get(key)!,
-        categories.get(key)!,
-        occurrences,
+        bucket.key,
+        bucket.displayName,
+        bucket.category,
+        bucket.occurrences,
       ),
     )
     .sort((a, b) =>
@@ -203,9 +266,13 @@ export function matchesAggregateSearchQuery(
   const normQuery = CategoryClassifier.normalizeForComparison(rawQuery);
   if (!normQuery) return true;
   if (aggregate.normalizedKey.includes(normQuery)) return true;
+  const normRaw = CategoryClassifier.normalize(rawQuery);
+  if (CategoryClassifier.normalize(aggregate.displayName).includes(normRaw)) {
+    return true;
+  }
   if (
-    CategoryClassifier.normalize(aggregate.displayName).includes(
-      CategoryClassifier.normalize(rawQuery),
+    aggregate.occurrences.some((occ) =>
+      CategoryClassifier.normalize(occ.productName).includes(normRaw),
     )
   ) {
     return true;
@@ -257,27 +324,7 @@ export function calculatePriceIndex(
   daysWindow = 60,
 ): PriceIndexSummary {
   const cutoffMs = Date.now() - daysWindow * 24 * 60 * 60 * 1000;
-
-  const productsMap = new Map<string, ProductHistoryOccurrence[]>();
-  for (const record of history) {
-    for (const item of record.items) {
-      if (item.price <= 0) continue;
-      const key = CategoryClassifier.normalizeForComparison(item.name);
-      if (!key) continue;
-      const list = productsMap.get(key) ?? [];
-      list.push({
-        productName: item.name,
-        category: item.category,
-        price: item.price,
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        unit: item.unit,
-        marketName: record.marketName,
-        date: record.date,
-      });
-      productsMap.set(key, list);
-    }
-  }
+  const buckets = groupHistoryOccurrences(history, { onlyPriced: true });
 
   const variations: ProductVariationItem[] = [];
   let increasedCount = 0;
@@ -285,8 +332,10 @@ export function calculatePriceIndex(
   let stableCount = 0;
   let totalVariationSum = 0;
 
-  for (const list of productsMap.values()) {
-    list.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  for (const bucket of buckets) {
+    const list = [...bucket.occurrences].sort(
+      (a, b) => Date.parse(b.date) - Date.parse(a.date),
+    );
     if (list.length < 2) continue;
 
     const latest = list[0];

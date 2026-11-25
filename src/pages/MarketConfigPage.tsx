@@ -68,21 +68,20 @@ function SortableCategoryRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-ui ${
+      {...attributes}
+      {...listeners}
+      className={`flex cursor-grab select-none items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-ui active:cursor-grabbing ${
         isDragging
           ? 'z-10 border-[var(--accent)] bg-[var(--bg-surface)] shadow-md'
           : 'border-[var(--border-hairline)] bg-[var(--bg-app)]'
       }`}
     >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label={`Arrastar ${info.label}`}
-        className="cursor-grab touch-none text-[var(--text-muted)] active:cursor-grabbing"
+      <span
+        aria-hidden="true"
+        className="text-[var(--text-muted)]"
       >
         <GripVertical size={16} strokeWidth={1.5} />
-      </button>
+      </span>
       <span className="font-mono-tabular w-5 text-center text-xs font-medium text-[var(--text-muted)]">
         {index + 1}
       </span>
@@ -91,7 +90,10 @@ function SortableCategoryRow({
       <span className="flex-1 text-xs font-medium text-[var(--text-primary)]">
         {info.label}
       </span>
-      <div className="flex items-center gap-1">
+      <div
+        className="flex items-center gap-1"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           disabled={index === 0}
@@ -154,6 +156,7 @@ export function MarketConfigPage() {
   );
   const [expandedCategory, setExpandedCategory] =
     useState<ProductCategoryId | null>(null);
+  const [showAllKeywords, setShowAllKeywords] = useState(false);
   const [newKeywordInput, setNewKeywordInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
@@ -590,6 +593,7 @@ export function MarketConfigPage() {
                     type="button"
                     onClick={() => {
                       setExpandedCategory(isOpen ? null : cat.id);
+                      setShowAllKeywords(false);
                       setNewKeywordInput('');
                     }}
                     className="flex w-full items-center justify-between bg-[var(--bg-app)] px-3 py-2.5 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
@@ -631,7 +635,10 @@ export function MarketConfigPage() {
                       </form>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {keywords.slice(0, 40).map((kw) => (
+                        {(showAllKeywords
+                          ? keywords
+                          : keywords.slice(0, 40)
+                        ).map((kw) => (
                           <span
                             key={kw}
                             className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-1 text-xs text-[var(--text-primary)]"
@@ -649,10 +656,23 @@ export function MarketConfigPage() {
                             </button>
                           </span>
                         ))}
-                        {keywords.length > 40 && (
-                          <span className="font-mono-tabular px-2 py-1 text-xs text-[var(--text-muted)]">
+                        {keywords.length > 40 && !showAllKeywords && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllKeywords(true)}
+                            className="font-mono-tabular rounded-md border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 py-1 text-xs font-medium text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                          >
                             +{keywords.length - 40} termos
-                          </span>
+                          </button>
+                        )}
+                        {keywords.length > 40 && showAllKeywords && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllKeywords(false)}
+                            className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+                          >
+                            Mostrar menos
+                          </button>
                         )}
                       </div>
                     </div>
