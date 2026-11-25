@@ -194,4 +194,47 @@ describe('ReceiptImportModal item editing and gestures', () => {
     expect(screen.getByText('Queijo Prato')).toBeInTheDocument();
     expect(screen.getByText('Total: R$ 22,70')).toBeInTheDocument();
   });
+
+  it('displays gesture chips and shows a tap hint when clicking without holding', () => {
+    vi.useFakeTimers();
+    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+
+    // Switch to Texto / Manual tab and add an item
+    fireEvent.click(screen.getByText('Texto / Manual'));
+    fireEvent.change(screen.getByPlaceholderText('Item manual'), {
+      target: { value: 'Suco de Uva' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Preço'), {
+      target: { value: '12,50' },
+    });
+    fireEvent.click(screen.getByLabelText('Adicionar item manual'));
+
+    // Check intuitive header chips
+    expect(screen.getByText('Segure p/ editar')).toBeInTheDocument();
+    expect(screen.getByText('Deslize p/ excluir')).toBeInTheDocument();
+
+    // Perform a quick tap (pointerdown and pointerup without waiting 450ms)
+    const itemCard = screen.getByText('Suco de Uva').closest('.touch-pan-y')!;
+    fireEvent.pointerDown(itemCard, { clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(itemCard, { clientX: 100, clientY: 100 });
+
+    // The tap hint should appear
+    expect(
+      screen.getByText(
+        'Dica: segure o item para editar • deslize para a esquerda para excluir',
+      ),
+    ).toBeInTheDocument();
+
+    // After hint timeout expires, hint disappears
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(
+      screen.queryByText(
+        'Dica: segure o item para editar • deslize para a esquerda para excluir',
+      ),
+    ).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
 });

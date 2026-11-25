@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Camera,
   Check,
+  ChevronLeft,
   ExternalLink,
   FileText,
+  Hand,
   Plus,
   QrCode,
+  Sparkles,
   Trash2,
   Upload,
   X,
@@ -313,19 +316,24 @@ function EditScannedItemModal({
 interface SwipeableScannedReceiptItemRowProps {
   item: EditableReceiptItem;
   itemIndex: number;
+  isFirstItem?: boolean;
   onOpenEdit: (item: EditableReceiptItem) => void;
   onRemove: (id: string) => void;
+  onTap?: () => void;
 }
 
 export function SwipeableScannedReceiptItemRow({
   item,
   itemIndex,
+  isFirstItem,
   onOpenEdit,
   onRemove,
+  onTap,
 }: SwipeableScannedReceiptItemRowProps) {
   const [translateX, setTranslateX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
 
   const startXRef = useRef<number>(0);
   const startYRef = useRef<number>(0);
@@ -335,12 +343,32 @@ export function SwipeableScannedReceiptItemRow({
   const isPressActiveRef = useRef(false);
   const lastPointerEventAtRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const categoryInfo = PRODUCT_CATEGORY_MAP[item.category];
   const showUnitPrice =
     item.quantity > 0 &&
     Math.abs(item.quantity - 1) > 0.001 &&
     item.price > 0;
+
+  useEffect(() => {
+    if (!isFirstItem) return;
+    peekTimerRef.current = setTimeout(() => {
+      if (isPressActiveRef.current || isDismissed) return;
+      setTranslateX(-36);
+      peekTimerRef.current = setTimeout(() => {
+        if (isPressActiveRef.current || isDismissed) return;
+        setTranslateX(0);
+      }, 420);
+    }, 600);
+
+    return () => {
+      if (peekTimerRef.current) {
+        clearTimeout(peekTimerRef.current);
+        peekTimerRef.current = null;
+      }
+    };
+  }, [isFirstItem, isDismissed]);
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current !== null) {
@@ -376,8 +404,14 @@ export function SwipeableScannedReceiptItemRow({
       return;
     }
 
+    if (peekTimerRef.current) {
+      clearTimeout(peekTimerRef.current);
+      peekTimerRef.current = null;
+    }
+
     if (isDismissed || isPressActiveRef.current) return;
     isPressActiveRef.current = true;
+    setIsPressing(true);
 
     const { clientX, clientY } = getCoords(e);
     startXRef.current = clientX;
@@ -389,6 +423,7 @@ export function SwipeableScannedReceiptItemRow({
 
     longPressTimerRef.current = setTimeout(() => {
       isLongPressTriggeredRef.current = true;
+      setIsPressing(false);
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         try {
           navigator.vibrate(40);
@@ -415,12 +450,14 @@ export function SwipeableScannedReceiptItemRow({
         isHorizontalSwipeRef.current = Math.abs(deltaX) > Math.abs(deltaY);
         if (isHorizontalSwipeRef.current) {
           clearLongPressTimer();
+          setIsPressing(false);
         }
       }
     }
 
     if (isHorizontalSwipeRef.current) {
       clearLongPressTimer();
+      setIsPressing(false);
       currentDeltaXRef.current = deltaX;
       if (deltaX < 0) {
         setIsSwiping(true);
@@ -431,6 +468,7 @@ export function SwipeableScannedReceiptItemRow({
       }
     } else if (Math.abs(deltaY) > 8) {
       clearLongPressTimer();
+      setIsPressing(false);
     }
   };
 
@@ -443,6 +481,7 @@ export function SwipeableScannedReceiptItemRow({
 
     if (!isPressActiveRef.current) return;
     isPressActiveRef.current = false;
+    setIsPressing(false);
     clearLongPressTimer();
 
     if (isLongPressTriggeredRef.current) {
@@ -465,12 +504,17 @@ export function SwipeableScannedReceiptItemRow({
       }
       setTranslateX(0);
       currentDeltaXRef.current = 0;
+      return;
     }
+
+    // Quick tap detected
+    onTap?.();
   };
 
   const handlePressCancel = () => {
     lastPointerEventAtRef.current = Date.now();
     isPressActiveRef.current = false;
+    setIsPressing(false);
     isLongPressTriggeredRef.current = false;
     clearLongPressTimer();
     setIsSwiping(false);
@@ -513,8 +557,18 @@ export function SwipeableScannedReceiptItemRow({
             : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
           touchAction: 'pan-y',
         }}
-        className="relative flex cursor-pointer touch-pan-y items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 shadow-2xs transition-colors duration-150 ease-ui active:bg-[var(--bg-subtle)] hover:border-[var(--border-subtle)]"
+        className={`relative flex cursor-pointer touch-pan-y items-center justify-between gap-3 rounded-xl border p-3 shadow-2xs transition-all duration-150 ease-ui ${
+          isPressing && !isSwiping
+            ? 'scale-[0.985] border-[var(--accent)] bg-[var(--bg-subtle)]'
+            : 'border border-[var(--border-hairline)] bg-[var(--bg-app)] hover:border-[var(--border-subtle)]'
+        }`}
       >
+        {/* Subtle long-press charge progress bar */}
+        {isPressing && !isSwiping && (
+          <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden rounded-b-xl bg-[var(--border-hairline)]">
+            <div className="h-full bg-[var(--accent)] animate-press-fill" />
+          </div>
+        )}
         {/* Left: Index badge + Name + Category + Qty/Unit */}
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center gap-2">
@@ -589,9 +643,29 @@ export function ReceiptImportModal({
   const [scannedItems, setScannedItems] = useState<EditableReceiptItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditableReceiptItem | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [tapHintVisible, setTapHintVisible] = useState(false);
+  const tapHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [manualName, setManualName] = useState('');
   const [manualPrice, setManualPrice] = useState('');
+
+  const handleItemTap = () => {
+    if (tapHintTimeoutRef.current) {
+      clearTimeout(tapHintTimeoutRef.current);
+    }
+    setTapHintVisible(true);
+    tapHintTimeoutRef.current = setTimeout(() => {
+      setTapHintVisible(false);
+    }, 2800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tapHintTimeoutRef.current) {
+        clearTimeout(tapHintTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
   const qrRegionId = 'nfce-qr-reader-region';
@@ -1132,16 +1206,23 @@ export function ReceiptImportModal({
             {/* Extracted Items Preview */}
             {scannedItems.length > 0 && (
               <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-                <div className="flex items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-2.5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[var(--border-hairline)] pb-2.5">
                   <div>
                     <h3 className="text-xs font-semibold text-[var(--text-primary)]">
                       Itens identificados (<span className="font-mono-tabular">{scannedItems.length}</span>)
                     </h3>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Segure para editar • Deslize para a esquerda para remover
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                        <Hand size={11} className="text-[var(--accent-fg)]" strokeWidth={2} />
+                        Segure p/ editar
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+                        <ChevronLeft size={11} className="text-[var(--negative)]" strokeWidth={2.5} />
+                        Deslize p/ excluir
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right sm:self-center">
                     <span className="font-mono-tabular text-xs font-semibold text-[var(--accent-fg)]">
                       Total: {AppFormatters.formatCurrency(totalExtracted)}
                     </span>
@@ -1172,14 +1253,23 @@ export function ReceiptImportModal({
                       key={item.id}
                       item={item}
                       itemIndex={idx + 1}
+                      isFirstItem={idx === 0}
                       onOpenEdit={(it) => {
                         setIsAddingNew(false);
                         setEditingItem(it);
                       }}
                       onRemove={handleRemoveItem}
+                      onTap={handleItemTap}
                     />
                   ))}
                 </div>
+
+                {tapHintVisible && (
+                  <div className="pointer-events-none flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1.5 text-center text-[11px] font-medium text-[var(--text-secondary)] animate-enter shadow-xs">
+                    <Sparkles size={13} className="shrink-0 text-[var(--accent-fg)]" />
+                    <span>Dica: segure o item para editar • deslize para a esquerda para excluir</span>
+                  </div>
+                )}
 
                 <button
                   type="button"

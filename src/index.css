@@ -64,6 +64,19 @@
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+@keyframes press-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-press-fill {
+  animation: press-fill 450ms linear forwards;
+}
+
 @keyframes unslop-enter {
   from {
     opacity: 0;
