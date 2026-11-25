@@ -101,7 +101,7 @@ export function DualPriceComparisonChart({
             type="monotone"
             dataKey="priceA"
             name={itemA.displayName}
-            stroke="#15803D"
+            stroke="var(--accent)"
             strokeWidth={2}
             connectNulls
             dot={{ r: 3 }}
@@ -110,7 +110,7 @@ export function DualPriceComparisonChart({
             type="monotone"
             dataKey="priceB"
             name={itemB.displayName}
-            stroke="#B45309"
+            stroke="#D97706"
             strokeWidth={2}
             connectNulls
             dot={{ r: 3 }}

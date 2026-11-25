@@ -8,7 +8,9 @@ import {
 const IGNORED_RECEIPT_KEYWORDS = [
   'cnpj', 'cpf', 'inscricao estadual', 'documento auxiliar',
   'nota fiscal', 'cupom fiscal', 'consumidor', 'danfe',
-  'qtd. total', 'qtd total', 'valor total', 'ualor total',
+  'qtd. total', 'qtd total', 'qtde. total', 'qtde total',
+  'total de itens', 'total itens', 'qtd itens', 'qtde itens',
+  'valor total', 'ualor total',
   'valor total a pagar', 'ualor total a pagar', 'total a pagar',
   'valor a pagar', 'ualor a pagar', 'total geral', 'valor geral',
   'ualor geral', 'total pago', 'valor pago', 'ualor pago',
@@ -26,40 +28,99 @@ const IGNORED_RECEIPT_KEYWORDS = [
   'cartao de debito', 'cartao credito', 'cartao debito', 'credito',
   'debito', 'dinheiro', 'troco', 'valor troco', 'ualor troco',
   'valor recebido', 'ualor recebido', 'total recebido', 'tributos',
+  'trib aprox', 'trib. aprox', 'val aprox', 'fonte ibpt',
   'aproximados', 'lei federal', 'ibpt', 'procon', 'decon',
   'chave de acesso', 'consulte pela', 'protocolo', 'autorizacao',
   'serie', 'emissao', 'operador', 'caixa', 'extrato', 'sat ',
   'qrcode', 'http', 'www.', 'sefaz', 'fazenda',
+  'codigo descricao', 'cod descricao', 'item codigo',
+  'razao social', 'nome fantasia', 'via consumidor', 'via estabelecimento',
 ];
 
 export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'CHOC BARRA': 'Chocolate em Barra',
   'CHOCOLATE BARRA': 'Chocolate em Barra',
   'CR LEITE': 'Creme de Leite',
+  'CR LT': 'Creme de Leite',
+  'CRM LEITE': 'Creme de Leite',
+  'CREM LEITE': 'Creme de Leite',
   'CREM LEIT': 'Creme de Leite',
   'CR DE LEITE': 'Creme de Leite',
   'L MOV': 'Lava Móveis',
   'L MOVEIS': 'Lava Móveis',
+  'LIMP MOV': 'Limpa Móveis',
+  'LUSTR MOV': 'Lustra Móveis',
+  'LUSTRA MOV': 'Lustra Móveis',
+  'TIRA MAN': 'Tira Manchas',
   'L ROUP': 'Lava Roupas',
   'L ROUPAS': 'Lava Roupas',
   'L LOUC': 'Lava Louças',
   'L LOUCA': 'Lava Louças',
   'L LOUCAS': 'Lava Louças',
   'AG SANIT': 'Água Sanitária',
+  'AQ SANIT': 'Água Sanitária',
   'AGUA SANIT': 'Água Sanitária',
   'AG SANITARIA': 'Água Sanitária',
+  'CLOR ATIV': 'Cloro Ativo',
+  'LIMP VID': 'Limpa Vidros',
+  'LIMPA VID': 'Limpa Vidros',
+  'LIMP ALUM': 'Limpa Alumínio',
+  'LIMPA ALUM': 'Limpa Alumínio',
+  'ESP ACO': 'Esponja de Aço',
+  'ESP MULT': 'Esponja Multiuso',
+  'PAN PRAT': 'Pano de Prato',
+  'PANO PRAT': 'Pano de Prato',
+  'PAN CHAO': 'Pano de Chão',
+  'PANO CHAO': 'Pano de Chão',
+  'PANO MULT': 'Pano Multiuso',
   'AG MIN': 'Água Mineral',
   'AG MINER': 'Água Mineral',
   'AGUA MIN': 'Água Mineral',
+  'AG TONICA': 'Água Tônica',
+  'AG TONIC': 'Água Tônica',
+  'AGUA TON': 'Água Tônica',
+  'AG MICE': 'Água Micelar',
+  'AGUA MICE': 'Água Micelar',
   'SAB EM PO': 'Sabão em Pó',
   'SAB PO': 'Sabão em Pó',
   'SAB BARRA': 'Sabão em Barra',
+  'SAB DE COCO': 'Sabão de Coco',
+  'SAB COCO': 'Sabão de Coco',
   'PAPEL HIG': 'Papel Higiênico',
   'PAP HIG': 'Papel Higiênico',
+  'PAPEL TOALH': 'Papel Toalha',
+  'PAP TOALH': 'Papel Toalha',
+  'PAPEL ALUM': 'Papel Alumínio',
+  'PAP ALUM': 'Papel Alumínio',
+  'PAPEL MANT': 'Papel Manteiga',
   'CREM DENT': 'Creme Dental',
   'CR DENT': 'Creme Dental',
+  'CRM DENT': 'Creme Dental',
+  'ESC DENT': 'Escova Dental',
+  'ESC DENTE': 'Escova Dental',
+  'CD COLG': 'Creme Dental Colgate',
+  'CD SORR': 'Creme Dental Sorriso',
+  'CD ORAL': 'Creme Dental Oral-B',
+  'CD SENSOD': 'Creme Dental Sensodyne',
+  'CD CLOSE': 'Creme Dental Closeup',
+  'FIO DENT': 'Fio Dental',
+  'ENX BUCAL': 'Enxaguante Bucal',
+  'ENXAG BUCAL': 'Enxaguante Bucal',
+  'AP BARB': 'Aparelho de Barbear',
+  'APAR BARB': 'Aparelho de Barbear',
+  'ESP BARB': 'Espuma de Barbear',
+  'CR BARB': 'Creme de Barbear',
+  'LAM BARB': 'Lâmina de Barbear',
+  'LENC UMED': 'Lenço Umedecido',
+  'LENCO UMED': 'Lenço Umedecido',
+  'LENC UMEDEC': 'Lenço Umedecido',
+  'PROT SOLAR': 'Protetor Solar',
+  'PROT SOL': 'Protetor Solar',
+  'PROT DIAR': 'Protetor Diário',
   'PAO FRANC': 'Pão Francês',
+  'PAO FRAN': 'Pão Francês',
   'PAO FORM': 'Pão de Forma',
+  'PAO FORMA': 'Pão de Forma',
   'P DE FORMA': 'Pão de Forma',
   'P FRANCES': 'Pão Francês',
   'C/ CAROCO': 'Com Caroço',
@@ -69,21 +130,30 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'BAT PALHA': 'Batata Palha',
   'BAT FRITA': 'Batata Frita',
   'BAT DOCE': 'Batata Doce',
+  'BAT CHIPS': 'Batata Chips',
   'CH VERD': 'Cheiro Verde',
   'CH VERDE': 'Cheiro Verde',
   'CHEIRO VERD': 'Cheiro Verde',
   'MOLHO TOM': 'Molho de Tomate',
   'MOLH TOM': 'Molho de Tomate',
   'MOL TOM': 'Molho de Tomate',
+  'M TARANT': 'Molho Tarantella',
+  'MOLH SHOYU': 'Molho Shoyu',
+  'MOLH INGLES': 'Molho Inglês',
   'EXTR TOM': 'Extrato de Tomate',
   'EXT TOM': 'Extrato de Tomate',
   'POLP TOM': 'Polpa de Tomate',
   'POL TOM': 'Polpa de Tomate',
   'LEIT COND': 'Leite Condensado',
   'LEITE COND': 'Leite Condensado',
+  'LT COND': 'Leite Condensado',
   'L COND': 'Leite Condensado',
   'LEIT CONDENS': 'Leite Condensado',
   'LEITE CONDENS': 'Leite Condensado',
+  'LT PO': 'Leite em Pó',
+  'LT EM PO': 'Leite em Pó',
+  'LEITE PO': 'Leite em Pó',
+  'LT SD': 'Leite Semidesnatado',
   'LEIT UHT': 'Leite UHT',
   'LEITE UHT': 'Leite UHT',
   'LEIT INT': 'Leite Integral',
@@ -93,28 +163,64 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'LEIT SEMI': 'Leite Semidesnatado',
   'LEITE SEMI': 'Leite Semidesnatado',
   'PEIT PERU': 'Peito de Peru',
+  'PEI PERU': 'Peito de Peru',
   'PEITO PERU': 'Peito de Peru',
   'PEIT FRANG': 'Peito de Frango',
+  'PEI FRANG': 'Peito de Frango',
   'PEITO FRANG': 'Peito de Frango',
   'FILE PEIT': 'Filé de Peito',
   'FILE DE PEITO': 'Filé de Peito',
+  'FIL FRANG': 'Filé de Frango',
+  'FILE FRANG': 'Filé de Frango',
+  'COX FRANG': 'Coxa de Frango',
+  'CX FRANG': 'Coxa de Frango',
+  'S COXA': 'Sobrecoxa',
+  'SOBR COXA': 'Sobrecoxa',
   'FILE MIGNON': 'Filé Mignon',
+  'FIL MIGNON': 'Filé Mignon',
+  'FL MIGNON': 'Filé Mignon',
   'F MIGNON': 'Filé Mignon',
   'CONTRA FILE': 'Contrafilé',
+  'CONTRA FIL': 'Contrafilé',
+  'CNT FILE': 'Contrafilé',
   'C FILE': 'Contrafilé',
   'COX SOBRECOX': 'Coxa e Sobrecoxa',
   'C SOBRECOX': 'Coxa e Sobrecoxa',
   'CARN MOID': 'Carne Moída',
   'CARNE MOID': 'Carne Moída',
+  'COST BOV': 'Costela Bovina',
+  'COST SUIN': 'Costela Suína',
   'LING CALAB': 'Linguiça Calabresa',
   'LINGUICA CALAB': 'Linguiça Calabresa',
+  'LI CAL': 'Linguiça Calabresa',
   'LING TOSC': 'Linguiça Toscana',
   'LINGUICA TOSC': 'Linguiça Toscana',
+  'LI TOSC': 'Linguiça Toscana',
+  'LI FGO': 'Linguiça de Frango',
+  'LING FRANG': 'Linguiça de Frango',
+  'CAL DEF': 'Calabresa Defumada',
   'DOCE LEIT': 'Doce de Leite',
   'DOCE DE LEIT': 'Doce de Leite',
   'AZEIT EXTR VIRG': 'Azeite Extra Virgem',
   'AZEITE EV': 'Azeite Extra Virgem',
   'AZ EXT VIRG': 'Azeite Extra Virgem',
+  'AZ EXTRAVIRGEM': 'Azeite Extra Virgem',
+  'AZEITE EXTRAV': 'Azeite Extra Virgem',
+  'AZEITE EXT VIRGEM': 'Azeite Extra Virgem',
+  'AZ OLIVA': 'Azeite de Oliva',
+  'EXT VIRGEM': 'Extra Virgem',
+  'EXT VIRG': 'Extra Virgem',
+  'OL SOJA': 'Óleo de Soja',
+  'OL SJ': 'Óleo de Soja',
+  'OLEO SOJ': 'Óleo de Soja',
+  'OL GIRASSOL': 'Óleo de Girassol',
+  'OL MILHO': 'Óleo de Milho',
+  'FAR TRIGO': 'Farinha de Trigo',
+  'FAR MANDIOCA': 'Farinha de Mandioca',
+  'FAR MAND': 'Farinha de Mandioca',
+  'MIST BOLO': 'Mistura para Bolo',
+  'ACUC REFIN': 'Açúcar Refinado',
+  'ACUC CRIST': 'Açúcar Cristal',
   'P CAFE': 'Pó de Café',
   'PO CAFE': 'Pó de Café',
   'PO DE CAFE': 'Pó de Café',
@@ -126,7 +232,12 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'COM LACT': 'Com Lactose',
   'S/ LACT': 'Sem Lactose',
   'SEM LACT': 'Sem Lactose',
+  'S LACT': 'Sem Lactose',
+  'S LACTOSE': 'Sem Lactose',
   'ZERO LACT': 'Zero Lactose',
+  'S GLUT': 'Sem Glúten',
+  'S GLUTEN': 'Sem Glúten',
+  'S ACUC': 'Sem Açúcar',
   'C/ CAROC': 'Com Caroço',
   'COM CAROC': 'Com Caroço',
   'S/ CAROC': 'Sem Caroço',
@@ -136,12 +247,32 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'FOLHA TRIPLA': 'Folha Tripla',
   'FD TRIPLA': 'Folha Tripla',
   'SACO P/ LIXO': 'Saco para Lixo',
-  'SC LIXO': 'Saco para Lixo',
-  'SACO LIX': 'Saco para Lixo',
+  'SC LIXO': 'Saco de Lixo',
+  'SC LIX': 'Saco de Lixo',
+  'SACO LIX': 'Saco de Lixo',
+  'SACO LIXO': 'Saco de Lixo',
+  'COP DESC': 'Copo Descartável',
+  'COPO DESC': 'Copo Descartável',
+  'PRAT DESC': 'Prato Descartável',
+  'PRATO DESC': 'Prato Descartável',
+  'TALH DESC': 'Talher Descartável',
+  'SAC PLAST': 'Sacola Plástica',
+  'SACOLA PLAST': 'Sacola Plástica',
+  'FRALD DESC': 'Fralda Descartável',
+  'FRALDA DESC': 'Fralda Descartável',
+  'FRALD INF': 'Fralda Infantil',
+  'FRALD GER': 'Fralda Geriátrica',
+  'FILT PAP': 'Filtro de Papel',
+  'FILTRO PAP': 'Filtro de Papel',
+  'PILH ALC': 'Pilha Alcalina',
+  'PILHA ALC': 'Pilha Alcalina',
   'SAB LIQ': 'Sabonete Líquido',
   'SAB LIQUIDO': 'Sabonete Líquido',
   'DESOD AER': 'Desodorante Aerossol',
+  'DESOD AERO': 'Desodorante Aerossol',
   'DESOD AEROS': 'Desodorante Aerossol',
+  'DESOD ROLL': 'Desodorante Roll-on',
+  'DESOD ROLON': 'Desodorante Roll-on',
   'LIMP MULT': 'Limpador Multiuso',
   'LIMP MULTIUSO': 'Limpador Multiuso',
   'AMAC CONC': 'Amaciante Concentrado',
@@ -152,12 +283,16 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'PAO HOT DOG': 'Pão de Hot Dog',
   'PAO HD': 'Pão de Hot Dog',
   'PAO QUEIJ': 'Pão de Queijo',
+  'PAO QUEIJO': 'Pão de Queijo',
+  'PAO QJ': 'Pão de Queijo',
+  'PAO QJO': 'Pão de Queijo',
   'P DE QUEIJO': 'Pão de Queijo',
   'AG COCO': 'Água de Coco',
   'AGUA COCO': 'Água de Coco',
   'BEB LACT': 'Bebida Láctea',
   'IORG GREGO': 'Iogurte Grego',
   'IOG GREGO': 'Iogurte Grego',
+  'IOG NAT': 'Iogurte Natural',
   'QUEIJ MIN': 'Queijo Minas',
   'QUEIJO MINAS': 'Queijo Minas',
   'QUEIJ PRAT': 'Queijo Prato',
@@ -168,6 +303,7 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'QUEIJO PARMESAO': 'Queijo Parmesão',
   'QUEIJ COALH': 'Queijo Coalho',
   'QUEIJO COALHO': 'Queijo Coalho',
+  'QJ RAL': 'Queijo Ralado',
   'REQUEIJ CREM': 'Requeijão Cremoso',
   'MANTEIG C/SAL': 'Manteiga com Sal',
   'MANTEIG S/SAL': 'Manteiga sem Sal',
@@ -239,30 +375,37 @@ export const ABBREV_MAP: Record<string, string> = {
   CAC: 'Cacau', AVEI: 'Aveia', CEREAL: 'Cereal', BAR: 'Barra',
   SBRM: 'Sobremesa', GELAT: 'Gelatina', GELE: 'Geleia', GELEIA: 'Geleia',
   ADOC: 'Adoçante', ADOCANT: 'Adoçante', MEL: 'Mel', PUD: 'Pudim', PUDIM: 'Pudim',
-  REFRIG: 'Refrigerante', REF: 'Refrigerante', REFRI: 'Refrigerante',
+  REFRIG: 'Refrigerante', REFRI: 'Refrigerante',
   CAFE: 'Café', CAFÉ: 'Café', PILAO: 'Pilão', PILÃO: 'Pilão',
   FEIJAO: 'Feijão', FEIJÃO: 'Feijão', ACUCAR: 'Açúcar', AÇUCAR: 'Açúcar',
   PAO: 'Pão', PÃO: 'Pão', SABAO: 'Sabão', SABÃO: 'Sabão',
   AGUA: 'Água', ÁGUA: 'Água', MELAO: 'Melão', MELÃO: 'Melão',
-  YPE: 'Ypê', YPÊ: 'Ypê',
+  YPE: 'Ypê', YPÊ: 'Ypê', UNIAO: 'União', UNIÃO: 'União',
+  REQUEIJAO: 'Requeijão', LINGUICA: 'Linguiça', ALMONDEGA: 'Almôndega',
+  BROCOLIS: 'Brócolis', ABOBORA: 'Abóbora', PESSEGO: 'Pêssego',
+  MARACUJA: 'Maracujá', GUARANA: 'Guaraná', ACAI: 'Açaí',
+  FUBA: 'Fubá', ALCOOL: 'Álcool', ORGANICO: 'Orgânico', ORGANICA: 'Orgânica',
+  SALMAO: 'Salmão', CAMARAO: 'Camarão', AVELA: 'Avelã', FRANCES: 'Francês',
+  PARMESAO: 'Parmesão', MUSCULO: 'Músculo', COXAO: 'Coxão',
+  PACOCA: 'Paçoca', CAFEINA: 'Cafeína', SOLUVEL: 'Solúvel',
   CERV: 'Cerveja', CERVEJ: 'Cerveja', CHOP: 'Chopp', SUC: 'Suco',
   AG: 'Água', AGU: 'Água', MIN: 'Mineral', MINER: 'Mineral',
   'S/GAS': 'Sem Gás', SGAS: 'Sem Gás', 'C/GAS': 'Com Gás', CGAS: 'Com Gás',
   TON: 'Tônica', TONIC: 'Tônica', ESPUM: 'Espumante', ENERG: 'Energético',
-  ISOT: 'Isotônico', CHA: 'Chá',
-  SAB: 'Sabonete', SABON: 'Sabonete', SH: 'Shampoo', SHAMP: 'Shampoo',
+  ISOT: 'Isotônico', CHA: 'Chá', NECT: 'Néctar',
+  SAB: 'Sabonete', SBT: 'Sabonete', SABON: 'Sabonete', SH: 'Shampoo', SHAMP: 'Shampoo',
   SHAMPO: 'Shampoo', SHP: 'Shampoo', CND: 'Condicionador',
-  DESOD: 'Desodorante', DES: 'Desodorante', AER: 'Aerossol', AEROS: 'Aerossol',
+  DESOD: 'Desodorante', DESODOR: 'Desodorante', DES: 'Desodorante', AER: 'Aerossol', AEROS: 'Aerossol',
   ROLL: 'Roll-on', 'CREM DENT': 'Creme Dental', 'CR DENT': 'Creme Dental',
-  DENT: 'Dental', CREM: 'Creme', CR: 'Creme', ESCOV: 'Escova', ESCOUA: 'Escova',
+  DENT: 'Dental', CREM: 'Creme', CR: 'Creme', ESCOV: 'Escova', ESCOUA: 'Escova', ESC: 'Escova',
   HIDRAT: 'Hidratante', HIDR: 'Hidratante', HID: 'Hidratante', FRAL: 'Fralda',
-  ABS: 'Absorvente', ABSORV: 'Absorvente', PROT: 'Protetor', SOL: 'Solar',
+  ABS: 'Absorvente', ABSORV: 'Absorvente', PROT: 'Protetor',
   ANTISS: 'Antisséptico', ANTISSEP: 'Antisséptico', ENXAG: 'Enxaguante',
   BUCAL: 'Bucal', HAST: 'Hastes Flexíveis', COTON: 'Cotonetes',
   ALGOD: 'Algodão', LENCO: 'Lenço Umedecido', UMED: 'Umedecido',
   DESC: 'Descartável', DET: 'Detergente', DETERG: 'Detergente',
-  AMAC: 'Amaciante', AMACIANT: 'Amaciante', CONC: 'Concentrado',
-  LIMP: 'Limpador', DESINF: 'Desinfetante', DESINFET: 'Desinfetante',
+  AMAC: 'Amaciante', AMACIANT: 'Amaciante', AM: 'Amaciante', CONC: 'Concentrado',
+  LIMP: 'Limpador', DESINF: 'Desinfetante', DESINFET: 'Desinfetante', DESF: 'Desinfetante',
   MULT: 'Multiuso', MULTIUS: 'Multiuso', ESPONJA: 'Esponja', ESP: 'Esponja',
   PANO: 'Pano', FLAN: 'Flanela', UASSOURA: 'Vassoura', ROD: 'Rodo',
   LAV: 'Lava', ROUP: 'Roupas', ROUPA: 'Roupas', LOUC: 'Louças', LOUCA: 'Louças',
@@ -272,17 +415,17 @@ export const ABBREV_MAP: Record<string, string> = {
   'AG SANIT': 'Água Sanitária', 'AGUA SANIT': 'Água Sanitária',
   'SAB EM PO': 'Sabão em Pó', 'SAB PO': 'Sabão em Pó',
   'SAB BARRA': 'Sabão em Barra', 'PAPEL HIG': 'Papel Higiênico',
-  GUARD: 'Guardanapo', TOALH: 'Toalha', LIX: 'Lixo', LIXO: 'Lixo',
-  INSET: 'Inseticida', REPEL: 'Repelente', ODOR: 'Odorizador',
-  AROMAT: 'Aromatizador', PCT: 'Pacote', PACOT: 'Pacote', CX: 'Caixa',
-  CXA: 'Caixa', FD: 'Fardo', FARDO: 'Fardo', GAR: 'Garrafa', GARRAF: 'Garrafa',
+  GUARD: 'Guardanapo', GUARDAN: 'Guardanapo', TOALH: 'Toalha', LIX: 'Lixo', LIXO: 'Lixo',
+  INSET: 'Inseticida', INSETIC: 'Inseticida', REPEL: 'Repelente', ODOR: 'Odorizador', ODORIZ: 'Odorizador',
+  AROMAT: 'Aromatizador', PCT: 'Pacote', PCTE: 'Pacote', PACOT: 'Pacote', CX: 'Caixa',
+  CXA: 'Caixa', FD: 'Fardo', FARDO: 'Fardo', GAR: 'Garrafa', GARRAF: 'Garrafa', GRF: 'Garrafa',
   LAT: 'Lata', LATA: 'Lata', EMB: 'Embalagem', EMBAL: 'Embalagem',
   BDJ: 'Bandeja', BANDEJ: 'Bandeja', PET: 'Pet', REFIL: 'Refil',
   ECON: 'Econômica', ECONOM: 'Econômico', LEVE: 'Leve', PAG: 'Pague',
   PAGUE: 'Pague', PROM: 'Promoção', PROMO: 'Promoção', TRAD: 'Tradicional',
   TRADIC: 'Tradicional', ORIG: 'Original', NAT: 'Natural', NATUR: 'Natural',
-  SABOR: 'Sabor', LIQ: 'Líquido', LIQUID: 'Líquido', PO: 'Pó',
-  UN: 'Unidade', UND: 'Unidade', 'C/': 'Com', 'S/': 'Sem', 'P/': 'Para',
+  SABOR: 'Sabor', LIQ: 'Líquido', LIQUID: 'Líquido', LIQUIDA: 'Líquida', PO: 'Pó',
+  UNID: 'Unidade', 'C/': 'Com', 'S/': 'Sem', 'P/': 'Para',
   UHT: 'UHT', EV: 'Extra Virgem', VIRG: 'Virgem',
   TOSC: 'Toscana', CALAB: 'Calabresa', CALABR: 'Calabresa', APRES: 'Apresuntado', APRESUNT: 'Apresuntado',
   LAVAND: 'Lavanda', PINH: 'Pinho', EUCAL: 'Eucalipto', CITR: 'Cítrico',
@@ -290,7 +433,13 @@ export const ABBREV_MAP: Record<string, string> = {
   COCO: 'Coco', BAUN: 'Baunilha', BAUNILH: 'Baunilha', CANEL: 'Canela', CRAV: 'Cravo',
   AMEND: 'Amendoim', GEL: 'Gel', SOLUV: 'Solúvel', CAPS: 'Cápsulas', SACH: 'Sachê', SACHE: 'Sachê', FLOC: 'Flocos',
   TP: 'Tipo', T1: 'Tipo 1', T2: 'Tipo 2', INTENS: 'Intenso',
-  PERF: 'Perfeita', FRESC: 'Fresco',
+  PERF: 'Perfeita', FRESC: 'Fresco', PIP: 'Pipoca', PEI: 'Peito',
+  FEJ: 'Feijão', MACAR: 'Macarrão', MACC: 'Macarrão', TARANT: 'Tarantella',
+  AMID: 'Amido', FERM: 'Fermento', FERMENT: 'Fermento', CROIS: 'Croissant',
+  BAUD: 'Bauducco', FGO: 'Frango', MORT: 'Mortadela', MORTAD: 'Mortadela', SALAM: 'Salame',
+  POLIF: 'Poliflor', GLAD: 'Glade', COZ: 'Cozinha', COLG: 'Colgate',
+  ACET: 'Acetona', CICATR: 'Cicatricure', PH: 'Papel Higiênico', HIG: 'Higiênico',
+  ALCAL: 'Alcalina', ALMOF: 'Almofadado', INTEGR: 'Integral', INST: 'Instantâneo', INSTANT: 'Instantâneo',
   UALOR: 'Valor', VALOR: 'Valor',
 };
 
@@ -381,9 +530,10 @@ function escapeRegExp(str: string): string {
 }
 
 function repairOcrPricesInLine(line: string): string {
-  let s = line.replace(/(?<=[,.])([Oo0-9]{2,3})\b/g, (m) =>
-    m.replace(/[Oo]/g, '0'),
-  );
+  let s = line
+    .replace(/\bR[S5]\s*(?=\d)/g, 'R$ ')
+    .replace(/(\d)\s*,\s*(\d{2})\b/g, '$1,$2')
+    .replace(/(?<=[,.])([Oo0-9]{2,3})\b/g, (m) => m.replace(/[Oo]/g, '0'));
   s = s.replace(/\b([0-9]*[Oo]+[0-9]*)(?=[,.])/g, (m) =>
     m.replace(/[Oo]/g, '0'),
   );
@@ -458,6 +608,29 @@ function shouldIgnoreReceiptLine(line: string): boolean {
   const lower = line.toLowerCase();
   for (const keyword of IGNORED_RECEIPT_KEYWORDS) {
     if (lower.includes(keyword)) return true;
+  }
+  if (
+    /\b(?:pix|mastercard|visa\s*(?:electron|cr[eé]dito|d[eé]bito)?|elo\s*(?:cr[eé]dito|d[eé]bito)?|hipercard|amex|alelo|sodexo|pluxee|vale\s*alimenta[çc][ãa]o|vale\s*refei[çc][ãa]o)\b/i.test(
+      lower,
+    )
+  ) {
+    return true;
+  }
+  if (/^\s*desc(?:onto)?\.?\s*(?:item|sobre|no|na|do|:|-|\d)/i.test(lower)) {
+    return true;
+  }
+  if (
+    /^\s*(?:rua|av\.?|avenida|rod\.?|rodovia|cep|tel(?:efone)?|fone)\b.*?(?:\d{4,5}-?\d{3}|\(\d{2}\))/i.test(
+      lower,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:supermercado|hipermercado|ltda|eireli)\b/i.test(lower) &&
+    !/\d{1,3}(?:\.\d{3})*[,.]\d{2}\b/.test(lower)
+  ) {
+    return true;
   }
   if (isReceiptTotalOrSummaryLine(lower)) return true;
   const digitsOnly = line.replace(/\D/g, '');
@@ -559,9 +732,14 @@ export function repairReceiptWord(word: string): string {
   if (upperWord === 'OL' || upperWord === 'SC') return word;
 
   const isMeasurement =
-    /^\d*(?:[,.]\d+)?[Oo0-9]+(?:g|kg|ml|l|lt|un|pc|pct|cx|emb|%)$/i.test(
+    /^\d*(?:[,.]\d+)?[Oo0-9]+(?:g|kg|ml|l|lt|mg|un|pc|pct|cx|emb|%)$/i.test(
       word,
-    ) || /^C\/\d*$/i.test(word);
+    ) ||
+    /^\d+\s*[xX*]\s*\d+(?:[,.]\d+)?(?:g|kg|ml|l|lt|mg|un|pc|pct|cx|emb)?$/i.test(
+      word,
+    ) ||
+    /^\d+em\d+$/i.test(word) ||
+    /^C\/\d*$/i.test(word);
 
   let w = word;
   if (isMeasurement) {
@@ -698,33 +876,183 @@ export function mergeSplitWords(rawTokens: string[]): string[] {
 }
 
 export function cleanReceiptProductName(raw: string): string {
-  let s = raw;
+  if (!raw) return '';
 
-  // 0. Remove bracketed / parenthesized codes e.g. (Código: 1234), (Cód: 5678), (Cod: 90), (PLU: 4011), (Ref: 99)
-  s = s.replace(/\s*\((?:c[óo]d(?:igo)?|plu|ref|ean|gtin|item)\s*:[^)]*\)\s*/gi, ' ');
-  s = s.replace(/\s*\[(?:c[óo]d(?:igo)?|plu|ref|ean|gtin|item)\s*:[^\]]*\]\s*/gi, ' ');
-  s = s.replace(/\b(?:c[óo]d(?:igo)?|plu|ref|ean|gtin)\s*:\s*\d+\b/gi, ' ');
-  s = s.replace(/\bNCM(?:\s*:)?\s*[\d.-]+\b/gi, ' ');
+  // 0. Normalize unicode spaces & invisible chars
+  let s = raw
+    .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return '';
 
-  // 1. Remove leading item index, codes, and barcodes (e.g. "001 7891000315507 ", "ITEM 01 12345 ")
-  s = s.replace(/^\s*(?:ITEM|IT|COD|CÓD)?\s*#?\s*\d{1,6}\s+\d{4,14}\s+/i, '');
-  s = s.replace(/^\s*(?:ITEM|IT|COD|CÓD)?\s*#?\s*\d{1,14}[\s.-]+/i, '');
-  s = s.replace(/^\s*\d{7,14}\s+/, '');
+  // 1. Remove bracketed / parenthesized fiscal & internal codes
+  // e.g. (Código: 12345), (Cód.: 1019816), (Cód 70), (PLU: 4011), (Ref: 99), [EAN: 789...], (123456), (UN)
+  s = s.replace(
+    /\s*\((?:c[óo]d(?:igo)?|plu|ref|ean|gtin|sku|ncm|cest|cfop|item|it|lote)\s*[:.]?\s*[^)]*\)\s*/gi,
+    ' ',
+  );
+  s = s.replace(
+    /\s*\[(?:c[óo]d(?:igo)?|plu|ref|ean|gtin|sku|ncm|cest|cfop|item|it|lote)\s*[:.]?\s*[^\]]*\]\s*/gi,
+    ' ',
+  );
+  // Unclosed trailing "(Cód: 1234" from OCR cutoff
+  s = s.replace(
+    /\s*\((?:c[óo]d(?:igo)?|plu|ref|ean|gtin|sku|ncm)\s*[:.]?\s*[A-Z0-9.-]*$/gi,
+    '',
+  );
+  // Numeric-only or unit/tax-only parenthesized/bracketed tokens e.g. (12345), (01), (UN), (F1)
+  s = s.replace(
+    /\s*\(\s*(?:\d[\d.\s/-]*|un|und|kg|pc|pct|cx|f\d+|t\d+(?:[,.]\d+)?%?|i\d+|n\d+|st)\s*\)\s*/gi,
+    ' ',
+  );
+  s = s.replace(
+    /\s*\[\s*(?:\d[\d.\s/-]*|un|und|kg|pc|pct|cx|f\d+|t\d+(?:[,.]\d+)?%?|i\d+|n\d+|st)\s*\]\s*/gi,
+    ' ',
+  );
 
-  // 2. Remove trailing quantity multipliers, fiscal tags and unit markers
-  s = s.replace(/\s+\d+(?:[,.]\d+)?\s*(?:UN|KG|PC|PCT|CX|EMB)\s*[xX*]\s*[\d,.]+.*$/i, '');
-  s = s.replace(/\s*(?:UN|KG|LT|PC)\s*:\s*[A-Z0-9]+.*$/i, '');
-  s = s.replace(/\s*V(?:L|LR)?\.?\s*UNIT(?:\.|ÁRIO)?\s*:?.*$/i, '');
-  s = s.replace(/\s+(?:F\d+|T\d+(?:[,.]\d+)?%?|I\d+|N\d+|II|FF|NN|ST|ICMS(?:\s*\d+%)?|PIS|COFINS)\b.*$/gi, '');
-  s = s.replace(/\s+(?:UN|PC|R\$)\s*$/i, '');
+  // Inline key-value codes & tax identifiers
+  s = s.replace(
+    /\b(?:c[óo]d(?:igo)?|plu|ref|ean|gtin|sku|lote)\s*[:.#-]?\s*[\d.-]{1,}(?:\/[\d.-]+)?\b/gi,
+    ' ',
+  );
+  s = s.replace(/\b(?:ncm|cest|cfop)\b(?:\s*[:.]?\s*[\d.-]+)?/gi, ' ');
+  s = s.replace(/#\s*\d+\b/g, ' ');
 
-  // 3. Remove stray symbols like ***, ===, ---, >>>, <<<, #, |, ~
-  s = s.replace(/[*=_#|~<>]+/g, ' ');
+  // 2. Remove SEFAZ / receipt inline quantity, unit, multiplier, and price remnants
+  s = s.replace(/\b(?:qtde?|quant(?:idade)?)\.?\s*:?\s*[\d.,]+.*$/i, '');
+  s = s.replace(/\b(?:un|und|unid|kg|lt|pc|pct|cx|fd)\s*:\s*[A-Z0-9.,/-]+.*$/i, '');
+  s = s.replace(/\bv(?:l|lr)?\.?\s*(?:unit(?:[áa]rio)?|total|tot)\s*[:.]?.*$/i, '');
+  s = s.replace(
+    /\b\d+(?:[,.]\d+)?\s*(?:un|und|unid|kg|g|l|lt|ml|pc|pct|cx|emb|dz|fd|bdj)?\s*[xX*]\s*\d+[,.]\d{2,4}.*$/i,
+    '',
+  );
+  s = s.replace(
+    /\s+\d+(?:[,.]\d+)?\s*(?:un|und|unid|kg|pc|pct|cx|emb|dz|fd|bdj)\s*[xX*]\s*$/i,
+    '',
+  );
+  s = s.replace(/\s+r\$\s*[\d.,]*.*$/i, '');
 
-  for (const [key, val] of Object.entries(PHRASE_ABBREV_MAP)) {
-    const pattern = new RegExp(`\\b${escapeRegExp(key)}\\b`, 'gi');
-    s = s.replace(pattern, val);
-  }
+  // 3. Remove leading stray symbols, item sequence indexes, and codes/barcodes
+  const stripLeadingNoise = (input: string): string => {
+    let cur = input.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°]+/, '');
+    cur = cur.replace(
+      /^(?:item|it|c[óo]d(?:igo)?|n[º°o]?\.?)\s*#?[:.-]?\s*\d{1,18}(?:[-/]\d+)?[\s.:/)-]*/i,
+      '',
+    );
+    cur = cur.replace(/^\d{1,6}\s+\d{4,18}(?:[-/]\d{1,3})?[\s.:/)-]+/, '');
+    cur = cur.replace(/^\d{4,18}(?:[-/]\d{1,3})?(?=[\s.:/)-])[\s.:/)-]+/, '');
+    cur = cur.replace(/^0\d{1,4}(?=[\s.:/)-])[\s.:/)-]+/, '');
+    cur = cur.replace(/^\d{1,3}\s*[.):/-]+\s*/, '');
+    cur = cur.replace(
+      /^(?!\d+\s*(?:cora[çc][õo]es|queijos?|em\s+\d|belo|ervas?|cereais|gr[ãa]os|frutas?|leites?|un|kg|g|l|ml|mg|cm|m|rolos?|folhas?)\b)\d{1,3}\s+(?=[a-zA-ZÀ-ÿ])/i,
+      '',
+    );
+    return cur.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°]+/, '').trim();
+  };
+  s = stripLeadingNoise(s);
+  s = stripLeadingNoise(s);
+
+  // 4. Preserve "Tipo 1" / "Tipo 2" before fiscal tag stripping
+  s = s.replace(/\bTIPO\s+II\b/gi, 'Tipo 2');
+  s = s.replace(/\bTIPO\s+I\b/gi, 'Tipo 1');
+  s = s.replace(
+    /\b(arroz|feij[aã]o|arr|feij|a[çc][uú]car|acuc|farinha|far|milho|caf[eé])\b(.*?)\bT([12])\b/gi,
+    '$1$2Tipo $3',
+  );
+  s = s.replace(
+    /\bT([12])\b(?=\s+\d+(?:[,.]\d+)?\s*(?:kg|kilos?|quilos?|g|gr|l|lt|ml)\b)/gi,
+    'Tipo $1',
+  );
+
+  // 5. Remove trailing tax flags, ICMS rates, and fiscal tags
+  s = s.replace(
+    /(?:^|\s+)(?:F\d+|T\d{1,2}(?:[,.]\d+)?%?|I\d+|N\d+|II|FF|NN|IS|NT|ST|ISENTO|TRIB(?:UTADO)?|ICMS(?:\s*[\d,.]+%?)?|PIS|COFINS)\b.*$/gi,
+    '',
+  );
+  s = s.replace(/(?:^|\s+)\d{1,2},\d{2}%.*$/i, '');
+  s = s.replace(/(?:^|\s+)(?:7|12|17|18|19|25|27)%.*$/i, '');
+
+  // 6. Remove trailing receipt quantity / bare commercial unit columns
+  s = s.replace(
+    /(?:^|\s+)\d+[,.]\d{3,4}\s*(?:un|und|unid|kg|g|l|lt|ml|pc|pct|cx|dz|bdj|fd)\b.*$/i,
+    '',
+  );
+  s = s.replace(
+    /(?:^|\s+)(?:\d{1,3}\s+(?:un|und|unid|pc|pct|cx|bdj|fd)|0\d{1,2}(?:un|und|unid))\s*$/i,
+    '',
+  );
+  s = s.replace(
+    /(?<=\b\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|mg)\b.*)\s+\d{1,2}(?:un|und|unid)\s*$/i,
+    '',
+  );
+  s = s.replace(/(?:^|\s+)(?:un|und|unid|pc|kg|lt|r\$)\s*$/i, '');
+
+  // 7. Remove trailing & middle standalone 4+ digit codes (PLU/EAN/SKU) and hyphenated numeric codes
+  s = s.replace(
+    /(?:^|\s+)\d{4,18}\b(?!\s*(?:g|gr|grs|gramas?|kg|kilos?|quilos?|ml|mls|l|lt|lts|litros?|mg|m|cm|mm|folhas?|rolos?|un|und|pc|pct|%))/gi,
+    '',
+  );
+  s = s.replace(
+    /(?:^|\s+)\d{1,6}[-/]\d{1,6}\b(?!\s*(?:g|gr|grs|gramas?|kg|kilos?|quilos?|ml|mls|l|lt|lts|litros?|mg|m|cm|mm|%))/gi,
+    '',
+  );
+
+  // 8. Clean stray punctuation & OCR symbols while preserving decimals, C/12, S/LACT, Coca-Cola
+  s = s.replace(/[*=_#|~<>•·…—–«»"'`^°¨§¬¢£¤¦©®™\\;!?@$]+/g, ' ');
+  s = s.replace(/[()[\]{}]+/g, ' ');
+  // Abbreviation dots attached to letters: "CR.LEITE" -> "CR LEITE", "BISC." -> "BISC"
+  s = s.replace(/([a-zA-ZÀ-ÿ])\.([a-zA-ZÀ-ÿ])/g, '$1 $2');
+  s = s.replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
+  s = s.replace(/(?<!\d),|,(?!\d)/g, ' ');
+  s = s.replace(/[:]+/g, ' ');
+  // Normalize slash notations (preserve C/12, CH/VERD, expand C/, S/, P/ before letters, drop stray slashes)
+  s = s.replace(/\bS\/S\b/gi, 'Sem Semente');
+  s = s.replace(/\bC\/(?=[a-zA-ZÀ-ÿ])/gi, 'Com ');
+  s = s.replace(/\bS\/(?=[a-zA-ZÀ-ÿ])/gi, 'Sem ');
+  s = s.replace(/\bP\/(?=[a-zA-ZÀ-ÿ])/gi, 'Para ');
+  s = s.replace(/(?<![cCsSpP])\/|\/(?![a-zA-ZÀ-ÿ0-9])/g, ' ');
+  // Drop stray hyphens not joining two word characters (keep "COCA-COLA")
+  s = s.replace(/(?<![a-zA-ZÀ-ÿ0-9])-+|-+(?![a-zA-ZÀ-ÿ0-9])/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+
+  // 9. Standardize attached weight/volume tokens BEFORE abbreviation expansion
+  // (e.g. "1 LT" -> "1l", preventing "LT" -> "Leite"!)
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:l|lt|lts|litros?)\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}l`,
+  );
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:ml|mls)\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}ml`,
+  );
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:kg|kilos?|quilos?)\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}kg`,
+  );
+  s = s.replace(
+    /\b([1235]|10|0[,.]\d+)\s*k\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}kg`,
+  );
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:g|gr|grs|gramas?)\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}g`,
+  );
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*mg\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}mg`,
+  );
+
+  // 10. Expand multi-word phrases, merge split OCR fragments, repair OCR word confusions, expand abbreviations
+  const applyPhraseMap = (text: string): string => {
+    let out = text;
+    for (const [key, val] of Object.entries(PHRASE_ABBREV_MAP)) {
+      const pattern = new RegExp(`\\b${escapeRegExp(key)}\\b`, 'gi');
+      out = out.replace(pattern, val);
+    }
+    return out;
+  };
+
+  s = applyPhraseMap(s);
 
   let rawTokens = s
     .split(/\s+/)
@@ -732,61 +1060,165 @@ export function cleanReceiptProductName(raw: string): string {
     .filter(Boolean);
   rawTokens = mergeSplitWords(rawTokens);
 
-  const cleanedWords: string[] = [];
-  for (const w of rawTokens) {
+  const repairedTokens = rawTokens.map((w) => {
     const rawUpper = w.toUpperCase();
-    if (rawUpper in ABBREV_MAP) {
-      cleanedWords.push(ABBREV_MAP[rawUpper]);
+    if (rawUpper in ABBREV_MAP) return w;
+    return repairReceiptWord(w);
+  });
+
+  // Re-run phrase map after OCR word repairs (e.g. "CR LE1TE" -> "CR LEITE" -> "Creme de Leite")
+  s = applyPhraseMap(repairedTokens.join(' '));
+  const isBigMac = /\bbig\s+mac\b/i.test(s);
+
+  const expandedTokens = s
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .map((w, idx) => {
+      const upper = w.toUpperCase();
+      if (upper === 'MAC' && isBigMac) return w;
+      if (upper === 'REF' && idx === 0) return 'Refrigerante';
+      if (upper in ABBREV_MAP) return ABBREV_MAP[upper];
+      return w;
+    });
+
+  // 11. Strip dangling leading/trailing OCR noise, meaningless numbers, and stray 1-2 char tokens
+  while (expandedTokens.length > 1) {
+    const first = expandedTokens[0];
+    const firstLower = first.toLowerCase();
+    const secondLower = expandedTokens[1]?.toLowerCase() ?? '';
+    if (/^\d{1,3}$/.test(first)) {
+      const keepLeadingDigit =
+        /^(?:cora[çc][õo]es|queijos?|em|belo|ervas?|cereais|gr[ãa]os|frutas?|leites?|un|rolos?|folhas?)$/.test(
+          secondLower,
+        );
+      if (!keepLeadingDigit) {
+        expandedTokens.shift();
+        continue;
+      }
+    }
+    if (first.length === 1 && /^[a-zA-Z]$/.test(first)) {
+      if (!(firstLower === 'q' && secondLower === 'boa')) {
+        expandedTokens.shift();
+        continue;
+      }
+    }
+    break;
+  }
+
+  const middleCleaned = expandedTokens.filter((tok, idx) => {
+    if (idx > 0 && idx < expandedTokens.length - 1) {
+      if (/^0\d{1,3}$/.test(tok)) return false;
+    }
+    return true;
+  });
+
+  const validTrailingShortWords = new Set([
+    'po', 'pó', 'cha', 'chá', 'sal', 'uva', 'mel', 'ovo', 'pao', 'pão',
+    'no', 'luz', 'sol', 'bem', 'mix',
+  ]);
+  const numericContextPredecessors = new Set([
+    'tipo', 'tp', 'total', 'n', 'nº', 'no', 'nro', 'numero', 'número',
+    'filtro', 'coador', 'melitta', 'leve', 'pague', 'zero', 'em',
+    'cachaca', 'cachaça', 'pirassununga', 'coracoes', 'corações',
+  ]);
+  const trailingAcronymModifiers = new Set([
+    'p', 'm', 'g', 'xg', 'xxg', 'aa', 'aaa', 'uht', 'ev',
+  ]);
+
+  while (middleCleaned.length > 1) {
+    const last = middleCleaned[middleCleaned.length - 1];
+    const lastLower = last.toLowerCase();
+    const prevLower = middleCleaned[middleCleaned.length - 2].toLowerCase();
+
+    if (
+      /^\d+(?:[,.]\d+)?(?:g|kg|ml|l|mg|m|cm|mm|un|%)$/i.test(last) ||
+      /^c\/\d+$/i.test(last)
+    ) {
+      break;
+    }
+    if (/^\d{1,3}$/.test(last) && numericContextPredecessors.has(prevLower)) {
+      break;
+    }
+    if (
+      (/^[a-e]$/i.test(last) &&
+        (prevLower === 'vitamina' || prevLower === 'tipo')) ||
+      (trailingAcronymModifiers.has(lastLower) &&
+        /^(?:fralda|fraldas|luva|luvas|pilha|pilhas|bateria|baterias|absorvente|absorventes|leite|azeite|tam|tamanho)$/.test(
+          prevLower,
+        ))
+    ) {
+      break;
+    }
+    if (validTrailingShortWords.has(lastLower)) {
+      break;
+    }
+    if (
+      last.length <= 2 ||
+      /^\d+$/.test(last) ||
+      [
+        'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'para',
+        'un', 'und', 'unid', 'kg', 'lt', 'pc',
+      ].includes(lastLower)
+    ) {
+      middleCleaned.pop();
       continue;
     }
-    const repaired = repairReceiptWord(w);
-    const upper = repaired.toUpperCase();
-    if (upper in ABBREV_MAP) {
-      cleanedWords.push(ABBREV_MAP[upper]);
-    } else {
-      cleanedWords.push(repaired);
-    }
-  }
-  s = cleanedWords.join(' ');
-
-  const trailingMatch = /\s+([A-Za-z0-9]{1,2}(?:\s+[A-Za-z0-9]{1,2})*)\s*$/.exec(
-    s,
-  );
-  if (trailingMatch) {
-    const trailingToken = trailingMatch[1].trim().toLowerCase();
-    const validShortWords = new Set([
-      'po', 'pó', 'cha', 'chá', 'sal', 'uva', 'mel', 'ovo', 'pao', 'pão',
-      'de', 'em', 'un', 'kg', 'ml', 'g', 'l', 'ev', '1', '2', '3', '4', '5', '6', '7', '8', '9', '12',
-    ]);
-    if (
-      !validShortWords.has(trailingToken) &&
-      !/^\d+[a-z]{1,2}$/i.test(trailingToken)
-    ) {
-      s = s.slice(0, trailingMatch.index).trim();
-    }
+    break;
   }
 
-  s = s.replace(/\s+/g, ' ').trim();
+  s = middleCleaned.join(' ').replace(/\s+/g, ' ').trim();
   if (!s || !/[a-zA-ZÀ-ÿ]/.test(s)) return '';
 
+  // 12. Format Title Case nicely while preserving units, minor prepositions, and acronyms
   const minorPrepositions = new Set([
     'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'e', 'para',
   ]);
-  return s
-    .split(' ')
-    .map((p) => {
+  const uppercaseAcronyms = new Set(['UHT', 'EV', 'AA', 'AAA', 'XG', 'XXG', 'PVC']);
+  const finalTokens = s.split(' ');
+
+  return finalTokens
+    .map((p, idx) => {
       if (!p) return '';
       if (/^\d+(?:[,.]\d+)?[a-zA-Z]{1,3}$/.test(p)) return p.toLowerCase();
-      if (p.toUpperCase() === 'UHT' || p.toUpperCase() === 'EV') return p.toUpperCase();
+      if (/^c\/\d+$/i.test(p)) return p.toLowerCase();
+      const upper = p.toUpperCase();
+      if (uppercaseAcronyms.has(upper)) return upper;
+      if (/^[a-zA-Z]$/.test(p) && idx > 0) {
+        const prev = finalTokens[idx - 1]?.toLowerCase() ?? '';
+        if (
+          prev === 'vitamina' ||
+          prev === 'tipo' ||
+          prev === 'fralda' ||
+          prev === 'luva'
+        ) {
+          return upper;
+        }
+      }
       const lower = p.toLowerCase();
-      if (minorPrepositions.has(lower)) return lower;
+      if (idx > 0 && minorPrepositions.has(lower)) return lower;
+      if (lower.includes('-')) {
+        return lower
+          .split('-')
+          .map((seg, segIdx) => {
+            if (!seg) return '';
+            if (segIdx > 0 && (seg === 'on' || minorPrepositions.has(seg))) {
+              return seg;
+            }
+            return seg[0].toUpperCase() + seg.slice(1);
+          })
+          .join('-');
+      }
       return lower[0].toUpperCase() + lower.slice(1);
     })
     .join(' ');
 }
 
 function extractItemIndex(line: string): number | undefined {
-  const match = /^\s*(?:item|it|cod|cód)?\s*#?\s*(\d{1,4})\b/i.exec(line);
+  const match =
+    /^\s*(?:item|it|cod|cód)?\s*#?\s*(\d{1,4})(?![,.]\d|[a-zA-ZÀ-ÿ])(?:\s|$|[.):/-])/i.exec(
+      line,
+    );
   if (match) {
     const val = Number.parseInt(match[1], 10);
     if (val >= 1 && val <= 999) return val;
@@ -852,20 +1284,163 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   const items: ScannedReceiptItem[] = [];
   let pendingProductName: string | null = null;
   let pendingItemIndex: number | undefined;
+  let pendingSefazDetail: {
+    qty: number;
+    unit: string;
+    unitPrice: number | null;
+  } | null = null;
 
   const priceRegex = /(\d{1,3}(?:\.\d{3})*[,.]\d{2})\b/g;
   const qtyMultiplierRegex =
-    /(\d+(?:[,.]\d+)?)\s*(un|kg|g|l|lt|ml|pc|pct|cx|emb)?\s*[xX*]\s*(\d+[,.]\d{2})/i;
+    /(\d+(?:[,.]\d+)?)\s*(un|und|unid|kg|g|l|lt|ml|pc|pct|cx|emb|dz|fd|bdj)?\s*[xX*]\s*(\d+[,.]\d{2,4})/i;
+  const sefazDetailRegex =
+    /\b(?:qtde?|quant(?:idade)?)\.?\s*:?\s*\d|\bvl\.?\s*unit\.?\s*:|\bun\s*:\s*[a-z]{1,6}\b/i;
+  const sefazItemTotalLabelRegex =
+    /^\s*v(?:l|lr)?\.?\s*total\s*:?\s*(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2})?\s*$/i;
+  const trailingTabularQtyRegex =
+    /\s+(\d+(?:[,.]\d+)?)\s+(un|und|unid|pc|pct|cx|dz|bdj|fd)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
+  const trailingWeightQtyRegex =
+    /\s+(\d+[,.]\d{2,4})\s*(kg|g|l|lt|ml)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
+  const trailingAttachedUnitQtyRegex =
+    /\s+(\d+[,.]\d{3,4}|0\d{1,2})\s*(un|und|unid|pc|pct|cx)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
+
+  const getPendingDetail = () => pendingSefazDetail;
+
+  const flushPendingSefazDetail = () => {
+    const detail = pendingSefazDetail;
+    if (
+      pendingProductName &&
+      !isTotalProductName(pendingProductName) &&
+      detail?.unitPrice != null &&
+      detail.unitPrice > 0
+    ) {
+      const qty = detail.qty > 0 ? detail.qty : 1.0;
+      const total = Number((detail.unitPrice * qty).toFixed(2));
+      if (total > 0 && total < 10000) {
+        items.push({
+          name: pendingProductName,
+          price: total,
+          unitPrice: detail.unitPrice,
+          quantity: qty,
+          unit: detail.unit || 'un',
+          category: CategoryClassifier.classify(pendingProductName),
+          itemIndex: pendingItemIndex,
+        });
+      }
+    }
+    pendingProductName = null;
+    pendingItemIndex = undefined;
+    pendingSefazDetail = null;
+  };
 
   for (const line of lines) {
     const rawLine = repairOcrPricesInLine(line);
+
+    // Handle SEFAZ copied "Vl. Total" / "Vl. Total: 29,94" line for an active pending item
+    const itemTotalMatch = sefazItemTotalLabelRegex.exec(rawLine);
+    if (itemTotalMatch && pendingProductName && !isTotalProductName(pendingProductName)) {
+      const priceStr = itemTotalMatch[1];
+      const activeDetail = getPendingDetail();
+      if (priceStr) {
+        const parsedTotal = AppFormatters.parsePrice(priceStr);
+        if (parsedTotal != null && parsedTotal > 0 && parsedTotal < 10000) {
+          const qty = activeDetail?.qty && activeDetail.qty > 0 ? activeDetail.qty : 1.0;
+          const unit = activeDetail?.unit || 'un';
+          const unitPrice =
+            activeDetail?.unitPrice ??
+            (qty > 0 ? Number((parsedTotal / qty).toFixed(4)) : parsedTotal);
+          items.push({
+            name: pendingProductName,
+            price: parsedTotal,
+            unitPrice,
+            quantity: qty,
+            unit,
+            category: CategoryClassifier.classify(pendingProductName),
+            itemIndex: pendingItemIndex,
+          });
+          pendingProductName = null;
+          pendingItemIndex = undefined;
+          pendingSefazDetail = null;
+        }
+      }
+      continue;
+    }
 
     if (
       shouldIgnoreReceiptLine(rawLine) ||
       isReceiptTotalOrSummaryLine(rawLine)
     ) {
-      pendingProductName = null;
-      pendingItemIndex = undefined;
+      flushPendingSefazDetail();
+      continue;
+    }
+
+    // Handle SEFAZ pasted detail lines (single-line or multi-line: "Qtde.: 2 UN: UN Vl. Unit.: 4,50 Vl. Total: 9,00")
+    if (sefazDetailRegex.test(rawLine)) {
+      const metaStart = rawLine.search(
+        /\b(?:qtde?|quant(?:idade)?\.?\s*:|un\s*:|vl\.?\s*unit\.?\s*:|vl\.?\s*total\s*:)/i,
+      );
+      const beforeMeta = metaStart > 0 ? rawLine.slice(0, metaStart).trim() : '';
+      const leadingName = beforeMeta ? cleanReceiptProductName(beforeMeta) : '';
+
+      if (leadingName.length >= 2 && !isTotalProductName(leadingName)) {
+        flushPendingSefazDetail();
+        pendingProductName = leadingName;
+        pendingItemIndex = extractItemIndex(beforeMeta);
+      }
+
+      if (pendingProductName && !isTotalProductName(pendingProductName)) {
+        const prevDetail = getPendingDetail();
+        let qty: number = prevDetail?.qty ?? 1.0;
+        let unit: string = prevDetail?.unit ?? 'un';
+        let unitPrice: number | null = prevDetail?.unitPrice ?? null;
+
+        const qm = /(?:qtde?|quant(?:idade)?)\.?:?\s*(\d+(?:[,.]\d+)?)/i.exec(rawLine);
+        if (qm) {
+          const pq = AppFormatters.parseQuantity(qm[1], unit);
+          if (pq != null && pq > 0) qty = pq;
+        }
+        const um = /\bun\s*:\s*([a-zA-ZÀ-ÿ]+)/i.exec(rawLine);
+        if (um) {
+          unit = AppFormatters.normalizeUnit(um[1]);
+          if (qm) {
+            const pq = AppFormatters.parseQuantity(qm[1], unit);
+            if (pq != null && pq > 0) qty = pq;
+          }
+        }
+        const upm = /vl\.?\s*unit\.?:?\s*(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4})/i.exec(rawLine);
+        if (upm) {
+          const parsedUp = AppFormatters.parsePrice(upm[1]);
+          if (parsedUp != null && parsedUp > 0) unitPrice = parsedUp;
+        }
+
+        const totm = /vl\.?\s*total\.?:?\s*(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2})/i.exec(rawLine);
+        if (totm) {
+          const parsedTotal = AppFormatters.parsePrice(totm[1]);
+          if (parsedTotal != null && parsedTotal > 0 && parsedTotal < 10000) {
+            const effectiveTotal =
+              qty > 1 && unitPrice != null && parsedTotal <= unitPrice
+                ? Number((unitPrice * qty).toFixed(2))
+                : parsedTotal;
+            items.push({
+              name: pendingProductName,
+              price: effectiveTotal,
+              unitPrice:
+                unitPrice ??
+                (qty > 0 ? Number((effectiveTotal / qty).toFixed(4)) : effectiveTotal),
+              quantity: qty > 0 ? qty : 1.0,
+              unit: unit || 'un',
+              category: CategoryClassifier.classify(pendingProductName),
+              itemIndex: pendingItemIndex,
+            });
+            pendingProductName = null;
+            pendingItemIndex = undefined;
+            pendingSefazDetail = null;
+            continue;
+          }
+        }
+
+        pendingSefazDetail = { qty, unit, unitPrice };
+      }
       continue;
     }
 
@@ -885,8 +1460,9 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           matches[matches.length - 1][1],
         );
         if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
-          const parsedQty = AppFormatters.parsePrice(qtyMatch[1]) ?? 1.0;
-          const unitStr = (qtyMatch[2] ?? 'un').toLowerCase();
+          const unitStr = AppFormatters.normalizeUnit(qtyMatch[2] ?? 'un');
+          const parsedQty =
+            AppFormatters.parseQuantity(qtyMatch[1], unitStr) ?? 1.0;
           const itemIdx = pendingItemIndex ?? extractItemIndex(rawLine);
           const parsedUnitPrice = qtyMatch[3]
             ? AppFormatters.parsePrice(qtyMatch[3])
@@ -895,7 +1471,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
             parsedQty > 1 &&
             parsedUnitPrice != null &&
             (parsedPrice <= parsedUnitPrice || matches.length === 1)
-              ? parsedUnitPrice * parsedQty
+              ? Number((parsedUnitPrice * parsedQty).toFixed(2))
               : parsedPrice;
           const effectiveUnitPrice =
             parsedUnitPrice ??
@@ -914,6 +1490,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           });
           pendingProductName = null;
           pendingItemIndex = undefined;
+          pendingSefazDetail = null;
           continue;
         }
       }
@@ -926,15 +1503,39 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
       const firstMatch = priceMatches[0];
       let beforePrices = rawLine.slice(0, firstMatch.index).trim();
 
-      let parsedQty = 1.0;
-      let parsedUnit = 'un';
-      let parsedUnitPrice: number | null = null;
+      let parsedQty = pendingSefazDetail?.qty ?? 1.0;
+      let parsedUnit = pendingSefazDetail?.unit ?? 'un';
+      let parsedUnitPrice: number | null = pendingSefazDetail?.unitPrice ?? null;
       if (qtyMatch && qtyMatch.index < (firstMatch.index ?? 0)) {
         beforePrices = rawLine.slice(0, qtyMatch.index).trim();
-        parsedUnit = (qtyMatch[2] ?? 'un').toLowerCase();
-        parsedQty = AppFormatters.parsePrice(qtyMatch[1]) ?? 1.0;
+        parsedUnit = AppFormatters.normalizeUnit(qtyMatch[2] ?? 'un');
+        parsedQty =
+          AppFormatters.parseQuantity(qtyMatch[1], parsedUnit) ?? 1.0;
         if (qtyMatch[3]) {
           parsedUnitPrice = AppFormatters.parsePrice(qtyMatch[3]);
+        }
+      } else {
+        // Tabular receipt line without 'x': "ARROZ CAMIL 5KG 2 UN 25,90 51,80" or "LEITE 1L 2,0000 UN 4,5000 9,00"
+        const tabMatch =
+          trailingTabularQtyRegex.exec(beforePrices) ??
+          trailingAttachedUnitQtyRegex.exec(beforePrices) ??
+          (priceMatches.length >= 2 || /\d+[,.]\d{2,4}\s*$/.test(beforePrices)
+            ? trailingWeightQtyRegex.exec(beforePrices)
+            : null);
+        if (tabMatch) {
+          const u = AppFormatters.normalizeUnit(tabMatch[2]);
+          const q = AppFormatters.parseQuantity(tabMatch[1], u);
+          if (q != null && q > 0) {
+            parsedQty = q;
+            parsedUnit = u;
+            beforePrices = beforePrices.slice(0, tabMatch.index).trim();
+            if (tabMatch[3]) {
+              const up = AppFormatters.parsePrice(tabMatch[3]);
+              if (up != null && up > 0) parsedUnitPrice = up;
+            } else if (priceMatches.length >= 2) {
+              parsedUnitPrice = AppFormatters.parsePrice(firstMatch[1]);
+            }
+          }
         }
       }
 
@@ -946,7 +1547,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           parsedQty > 1 &&
           parsedUnitPrice != null &&
           parsedPrice <= parsedUnitPrice
-            ? parsedUnitPrice * parsedQty
+            ? Number((parsedUnitPrice * parsedQty).toFixed(2))
             : parsedPrice;
         const effectiveUnitPrice =
           parsedUnitPrice ??
@@ -955,6 +1556,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
             : effectiveTotalPrice);
 
         if (cleanedName.length >= 2 && !isTotalProductName(cleanedName)) {
+          flushPendingSefazDetail();
           items.push({
             name: cleanedName,
             price: effectiveTotalPrice,
@@ -966,6 +1568,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           });
           pendingProductName = null;
           pendingItemIndex = undefined;
+          pendingSefazDetail = null;
           continue;
         } else if (
           pendingProductName &&
@@ -982,6 +1585,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           });
           pendingProductName = null;
           pendingItemIndex = undefined;
+          pendingSefazDetail = null;
           continue;
         }
       }
@@ -989,10 +1593,14 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
 
     const candidateName = cleanReceiptProductName(rawLine);
     if (candidateName.length >= 3 && !isTotalProductName(candidateName)) {
+      flushPendingSefazDetail();
       pendingProductName = candidateName;
       pendingItemIndex = extractItemIndex(rawLine);
+      pendingSefazDetail = null;
     }
   }
+
+  flushPendingSefazDetail();
 
   const filtered = items.filter((item) => !isTotalProductName(item.name));
 
@@ -1057,7 +1665,7 @@ async function preprocessImageForOcr(file: File): Promise<string> {
       el.src = imgUrl;
     });
 
-    const maxDim = 1800;
+    const maxDim = 2200;
     const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
     const width = Math.max(1, Math.round(img.width * scale));
     const height = Math.max(1, Math.round(img.height * scale));
@@ -1068,8 +1676,25 @@ async function preprocessImageForOcr(file: File): Promise<string> {
     const ctx = canvas.getContext('2d');
     if (!ctx) return imgUrl;
 
-    ctx.filter = 'grayscale(100%) contrast(140%)';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
+
+    try {
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      const contrast = 1.45;
+      for (let i = 0; i < data.length; i += 4) {
+        const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const boosted = Math.max(0, Math.min(255, (luma - 128) * contrast + 128));
+        data[i] = boosted;
+        data[i + 1] = boosted;
+        data[i + 2] = boosted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    } catch {
+      // Fallback if tainted canvas
+    }
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, 'image/jpeg', 0.92),

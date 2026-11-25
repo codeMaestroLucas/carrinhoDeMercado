@@ -316,17 +316,96 @@ export function cleanNfceProductName(raw: string): string {
   return cleanReceiptProductName(raw);
 }
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  nbsp: ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  ordm: 'º',
+  ordf: 'ª',
+  deg: '°',
+  ndash: '-',
+  mdash: '-',
+  aacute: 'á',
+  agrave: 'à',
+  acirc: 'â',
+  atilde: 'ã',
+  auml: 'ä',
+  eacute: 'é',
+  egrave: 'è',
+  ecirc: 'ê',
+  euml: 'ë',
+  iacute: 'í',
+  igrave: 'ì',
+  icirc: 'î',
+  iuml: 'ï',
+  oacute: 'ó',
+  ograve: 'ò',
+  ocirc: 'ô',
+  otilde: 'õ',
+  ouml: 'ö',
+  uacute: 'ú',
+  ugrave: 'ù',
+  ucirc: 'û',
+  uuml: 'ü',
+  ccedil: 'ç',
+  ntilde: 'ñ',
+  Aacute: 'Á',
+  Agrave: 'À',
+  Acirc: 'Â',
+  Atilde: 'Ã',
+  Eacute: 'É',
+  Ecirc: 'Ê',
+  Iacute: 'Í',
+  Oacute: 'Ó',
+  Ocirc: 'Ô',
+  Otilde: 'Õ',
+  Uacute: 'Ú',
+  Uuml: 'Ü',
+  Ccedil: 'Ç',
+};
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code: string) => {
+      const n = Number.parseInt(code, 10);
+      return Number.isFinite(n) ? String.fromCharCode(n) : '';
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
+      const n = Number.parseInt(hex, 16);
+      return Number.isFinite(n) ? String.fromCharCode(n) : '';
+    })
+    .replace(/&([a-zA-Z]+);/g, (full, name: string) => {
+      return NAMED_HTML_ENTITIES[name] ?? NAMED_HTML_ENTITIES[name.toLowerCase()] ?? full;
+    });
+}
+
 function stripTags(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
+  const withoutTags = html.replace(/<[^>]*>/g, ' ');
+  return decodeHtmlEntities(withoutTags).replace(/\s+/g, ' ').trim();
+}
+
+function stripTagsPreserveLines(html: string): string {
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:tr|div|p|li|td|th|h[1-6])>/gi, '\n');
+  const withoutTags = withBreaks.replace(/<[^>]*>/g, ' ');
+  return decodeHtmlEntities(withoutTags)
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function stripEmbeddedCodeTags(htmlFragment: string): string {
+  return htmlFragment
+    .replace(/<small[^>]*>[\s\S]*?<\/small>/gi, ' ')
+    .replace(
+      /<span[^>]*class="[^"]*(?:RCod|fixo-prod-cod|codigo)[^"]*"[^>]*>[\s\S]*?<\/span>/gi,
+      ' ',
+    );
 }
 
 export function cleanMarketName(raw: string): string {
@@ -474,7 +553,7 @@ function buildScannedItem(
     price: effectiveTotal,
     unitPrice: effectiveUnitPrice,
     quantity: qty > 0 ? qty : 1.0,
-    unit: unit || 'un',
+    unit: unit ? AppFormatters.normalizeUnit(unit) : 'un',
     category: CategoryClassifier.classify(cleanedName),
     itemIndex,
   };
@@ -490,7 +569,7 @@ function parseTableLayoutSp(html: string): ScannedReceiptItem[] {
     const priceMatch = /<span[^>]*class="[^"]*valor[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(rowHtml);
     if (!titleMatch || !priceMatch) continue;
 
-    const rawName = stripTags(titleMatch[1]);
+    const rawName = stripTags(stripEmbeddedCodeTags(titleMatch[1]));
     const price = AppFormatters.parsePrice(stripTags(priceMatch[1]));
 
     let qty = 1.0;
@@ -528,7 +607,10 @@ function parseTableLayoutStandard(html: string): ScannedReceiptItem[] {
   for (const row of html.matchAll(/<tr[^>]*id="Item[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi)) {
     const rowHtml = row[1];
     const nameMatch =
-      /<(?:span|td)[^>]*class="[^"]*(?:txtTit|fixo-prod-nome|descricao)[^"]*"[^>]*>([\s\S]*?)<\/(?:span|td)>/i.exec(
+      /<span[^>]*class="[^"]*(?:txtTit|fixo-prod-nome|descricao)[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(
+        rowHtml,
+      ) ??
+      /<td[^>]*class="[^"]*(?:txtTit|fixo-prod-nome|descricao)[^"]*"[^>]*>([\s\S]*?)<\/td>/i.exec(
         rowHtml,
       );
     const priceMatch =
@@ -537,7 +619,7 @@ function parseTableLayoutStandard(html: string): ScannedReceiptItem[] {
       );
     if (!nameMatch || !priceMatch) continue;
 
-    const rawName = stripTags(nameMatch[1]);
+    const rawName = stripTags(stripEmbeddedCodeTags(nameMatch[1]));
     const price = AppFormatters.parsePrice(stripTags(priceMatch[1]));
 
     let qty = 1.0;
@@ -580,14 +662,38 @@ function parseTableLayoutStandard(html: string): ScannedReceiptItem[] {
   return items;
 }
 
+function extractDanfeDetails(text: string): {
+  qty: number;
+  unit: string;
+  unitPrice: number | null;
+} {
+  let qty = 1.0;
+  let unit = 'un';
+  let unitPrice: number | null = null;
+
+  const qtyMatch = /(?:qtde|qtd|quant|quantidade)\.?:?\s*(\d+(?:[,.]\d+)?)/i.exec(text);
+  if (qtyMatch) {
+    const pq = parseNfceQuantity(qtyMatch[1]);
+    if (pq > 0) qty = pq;
+  }
+  const unMatch = /\bUN\s*:\s*([A-Za-z]{1,6})\b/i.exec(text);
+  if (unMatch) unit = unMatch[1].trim().toLowerCase() || 'un';
+  const upMatch = /Vl\.?\s*Unit\.?:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2,4})/i.exec(text);
+  if (upMatch) unitPrice = AppFormatters.parsePrice(upMatch[1]);
+
+  return { qty, unit, unitPrice };
+}
+
 function parseTableDanfe(html: string): ScannedReceiptItem[] {
   const items: ScannedReceiptItem[] = [];
 
+  // Method 1: Bootstrap NFC-e <li class="list-group-item"> containers (SEFAZ-DF & modern portals)
   for (const liMatch of html.matchAll(
     /<li[^>]*class="[^"]*list-group-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
   )) {
     const liContent = liMatch[1];
-    const lower = liContent.toLowerCase();
+    const liText = stripTags(liContent);
+    const lower = liText.toLowerCase();
     if (!lower.includes('qtde') && !lower.includes('vl. unit')) continue;
     if (
       lower.includes('qtd. total') ||
@@ -601,13 +707,12 @@ function parseTableDanfe(html: string): ScannedReceiptItem[] {
     let rawName: string | undefined;
     const h6Match = /<p[^>]*class="[^"]*h6[^"]*"[^>]*>([\s\S]*?)<\/p>/i.exec(liContent);
     if (h6Match) {
-      const withoutSmall = h6Match[1].replace(/<small[^>]*>[\s\S]*?<\/small>/gi, '');
-      rawName = stripTags(withoutSmall);
+      rawName = stripTags(stripEmbeddedCodeTags(h6Match[1]));
     } else {
       const col9Match = /<div[^>]*class="[^"]*col-9[^"]*"[^>]*>([\s\S]*?)<\/div>/i.exec(
         liContent,
       );
-      if (col9Match) rawName = stripTags(col9Match[1]);
+      if (col9Match) rawName = stripTags(stripEmbeddedCodeTags(col9Match[1]));
     }
     if (!rawName) continue;
 
@@ -616,7 +721,7 @@ function parseTableDanfe(html: string): ScannedReceiptItem[] {
       liContent.matchAll(/<div[^>]*class="[^"]*col-(?:3|4)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi),
     ).reverse();
     for (const col3 of col3Matches) {
-      const pMatch = /(\d{1,4},\d{2})/.exec(stripTags(col3[1]));
+      const pMatch = /(\d{1,3}(?:\.\d{3})*,\d{2})/.exec(stripTags(col3[1]));
       if (pMatch) {
         const cand = AppFormatters.parsePrice(pMatch[1]);
         if (cand != null && cand > 0) {
@@ -626,28 +731,104 @@ function parseTableDanfe(html: string): ScannedReceiptItem[] {
       }
     }
     if (price == null || price <= 0) {
-      const allPrices = Array.from(liContent.matchAll(/(\d{1,4},\d{2})/g));
+      const allPrices = Array.from(liText.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g));
       if (allPrices.length > 0) {
         price = AppFormatters.parsePrice(allPrices[allPrices.length - 1][1]);
       }
     }
 
-    let qty = 1.0;
-    let unit = 'un';
-    let unitPrice: number | null = null;
-
-    const qtyMatch = /Qtde\.?:?\s*(\d+(?:[,.]\d+)?)/i.exec(liContent);
-    if (qtyMatch) {
-      const pq = parseNfceQuantity(qtyMatch[1]);
-      if (pq > 0) qty = pq;
-    }
-    const unMatch = /UN:\s*([A-Za-z]+)/i.exec(liContent);
-    if (unMatch) unit = unMatch[1].trim().toLowerCase() || 'un';
-    const upMatch = /Vl\.\s*Unit\.?:?\s*(?:R\$\s*)?(\d{1,4},\d{2})/i.exec(liContent);
-    if (upMatch) unitPrice = AppFormatters.parsePrice(upMatch[1]);
-
+    const { qty, unit, unitPrice } = extractDanfeDetails(liText);
     const item = buildScannedItem(rawName, price, qty, unit, unitPrice, items.length + 1);
     if (item) items.push(item);
+  }
+
+  if (items.length > 0) return items;
+
+  // Method 2: Generic block containers (<tr>, <div>, <p>) containing Vl. Total
+  const danfeLineRegex =
+    /([^\n<>]+?)(?:\s*\(c[óo]d(?:igo)?:\s*\d+\))?\s+Vl\.?\s*Total:?\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/i;
+  for (const block of html.matchAll(/<(?:tr|div|p)[^>]*>([\s\S]*?)<\/(?:tr|div|p)>/gi)) {
+    if (/txtTit|fixo-prod-nome/i.test(block[1])) continue;
+    const blockText = stripTags(stripEmbeddedCodeTags(block[1]));
+    const lower = blockText.toLowerCase();
+    if (!lower.includes('vl. total') && !lower.includes('vl.total')) continue;
+    if (
+      lower.includes('qtd. total') ||
+      lower.includes('valor a pagar') ||
+      lower.includes('forma de pagamento') ||
+      lower.includes('tributos')
+    ) {
+      continue;
+    }
+
+    const match = danfeLineRegex.exec(blockText);
+    if (match) {
+      const rawName = match[1].replace(/\b(?:qtde?|un|vl\.?\s*unit).*$/i, '').trim();
+      const price = AppFormatters.parsePrice(match[2]);
+      const { qty, unit, unitPrice } = extractDanfeDetails(blockText);
+      const item = buildScannedItem(rawName, price, qty, unit, unitPrice, items.length + 1);
+      if (item) items.push(item);
+    }
+  }
+
+  return items;
+}
+
+function parseTableDanfePlainText(html: string): ScannedReceiptItem[] {
+  const items: ScannedReceiptItem[] = [];
+  const rawLines = stripTagsPreserveLines(html).split('\n');
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const lower = line.toLowerCase();
+    if (!lower.includes('qtde') && !lower.includes('vl. unit')) continue;
+    if (
+      lower.includes('qtd. total') ||
+      lower.includes('valor a pagar') ||
+      lower.includes('forma de pagamento') ||
+      lower.includes('tributos')
+    ) {
+      continue;
+    }
+
+    let price: number | null = null;
+    const pMatchNext =
+      i + 1 < rawLines.length ? /^(\d{1,3}(?:\.\d{3})*,\d{2})$/.exec(rawLines[i + 1]) : null;
+    if (pMatchNext) {
+      price = AppFormatters.parsePrice(pMatchNext[1]);
+    } else {
+      const pMatchThis = Array.from(line.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})\b/g));
+      if (pMatchThis.length > 0) {
+        price = AppFormatters.parsePrice(pMatchThis[pMatchThis.length - 1][1]);
+      }
+    }
+
+    const { qty, unit, unitPrice } = extractDanfeDetails(line);
+    let candidateName: string | undefined;
+    if (i >= 2 && rawLines[i - 1].toLowerCase().includes('total')) {
+      candidateName = rawLines[i - 2];
+    } else if (i >= 1) {
+      candidateName = rawLines[i - 1];
+    }
+
+    if (candidateName && price != null && price > 0) {
+      const cLower = candidateName.toLowerCase();
+      if (
+        !cLower.includes('documento') &&
+        !cLower.includes('consumidor') &&
+        !cLower.includes('cnpj') &&
+        !cLower.includes('danfe')
+      ) {
+        const item = buildScannedItem(
+          candidateName,
+          price,
+          qty,
+          unit,
+          unitPrice,
+          items.length + 1,
+        );
+        if (item) items.push(item);
+      }
+    }
   }
 
   return items;
@@ -658,15 +839,17 @@ function parseTableGeneric(html: string): ScannedReceiptItem[] {
   const priceRegex = /(\d{1,3}(?:\.\d{3})*,\d{2})\b/g;
 
   for (const row of html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const text = stripTags(row[1]);
+    const text = stripTags(stripEmbeddedCodeTags(row[1]));
     if (!text) continue;
     const lower = text.toLowerCase();
     if (
-      lower.includes('total') ||
+      lower.includes('qtd. total') ||
+      lower.includes('valor total') ||
+      lower.includes('valor a pagar') ||
       lower.includes('desconto') ||
       lower.includes('tributo') ||
       lower.includes('troco') ||
-      lower.includes('forma')
+      lower.includes('forma de pagamento')
     ) {
       continue;
     }
@@ -677,21 +860,13 @@ function parseTableGeneric(html: string): ScannedReceiptItem[] {
     const lastPriceStr = matches[matches.length - 1][1];
     const price = AppFormatters.parsePrice(lastPriceStr);
 
-    let qty = 1.0;
-    let unit = 'un';
-    let unitPrice: number | null = null;
+    const { qty, unit, unitPrice } = extractDanfeDetails(text);
 
-    const qMatch = /Qtde\.?:?\s*(\d+(?:[,.]\d+)?)/i.exec(text);
-    if (qMatch) {
-      const pq = parseNfceQuantity(qMatch[1]);
-      if (pq > 0) qty = pq;
-    }
-    const uMatch = /UN:\s*([A-Za-z]+)/i.exec(text);
-    if (uMatch) unit = uMatch[1].trim().toLowerCase() || 'un';
-    const upMatch = /Vl\.\s*Unit\.?:?\s*(?:R\$\s*)?(\d{1,4},\d{2})/i.exec(text);
-    if (upMatch) unitPrice = AppFormatters.parsePrice(upMatch[1]);
+    const firstPriceIdx = matches[0].index ?? text.length;
+    const metaIdx = text.search(/\b(?:qtde?|un\s*:|vl\.?\s*unit|vl\.?\s*total)/i);
+    const cutIdx = metaIdx !== -1 && metaIdx < firstPriceIdx ? metaIdx : firstPriceIdx;
+    const nameSection = text.slice(0, cutIdx).trim();
 
-    const nameSection = text.slice(0, matches[0].index).trim();
     if (price != null && price > 0 && price < 10000) {
       const item = buildScannedItem(
         nameSection,
@@ -721,6 +896,7 @@ export function parseNfceHtml(
   items = parseTableDanfe(html);
   if (items.length === 0) items = parseTableLayoutSp(html);
   if (items.length === 0) items = parseTableLayoutStandard(html);
+  if (items.length === 0) items = parseTableDanfePlainText(html);
   if (items.length === 0) items = parseTableGeneric(html);
 
   const accumulatedItems = accumulateScannedItems(items);
@@ -787,6 +963,22 @@ export async function fetchAndParseNfceViaProxy(
     const contentType = res.headers.get('content-type') ?? '';
     if (contentType.includes('application/json')) {
       const json = (await res.json()) as NfceParsedResult;
+      if (Array.isArray(json.items)) {
+        json.items = accumulateScannedItems(
+          json.items
+            .map((it): ScannedReceiptItem | null => {
+              const cleaned = cleanNfceProductName(it.name);
+              if (cleaned.length < 2 || isTotalProductName(cleaned)) return null;
+              return {
+                ...it,
+                name: cleaned,
+                unit: it.unit ? AppFormatters.normalizeUnit(it.unit) : 'un',
+                category: CategoryClassifier.classify(cleaned),
+              };
+            })
+            .filter((it): it is ScannedReceiptItem => it !== null),
+        );
+      }
       return json;
     }
     const html = await res.text();

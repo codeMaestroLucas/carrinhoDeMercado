@@ -4,6 +4,7 @@ import {
   isTotalProductName,
   repairReceiptWord,
   mergeSplitWords,
+  ReceiptScannerService,
 } from '../src/services/receiptParserService';
 import { NfceScannerService } from '../src/services/nfceParserService';
 
@@ -185,6 +186,137 @@ describe('Receipt and NFC-e Text Cleaning & Element Identification', () => {
       expect(item2.price).toBe(12.9);
       expect(item2.quantity).toBe(1);
       expect(item2.category).toBe('limpeza');
+    });
+
+    it('decodes HTML entities and removes embedded SEFAZ codes in DANFE and generic tables', () => {
+      const danfeHtml = `
+        <html>
+          <body>
+            <div class="col" style="font-weight: bold;">ATACADAO DIA A DIA</div>
+            <ul class="list-group">
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-9">
+                    <p class="h6">MA&Ccedil;&Atilde; FUJI KG <small>(C&oacute;d: 4131)</small></p>
+                  </div>
+                  <div class="col-3">R$ 7,98</div>
+                </div>
+                <div>Qtde.: 0,850 UN: KG Vl. Unit.: R$ 9,39</div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-9">
+                    <p class="h6">1048291 - BISC. RECH. OREO ORIG. 90G <small>(C&oacute;digo: 1048291)</small></p>
+                  </div>
+                  <div class="col-3">R$ 5,98</div>
+                </div>
+                <div>Qtde.: 2,000 UN: UN Vl. Unit.: R$ 2,99</div>
+              </li>
+            </ul>
+          </body>
+        </html>
+      `;
+
+      const result = NfceScannerService.parseNfceHtml(danfeHtml);
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].name).toBe('Maçã Fuji');
+      expect(result.items[0].quantity).toBeCloseTo(0.85);
+      expect(result.items[0].unit).toBe('kg');
+      expect(result.items[1].name).toBe('Biscoito Recheado Oreo Original 90g');
+      expect(result.items[1].quantity).toBe(2);
+      expect(result.items[1].unit).toBe('un');
+    });
+  });
+
+  describe('Enhanced NFC-e & OCR noise removal', () => {
+    it('removes stray numbers, codes, units and punctuation while preserving meaningful numbers', () => {
+      expect(cleanReceiptProductName('MELAO AMARELO 4821')).toBe('Melão Amarelo');
+      expect(cleanReceiptProductName('004521 MELAO AMARELO KG')).toBe('Melão Amarelo');
+      expect(cleanReceiptProductName('BISC. RECH. OREO ORIG. 90G (Cód.: 1048291)')).toBe(
+        'Biscoito Recheado Oreo Original 90g',
+      );
+      expect(cleanReceiptProductName('LEITE UHT INT. PIRACANJUBA 1 LT * 1UN X 4,99 F1')).toBe(
+        'Leite UHT Integral Piracanjuba 1l',
+      );
+      expect(cleanReceiptProductName('ARROZ T1 CAMIL 5KG 02')).toBe('Arroz Tipo 1 Camil 5kg');
+      expect(cleanReceiptProductName('SABONETE DOVE 90G T1')).toBe('Sabonete Dove 90g');
+      expect(cleanReceiptProductName('DESINFETANTE PINHO SOL 500ML 1')).toBe(
+        'Desinfetante Pinho Sol 500ml',
+      );
+      expect(cleanReceiptProductName('CREME DENTAL COLGATE TOTAL 12 90G')).toBe(
+        'Creme Dental Colgate Total 12 90g',
+      );
+      expect(cleanReceiptProductName('| . 003 ) MANTEIGA C/SAL AVIACAO 200G - 02 ;')).toBe(
+        'Manteiga com Sal Aviacao 200g',
+      );
+      expect(cleanReceiptProductName('KIT CHOC 2X100G 7891000100100')).toBe(
+        'Kit Chocolate 2x100g',
+      );
+      expect(cleanReceiptProductName('3 CORACOES CAFE TRAD 500G 01')).toBe(
+        '3 Coracoes Café Tradicional 500g',
+      );
+    });
+
+    it('parses copied SEFAZ plain text cleanly without leaking Qtde./Vl. Total into names', () => {
+      const sefazCopied = `
+SUPERMERCADO PAO DE ACUCAR
+CNPJ: 47.508.411/0001-56
+LEITE UHT INTEGRAL PIRACANJUBA 1L (Código: 123456 )
+Qtde.: 3   UN: UN   Vl. Unit.:   5,49
+Vl. Total
+16,47
+ARROZ BRANCO T1 CAMIL 5KG
+(Cód: 1019816)
+Qtde.: 2,000 UN: UN Vl. Unit.: R$ 26,90
+Vl. Total: R$ 53,80
+BANANA PRATA KG (Código: 4011 )
+Qtde.: 0,740   UN: KG   Vl. Unit.:   7,99
+Vl. Total
+5,91
+Qtd. total de itens: 3
+Valor total R$: 76,18
+`;
+
+      const items = ReceiptScannerService.parseReceiptText(sefazCopied);
+      expect(items).toHaveLength(3);
+      expect(items[0].name).toBe('Leite UHT Integral Piracanjuba 1l');
+      expect(items[0].quantity).toBe(3);
+      expect(items[0].price).toBe(16.47);
+      expect(items[1].name).toBe('Arroz Branco Tipo 1 Camil 5kg');
+      expect(items[1].quantity).toBe(2);
+      expect(items[1].price).toBe(53.8);
+      expect(items[2].name).toBe('Banana Prata');
+      expect(items[2].quantity).toBeCloseTo(0.74);
+      expect(items[2].unit).toBe('kg');
+      expect(items[2].price).toBe(5.91);
+    });
+
+    it('parses noisy OCR receipts with spaced prices, tabular quantities, and ignores PIX/tributos', () => {
+      const noisyOcr = `
+001 7891000315507 CR. LE1TE NESTLE 200G 2 UN X 4,50 F1 9,00
+002 004011 BANANA PRATA KG 0,850 KG x 7,99 6,79
+003 7891150056534 SAB. EM P0 OMO LAV. PERF. 800G T18,00% 15,90
+004 7891991010856 CERV. BRAHMA 350ML 6 UN 3,50 21,00
+005 | . 7894900011517 - REFRIG COCA-COLA 2L 1UN 9, 49
+006 MELAO AMARELO 4821 1 UN X 8,90 8,90
+QTD. TOTAL DE ITENS 006
+VALOR TOTAL R$ 71,08
+PIX 71,08
+TRIB APROX R$ 11,20 FED EST
+`;
+
+      const items = ReceiptScannerService.parseReceiptText(noisyOcr);
+      expect(items).toHaveLength(6);
+      expect(items[0].name).toBe('Creme de Leite Nestle 200g');
+      expect(items[1].name).toBe('Banana Prata');
+      expect(items[1].quantity).toBeCloseTo(0.85);
+      expect(items[2].name).toBe('Sabão em Pó Omo Lavagem Perfeita 800g');
+      expect(items[3].name).toBe('Cerveja Brahma 350ml');
+      expect(items[3].quantity).toBe(6);
+      expect(items[3].price).toBe(21);
+      expect(items[4].name).toBe('Refrigerante Coca-Cola 2l');
+      expect(items[4].price).toBe(9.49);
+      expect(items[5].name).toBe('Melão Amarelo');
     });
   });
 });

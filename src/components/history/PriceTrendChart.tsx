@@ -29,8 +29,8 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
         <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
           <defs>
             <linearGradient id="priceTrendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#15803D" stopOpacity={0.18} />
-              <stop offset="95%" stopColor="#15803D" stopOpacity={0.0} />
+              <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.22} />
+              <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.0} />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -71,11 +71,11 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
           <Area
             type="monotone"
             dataKey="price"
-            stroke="#15803D"
+            stroke="var(--accent)"
             strokeWidth={2}
             fill="url(#priceTrendFill)"
-            dot={{ r: 3, fill: '#15803D', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#15803D' }}
+            dot={{ r: 3, fill: 'var(--accent)', strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: 'var(--accent)' }}
           />
         </AreaChart>
       </ResponsiveContainer>

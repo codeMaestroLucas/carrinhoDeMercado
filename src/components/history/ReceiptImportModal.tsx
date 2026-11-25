@@ -178,7 +178,15 @@ export function ReceiptImportModal({
     if (!raw) return;
     setStatusError(null);
 
-    if (raw.includes('<') && (raw.includes('txtTit') || raw.includes('<tr') || raw.includes('<li'))) {
+    if (
+      raw.includes('<') &&
+      (raw.includes('txtTit') ||
+        raw.includes('<tr') ||
+        raw.includes('<li') ||
+        raw.includes('<div') ||
+        raw.includes('<table') ||
+        raw.includes('<p'))
+    ) {
       const res = NfceScannerService.parseNfceHtml(raw);
       if (res.items.length > 0) {
         setScannedItems(res.items);

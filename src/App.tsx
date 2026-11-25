@@ -94,7 +94,7 @@ export function App() {
 
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', isDarkMode ? '#161513' : '#F7F4EE');
+      metaTheme.setAttribute('content', isDarkMode ? '#0E0E10' : '#F7F4EE');
     }
   }, [isDarkMode]);
 
@@ -107,7 +107,7 @@ export function App() {
       )}
 
       {isOffline && (
-        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 border-b border-[var(--border-hairline)] bg-[#B45309] px-4 py-1.5 text-xs font-medium text-[#FDFBF7]">
+        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 border-b border-[var(--border-hairline)] bg-[#D97706] px-4 py-1.5 text-xs font-medium text-[#FDFBF7]">
           <WifiOff size={14} strokeWidth={1.5} />
           <span>Modo offline ativo, alterações salvas localmente</span>
         </div>
