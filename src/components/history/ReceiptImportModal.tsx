@@ -4,7 +4,6 @@ import {
   Check,
   ExternalLink,
   FileText,
-  Pencil,
   Plus,
   QrCode,
   Trash2,
@@ -311,6 +310,251 @@ function EditScannedItemModal({
   );
 }
 
+interface SwipeableScannedReceiptItemRowProps {
+  item: EditableReceiptItem;
+  itemIndex: number;
+  onOpenEdit: (item: EditableReceiptItem) => void;
+  onRemove: (id: string) => void;
+}
+
+export function SwipeableScannedReceiptItemRow({
+  item,
+  itemIndex,
+  onOpenEdit,
+  onRemove,
+}: SwipeableScannedReceiptItemRowProps) {
+  const [translateX, setTranslateX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  const startXRef = useRef<number>(0);
+  const startYRef = useRef<number>(0);
+  const currentDeltaXRef = useRef<number>(0);
+  const isHorizontalSwipeRef = useRef<boolean | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+  const isPressActiveRef = useRef(false);
+  const lastPointerEventAtRef = useRef(0);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const categoryInfo = PRODUCT_CATEGORY_MAP[item.category];
+  const showUnitPrice =
+    item.quantity > 0 &&
+    Math.abs(item.quantity - 1) > 0.001 &&
+    item.price > 0;
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const isMouseDuplicateAfterPointer = (e: React.SyntheticEvent): boolean => {
+    return (
+      e.type.startsWith('mouse') &&
+      Date.now() - lastPointerEventAtRef.current < 1000
+    );
+  };
+
+  const getCoords = (e: React.SyntheticEvent) => {
+    const anyE = e as unknown as {
+      clientX?: number;
+      clientY?: number;
+    };
+    return {
+      clientX: anyE.clientX ?? 0,
+      clientY: anyE.clientY ?? 0,
+    };
+  };
+
+  const handlePressStart = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      const pe = e as React.PointerEvent;
+      if (pe.pointerType === 'mouse' && pe.button !== 0) return;
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (isDismissed || isPressActiveRef.current) return;
+    isPressActiveRef.current = true;
+
+    const { clientX, clientY } = getCoords(e);
+    startXRef.current = clientX;
+    startYRef.current = clientY;
+    currentDeltaXRef.current = 0;
+    isHorizontalSwipeRef.current = null;
+    isLongPressTriggeredRef.current = false;
+    clearLongPressTimer();
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(40);
+        } catch (_) {}
+      }
+      onOpenEdit(item);
+    }, 450);
+  };
+
+  const handlePressMove = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (isDismissed || !isPressActiveRef.current) return;
+    const { clientX, clientY } = getCoords(e);
+    const deltaX = clientX - startXRef.current;
+    const deltaY = clientY - startYRef.current;
+
+    if (isHorizontalSwipeRef.current === null) {
+      if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+        isHorizontalSwipeRef.current = Math.abs(deltaX) > Math.abs(deltaY);
+        if (isHorizontalSwipeRef.current) {
+          clearLongPressTimer();
+        }
+      }
+    }
+
+    if (isHorizontalSwipeRef.current) {
+      clearLongPressTimer();
+      currentDeltaXRef.current = deltaX;
+      if (deltaX < 0) {
+        setIsSwiping(true);
+        const damped = deltaX < -120 ? -120 + (deltaX + 120) * 0.25 : deltaX;
+        setTranslateX(damped);
+      } else {
+        setTranslateX(0);
+      }
+    } else if (Math.abs(deltaY) > 8) {
+      clearLongPressTimer();
+    }
+  };
+
+  const handlePressEnd = (e: React.SyntheticEvent) => {
+    if (e.type.startsWith('pointer')) {
+      lastPointerEventAtRef.current = Date.now();
+    } else if (isMouseDuplicateAfterPointer(e)) {
+      return;
+    }
+
+    if (!isPressActiveRef.current) return;
+    isPressActiveRef.current = false;
+    clearLongPressTimer();
+
+    if (isLongPressTriggeredRef.current) {
+      isLongPressTriggeredRef.current = false;
+      setIsSwiping(false);
+      setTranslateX(0);
+      currentDeltaXRef.current = 0;
+      return;
+    }
+
+    if (isSwiping || currentDeltaXRef.current < -15) {
+      setIsSwiping(false);
+      if (currentDeltaXRef.current < -80) {
+        setIsDismissed(true);
+        setTranslateX(-500);
+        setTimeout(() => {
+          onRemove(item.id);
+        }, 220);
+        return;
+      }
+      setTranslateX(0);
+      currentDeltaXRef.current = 0;
+    }
+  };
+
+  const handlePressCancel = () => {
+    lastPointerEventAtRef.current = Date.now();
+    isPressActiveRef.current = false;
+    isLongPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    setIsSwiping(false);
+    setTranslateX(0);
+    currentDeltaXRef.current = 0;
+  };
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-xl select-none transition-[opacity,transform] duration-200 ease-ui ${
+        isDismissed ? 'pointer-events-none h-0 opacity-0' : 'opacity-100'
+      }`}
+    >
+      {/* Delete reveal layer */}
+      <div
+        className={`absolute inset-0 flex items-center justify-end rounded-xl bg-[var(--negative)] px-4 text-[#FDFBF7] transition-opacity duration-150 ease-ui ${
+          translateX < -5 ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      >
+        <div className="flex items-center gap-2 text-xs font-medium">
+          <span>Remover</span>
+          <Trash2 size={16} strokeWidth={1.5} />
+        </div>
+      </div>
+
+      {/* Foreground product card */}
+      <div
+        onPointerDown={handlePressStart}
+        onPointerMove={handlePressMove}
+        onPointerUp={handlePressEnd}
+        onPointerCancel={handlePressCancel}
+        onMouseDown={handlePressStart}
+        onMouseMove={handlePressMove}
+        onMouseUp={handlePressEnd}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isSwiping
+            ? 'none'
+            : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+          touchAction: 'pan-y',
+        }}
+        className="relative flex cursor-pointer touch-pan-y items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 shadow-2xs transition-colors duration-150 ease-ui active:bg-[var(--bg-subtle)] hover:border-[var(--border-subtle)]"
+      >
+        {/* Left: Index badge + Name + Category + Qty/Unit */}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <span
+              className="font-mono-tabular flex h-5 w-6 shrink-0 items-center justify-center rounded bg-[var(--bg-subtle)] text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-hairline)]"
+              title={`Item #${itemIndex}`}
+            >
+              #{String(itemIndex).padStart(2, '0')}
+            </span>
+            <p className="truncate text-xs font-medium text-[var(--text-primary)] sm:text-sm">
+              {item.name || '(Sem nome)'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
+            <span className="rounded bg-[var(--bg-subtle)] px-2 py-0.5 font-medium text-[var(--text-secondary)]">
+              {categoryInfo?.label ?? item.category}
+            </span>
+            <span className="font-mono-tabular font-medium text-[var(--text-muted)]">
+              {AppFormatters.formatQuantity(item.quantity, item.unit)}
+            </span>
+            {showUnitPrice && (
+              <span className="font-mono-tabular text-[10px] text-[var(--text-muted)]">
+                ({AppFormatters.formatCurrency(item.price / item.quantity)}/{item.unit})
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Price ONLY (no buttons!) */}
+        <div className="flex shrink-0 items-center pl-2">
+          <span className="font-mono-tabular text-sm font-semibold text-[var(--accent-fg)]">
+            {AppFormatters.formatCurrency(item.price)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type ImportMode = 'qr' | 'ocr' | 'paste';
 
 interface ReceiptImportModalProps {
@@ -352,57 +596,6 @@ export function ReceiptImportModal({
   const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
   const qrRegionId = 'nfce-qr-reader-region';
 
-  // Long press refs for mobile holding interaction
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startXRef = useRef(0);
-  const startYRef = useRef(0);
-  const isPressActiveRef = useRef(false);
-
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current !== null) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  const handlePointerDown = (e: React.PointerEvent, item: EditableReceiptItem) => {
-    if ((e.target as HTMLElement).closest('button')) return;
-
-    isPressActiveRef.current = true;
-    startXRef.current = e.clientX;
-    startYRef.current = e.clientY;
-    clearLongPressTimer();
-
-    longPressTimerRef.current = setTimeout(() => {
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate(40);
-        } catch (_) {}
-      }
-      setIsAddingNew(false);
-      setEditingItem(item);
-    }, 450);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isPressActiveRef.current) return;
-    const deltaX = Math.abs(e.clientX - startXRef.current);
-    const deltaY = Math.abs(e.clientY - startYRef.current);
-    if (deltaX > 8 || deltaY > 8) {
-      clearLongPressTimer();
-    }
-  };
-
-  const handlePointerUp = () => {
-    isPressActiveRef.current = false;
-    clearLongPressTimer();
-  };
-
-  const handlePointerCancel = () => {
-    isPressActiveRef.current = false;
-    clearLongPressTimer();
-  };
-
   const stopCamera = async () => {
     if (scannerRef.current) {
       try {
@@ -417,7 +610,6 @@ export function ReceiptImportModal({
 
   useEffect(() => {
     return () => {
-      clearLongPressTimer();
       void stopCamera();
     };
   }, []);
@@ -946,7 +1138,7 @@ export function ReceiptImportModal({
                       Itens identificados (<span className="font-mono-tabular">{scannedItems.length}</span>)
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      Segure um item para editá-lo ou use o botão de edição
+                      Segure para editar • Deslize para a esquerda para remover
                     </p>
                   </div>
                   <div className="text-right">
@@ -975,93 +1167,18 @@ export function ReceiptImportModal({
                 </div>
 
                 <div className="max-h-80 space-y-2 overflow-y-auto pr-1 sm:max-h-96">
-                  {scannedItems.map((item, idx) => {
-                    const categoryInfo = PRODUCT_CATEGORY_MAP[item.category];
-                    const showUnitPrice =
-                      item.quantity > 0 &&
-                      Math.abs(item.quantity - 1) > 0.001 &&
-                      item.price > 0;
-
-                    return (
-                      <div
-                        key={item.id}
-                        onPointerDown={(e) => handlePointerDown(e, item)}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerCancel}
-                        onContextMenu={(e) => e.preventDefault()}
-                        style={{ touchAction: 'pan-y' }}
-                        className="group relative flex items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 transition-[background-color,border-color,transform] duration-150 ease-ui select-none active:scale-[0.99] active:bg-[var(--bg-subtle)] hover:border-[var(--border-subtle)]"
-                      >
-                        {/* Left: Index badge + Name + Category + Qty/Unit */}
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="font-mono-tabular flex h-5 w-6 shrink-0 items-center justify-center rounded bg-[var(--bg-subtle)] text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-hairline)]"
-                              title={`Item #${idx + 1}`}
-                            >
-                              #{String(idx + 1).padStart(2, '0')}
-                            </span>
-                            <p className="truncate text-xs font-medium text-[var(--text-primary)] sm:text-sm">
-                              {item.name || '(Sem nome)'}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
-                            <span className="rounded bg-[var(--bg-subtle)] px-2 py-0.5 font-medium text-[var(--text-secondary)]">
-                              {categoryInfo?.label ?? item.category}
-                            </span>
-                            <span className="font-mono-tabular font-medium text-[var(--text-muted)]">
-                              {AppFormatters.formatQuantity(item.quantity, item.unit)}
-                            </span>
-                            {showUnitPrice && (
-                              <span className="font-mono-tabular text-[10px] text-[var(--text-muted)] hidden sm:inline">
-                                ({AppFormatters.formatCurrency(item.price / item.quantity)}/{item.unit})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Right: Price + Action buttons */}
-                        <div className="flex shrink-0 items-center gap-2.5">
-                          <span className="font-mono-tabular text-xs font-semibold text-[var(--accent-fg)] sm:text-sm">
-                            {AppFormatters.formatCurrency(item.price)}
-                          </span>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsAddingNew(false);
-                                setEditingItem(item);
-                              }}
-                              aria-label={`Editar ${item.name || idx + 1}`}
-                              title="Editar item (ou segure o item)"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-fg)] active:scale-[0.96]"
-                            >
-                              <Pencil size={14} strokeWidth={1.5} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveItem(item.id);
-                              }}
-                              aria-label={`Remover item ${item.name || idx + 1}`}
-                              title="Remover item"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--negative)] transition-colors hover:bg-[var(--negative-soft)] active:scale-[0.96]"
-                            >
-                              <Trash2 size={14} strokeWidth={1.5} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {scannedItems.map((item, idx) => (
+                    <SwipeableScannedReceiptItemRow
+                      key={item.id}
+                      item={item}
+                      itemIndex={idx + 1}
+                      onOpenEdit={(it) => {
+                        setIsAddingNew(false);
+                        setEditingItem(it);
+                      }}
+                      onRemove={handleRemoveItem}
+                    />
+                  ))}
                 </div>
 
                 <button

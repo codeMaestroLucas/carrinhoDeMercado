@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ReceiptImportModal } from '../src/components/history/ReceiptImportModal';
 import { useShoppingStore } from '../src/store/useShoppingStore';
 
-describe('ReceiptImportModal item editing', () => {
+describe('ReceiptImportModal item editing and gestures', () => {
   const onClose = vi.fn();
   const onImported = vi.fn();
 
@@ -24,7 +24,8 @@ describe('ReceiptImportModal item editing', () => {
     });
   });
 
-  it('allows editing an item via edit button and saving changes to purchase history', () => {
+  it('allows holding (long-press) an item to edit all fields and saves changes to purchase history', () => {
+    vi.useFakeTimers();
     render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
     // Switch to Texto / Manual tab
@@ -45,9 +46,16 @@ describe('ReceiptImportModal item editing', () => {
     expect(screen.getByText('Total: R$ 15,90')).toBeInTheDocument();
     expect(screen.getByText('Ovo Bco Grande')).toBeInTheDocument();
 
-    // Click edit button (pencil)
-    const editBtn = screen.getByLabelText('Editar Ovo Bco Grande');
-    fireEvent.click(editBtn);
+    // Verify edit/remove buttons are NOT present in the row
+    expect(screen.queryByLabelText(/Editar Ovo/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Remover item Ovo/)).not.toBeInTheDocument();
+
+    // Hold (long-press) item for 450ms
+    const itemCard = screen.getByText('Ovo Bco Grande').closest('.touch-pan-y')!;
+    fireEvent.pointerDown(itemCard, { clientX: 100, clientY: 200 });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     // Verify Edit Modal opened
     expect(screen.getByText('Editar item #01')).toBeInTheDocument();
@@ -99,48 +107,18 @@ describe('ReceiptImportModal item editing', () => {
     expect(saved.price).toBe(25.5);
     expect(onImported).toHaveBeenCalledWith('Mercado Teste', 1);
     expect(onClose).toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
-  it('triggers item editing by holding (long-press) the item on touch/mobile', () => {
+  it('swipes left from right to left to remove an item from the identified items list', () => {
     vi.useFakeTimers();
     render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
     // Switch to Texto / Manual tab
     fireEvent.click(screen.getByText('Texto / Manual'));
 
-    // Add item
-    fireEvent.change(screen.getByPlaceholderText('Item manual'), {
-      target: { value: 'Queijo Mussarela' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('Preço'), {
-      target: { value: '14,00' },
-    });
-    fireEvent.click(screen.getByLabelText('Adicionar item manual'));
-
-    const itemCard = screen.getByText('Queijo Mussarela').closest('.group')!;
-    expect(itemCard).toBeInTheDocument();
-
-    // Simulate pointer down (start holding)
-    fireEvent.pointerDown(itemCard, { clientX: 100, clientY: 200 });
-
-    // Advance timers for long-press threshold (450ms)
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    // Edit modal should now be open
-    expect(screen.getByText('Editar item #01')).toBeInTheDocument();
-
-    vi.useRealTimers();
-  });
-
-  it('adds items via "+ Adicionar item" modal and supports removing items', () => {
-    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
-
-    // Switch to Texto / Manual tab
-    fireEvent.click(screen.getByText('Texto / Manual'));
-
-    // Add item 1
+    // Add 2 items
     fireEvent.change(screen.getByPlaceholderText('Item manual'), {
       target: { value: 'Pimentao Verde' },
     });
@@ -149,8 +127,53 @@ describe('ReceiptImportModal item editing', () => {
     });
     fireEvent.click(screen.getByLabelText('Adicionar item manual'));
 
+    fireEvent.change(screen.getByPlaceholderText('Item manual'), {
+      target: { value: 'Tomate Salada' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Preço'), {
+      target: { value: '9,63' },
+    });
+    fireEvent.click(screen.getByLabelText('Adicionar item manual'));
+
     expect(screen.getByText('Pimentao Verde')).toBeInTheDocument();
-    expect(screen.getByText('Total: R$ 8,93')).toBeInTheDocument();
+    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 18,56')).toBeInTheDocument();
+
+    // Swipe left on item 1: start at clientX: 200, move to 90 (deltaX: -110), release
+    const pimentaoCard = screen.getByText('Pimentao Verde').closest('div[style]')!;
+    fireEvent.mouseDown(pimentaoCard, { clientX: 200, clientY: 100 });
+    fireEvent.mouseMove(pimentaoCard, { clientX: 90, clientY: 100 });
+    fireEvent.mouseUp(pimentaoCard, { clientX: 90, clientY: 100 });
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    // Pimentao Verde should be removed, leaving only Tomate Salada
+    expect(screen.queryByText('Pimentao Verde')).not.toBeInTheDocument();
+    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 9,63')).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it('adds items via "+ Adicionar item" modal', () => {
+    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+
+    // Switch to Texto / Manual tab
+    fireEvent.click(screen.getByText('Texto / Manual'));
+
+    // Add item 1
+    fireEvent.change(screen.getByPlaceholderText('Item manual'), {
+      target: { value: 'Alface Crespa' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Preço'), {
+      target: { value: '4,50' },
+    });
+    fireEvent.click(screen.getByLabelText('Adicionar item manual'));
+
+    expect(screen.getByText('Alface Crespa')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 4,50')).toBeInTheDocument();
 
     // Click "+ Adicionar item" button
     fireEvent.click(screen.getByText('Adicionar item'));
@@ -159,23 +182,16 @@ describe('ReceiptImportModal item editing', () => {
     expect(screen.getByText('Adicionar item à nota')).toBeInTheDocument();
 
     const nameInput = screen.getByPlaceholderText('Ex: Leite Integral');
-    fireEvent.change(nameInput, { target: { value: 'Tomate Salada' } });
+    fireEvent.change(nameInput, { target: { value: 'Queijo Prato' } });
 
     const priceInput = screen.getByPlaceholderText('0,00');
-    fireEvent.change(priceInput, { target: { value: '9,63' } });
+    fireEvent.change(priceInput, { target: { value: '18,20' } });
 
     fireEvent.click(screen.getByText('Adicionar à lista'));
 
     // Both items should be in the list
-    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
-    expect(screen.getByText('Total: R$ 18,56')).toBeInTheDocument();
-
-    // Remove item 1
-    const removeBtn = screen.getByLabelText('Remover item Pimentao Verde');
-    fireEvent.click(removeBtn);
-
-    expect(screen.queryByText('Pimentao Verde')).not.toBeInTheDocument();
-    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
-    expect(screen.getByText('Total: R$ 9,63')).toBeInTheDocument();
+    expect(screen.getByText('Alface Crespa')).toBeInTheDocument();
+    expect(screen.getByText('Queijo Prato')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 22,70')).toBeInTheDocument();
   });
 });
