@@ -58,17 +58,17 @@ export function DualPriceComparisonChart({
           <CartesianGrid
             vertical={false}
             strokeDasharray="3 3"
-            stroke="#8A847A"
-            strokeOpacity={0.2}
+            stroke="#86868B"
+            strokeOpacity={0.18}
           />
           <XAxis
             dataKey="dateLabel"
-            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `R$${v.toFixed(0)}`}
@@ -77,7 +77,7 @@ export function DualPriceComparisonChart({
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               return (
-                <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs shadow-md">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs shadow-lg">
                   <p className="font-mono-tabular mb-1 text-[11px] text-[var(--text-muted)]">
                     {label}
                   </p>
@@ -87,7 +87,7 @@ export function DualPriceComparisonChart({
                       className="flex items-center justify-between gap-3 text-[var(--text-primary)]"
                     >
                       <span>{entry.name}</span>
-                      <span className="font-mono-tabular font-medium">
+                      <span className="font-mono-tabular font-semibold">
                         {AppFormatters.formatCurrency(Number(entry.value ?? 0))}
                       </span>
                     </p>
@@ -102,18 +102,18 @@ export function DualPriceComparisonChart({
             dataKey="priceA"
             name={itemA.displayName}
             stroke="var(--accent)"
-            strokeWidth={2}
+            strokeWidth={2.2}
             connectNulls
-            dot={{ r: 3 }}
+            dot={{ r: 3.5 }}
           />
           <Line
             type="monotone"
             dataKey="priceB"
             name={itemB.displayName}
-            stroke="#D97706"
-            strokeWidth={2}
+            stroke="var(--blue)"
+            strokeWidth={2.2}
             connectNulls
-            dot={{ r: 3 }}
+            dot={{ r: 3.5 }}
           />
         </LineChart>
       </ResponsiveContainer>

@@ -66,34 +66,34 @@ export function PwaInstallBanner() {
   };
 
   return (
-    <div className="mx-auto mt-3 max-w-2xl px-4">
-      <div className="flex items-start gap-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-xs text-[var(--text-primary)] shadow-2xs">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-fg)]">
+    <div className="mx-auto mt-4 max-w-5xl px-4 sm:px-6 lg:px-8">
+      <div className="surface-card flex items-start gap-3.5 p-4 text-sm text-[var(--text-primary)]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-fg)]">
           {showIosGuide ? (
-            <Share size={16} strokeWidth={1.5} />
+            <Share size={18} strokeWidth={1.75} />
           ) : (
-            <Download size={16} strokeWidth={1.5} />
+            <Download size={18} strokeWidth={1.75} />
           )}
         </div>
         <div className="flex-1">
           {deferredPrompt ? (
             <>
-              <p className="text-sm font-medium">Instalar Carrinho de Compras</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                Adicione à tela inicial para usar offline no mercado
+              <p className="font-display text-base font-semibold">Instalar Carrinho</p>
+              <p className="mt-0.5 text-xs leading-5 text-[var(--text-secondary)]">
+                Adicione à tela inicial para usar offline no mercado com abertura instantânea
               </p>
               <button
                 type="button"
                 onClick={handleInstallClick}
-                className="mt-3 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+                className="btn-primary mt-3 h-9 px-4 text-xs"
               >
                 Instalar app
               </button>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium">Instalar no iPhone</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+              <p className="font-display text-base font-semibold">Instalar no iPhone</p>
+              <p className="mt-0.5 text-xs leading-5 text-[var(--text-secondary)]">
                 Toque em <strong>Compartilhar</strong> no Safari e escolha{' '}
                 <strong>Adicionar à Tela de Início</strong>
               </p>
@@ -104,9 +104,9 @@ export function PwaInstallBanner() {
           type="button"
           onClick={dismiss}
           aria-label="Fechar dica de instalação"
-          className="rounded-lg p-1 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
         >
-          <X size={16} strokeWidth={1.5} />
+          <X size={16} strokeWidth={1.75} />
         </button>
       </div>
     </div>

@@ -2,42 +2,128 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+  taste-skill 2.5.1 + Apple HIG + Micro-Interaction Engineering System — Carrinho
+  - Luminous Apple light palette + Emerald Green accent
+  - Smooth height transitions via interpolate-size: allow-keywords
+  - Zero-glitch theme switching via .theme-switching
+  - GPU-only transform/opacity animations (< 350ms, Doherty threshold)
+*/
+
 @layer base {
+  html {
+    interpolate-size: allow-keywords;
+  }
+
   :root {
-    --bg-app: #F7F4EE;
-    --bg-surface: #FDFBF7;
-    --bg-subtle: #EFE9DF;
-    --border-hairline: rgba(31, 27, 22, 0.09);
-    --text-primary: #1F1B16;
-    --text-secondary: #5E554A;
-    --text-muted: #7B7266;
-    --accent: #16A34A;
-    --accent-hover: #15803D;
-    --accent-fg: #158F43;
-    --accent-ink: #FDFBF7;
-    --accent-soft: rgba(22, 163, 74, 0.13);
-    --positive: #158F43;
-    --negative: #DC2626;
-    --negative-soft: rgba(220, 38, 38, 0.11);
-    --ease-ui: cubic-bezier(0.22, 1, 0.36, 1);
+    --bg-app: #F5F5F7;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #EFEFF4;
+    --bg-elevated: #FAFAFC;
+    --bg-glass: rgba(255, 255, 255, 0.80);
+    --bg-glass-strong: rgba(255, 255, 255, 0.90);
+
+    --bg-inverse: #1D1D1F;
+    --bg-inverse-surface: #2C2C2E;
+    --text-inverse: #FFFFFF;
+    --text-inverse-muted: #A1A1A6;
+
+    --border-hairline: rgba(0, 0, 0, 0.065);
+    --border-subtle: rgba(0, 0, 0, 0.11);
+    --border-strong: rgba(0, 0, 0, 0.18);
+
+    --text-primary: #1D1D1F;
+    --text-secondary: #515154;
+    --text-muted: #86868B;
+
+    /* Apple Emerald Green Primary Accent */
+    --accent: #198042;
+    --accent-bright: #24A148;
+    --accent-hover: #146E38;
+    --accent-fg: #167A3E;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E9F7EF;
+    --accent-ring: rgba(25, 128, 66, 0.22);
+
+    /* Semantic signals */
+    --positive: #167A3E;
+    --positive-hover: #126332;
+    --positive-soft: #E9F7EF;
+
+    --negative: #D92D20;
+    --negative-soft: #FEF2F2;
+
+    --amber: #D97706;
+    --amber-soft: #FFFBEB;
+
+    --blue: #0071E3;
+    --blue-soft: #EBF5FF;
+
+    /* Apple Shadows */
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 16px rgba(0, 0, 0, 0.035);
+    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.05), 0 12px 28px rgba(0, 0, 0, 0.06);
+    --shadow-pill: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+    /* Radii & Motion Curves */
+    --r-sm: 10px;
+    --r-md: 16px;
+    --r-lg: 22px;
+    --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+    --m-in: 140ms;
+    --m-out: 110ms;
+    --m-press: 80ms;
   }
 
   .dark {
-    --bg-app: #0E0E10;
-    --bg-surface: #161619;
-    --bg-subtle: #202024;
-    --border-hairline: rgba(244, 240, 232, 0.09);
-    --text-primary: #EFE9DE;
-    --text-secondary: #AAA398;
-    --text-muted: #8A847A;
-    --accent: #22C55E;
-    --accent-hover: #4ADE80;
-    --accent-fg: #4ADE80;
-    --accent-ink: #0E0E10;
-    --accent-soft: rgba(34, 197, 94, 0.15);
-    --positive: #4ADE80;
-    --negative: #F43F5E;
-    --negative-soft: rgba(244, 63, 94, 0.15);
+    --bg-app: #0B0B0D;
+    --bg-surface: #1C1C1E;
+    --bg-subtle: #2C2C2E;
+    --bg-elevated: #242426;
+    --bg-glass: rgba(28, 28, 30, 0.80);
+    --bg-glass-strong: rgba(28, 28, 30, 0.90);
+
+    --bg-inverse: #F5F5F7;
+    --bg-inverse-surface: #E5E5EA;
+    --text-inverse: #1D1D1F;
+    --text-inverse-muted: #6E6E73;
+
+    --border-hairline: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.14);
+    --border-strong: rgba(255, 255, 255, 0.22);
+
+    --text-primary: #F5F5F7;
+    --text-secondary: #AEAEB2;
+    --text-muted: #8E8E93;
+
+    /* Apple iOS Dark Mode System Green */
+    --accent: #30D158;
+    --accent-bright: #34D95E;
+    --accent-hover: #42DB69;
+    --accent-fg: #30D158;
+    --accent-ink: #071A0E;
+    --accent-soft: rgba(48, 209, 88, 0.16);
+    --accent-ring: rgba(48, 209, 88, 0.28);
+
+    --positive: #30D158;
+    --positive-hover: #42DB69;
+    --positive-soft: rgba(48, 209, 88, 0.16);
+
+    --negative: #FF453A;
+    --negative-soft: rgba(255, 69, 58, 0.16);
+
+    --amber: #FF9F0A;
+    --amber-soft: rgba(255, 159, 10, 0.16);
+
+    --blue: #0A84FF;
+    --blue-soft: rgba(10, 132, 255, 0.16);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.2);
+    --shadow-card-hover: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --shadow-pill: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-float: 0 12px 36px rgba(0, 0, 0, 0.5);
   }
 
   html,
@@ -46,13 +132,33 @@
     -webkit-tap-highlight-color: transparent;
     background-color: var(--bg-app);
     color: var(--text-primary);
-    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-feature-settings: "ss01", "cv01";
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Geist", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.48;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Geist", sans-serif;
+    letter-spacing: -0.028em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
+/* Zero-glitch theme switch: temporarily suspends competing transitions */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
 .font-mono-tabular {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, "SF Mono", "Geist Mono", Menlo, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -61,8 +167,209 @@
 }
 
 .ease-ui {
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: var(--ease-ui);
 }
+
+/* ----------------------------------------------------------------
+   Apple Frosted Materials & Tactile Button Primitives
+   (Squash & stretch at 0.97 on :active, < 100ms snappy response)
+   ---------------------------------------------------------------- */
+
+.apple-glass {
+  background-color: var(--bg-glass);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+}
+
+.apple-glass-strong {
+  background-color: var(--bg-glass-strong);
+  backdrop-filter: saturate(180%) blur(28px);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  background-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(25, 128, 66, 0.18), 0 4px 12px rgba(25, 128, 66, 0.14);
+  transition:
+    background-color var(--m-out) var(--ease-ui),
+    box-shadow var(--m-out) var(--ease-ui),
+    transform var(--m-press) var(--ease-ui),
+    opacity var(--m-out) var(--ease-ui);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  box-shadow: 0 2px 6px rgba(25, 128, 66, 0.24), 0 6px 16px rgba(25, 128, 66, 0.18);
+  transition-duration: var(--m-in), var(--m-in), var(--m-press), var(--m-in);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-hairline);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition:
+    background-color var(--m-out) var(--ease-ui),
+    border-color var(--m-out) var(--ease-ui),
+    transform var(--m-press) var(--ease-ui);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  transition-duration: var(--m-in), var(--m-in), var(--m-press);
+}
+
+.btn-tinted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  background-color: var(--accent-soft);
+  color: var(--accent-fg);
+  font-weight: 600;
+  transition:
+    background-color var(--m-out) var(--ease-ui),
+    transform var(--m-press) var(--ease-ui);
+}
+
+.btn-tinted:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled),
+  .btn-tinted:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+/* Tactile squash & stretch press (scale from 0.97) */
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.btn-tinted:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.97);
+}
+
+/* Apple Segmented Control */
+.segmented-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background-color: var(--bg-subtle);
+  padding: 3px;
+}
+
+.segmented-item {
+  position: relative;
+  z-index: 1;
+  border-radius: 999px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition:
+    background-color 180ms var(--ease-ui),
+    color 150ms var(--ease-ui),
+    box-shadow 180ms var(--ease-ui),
+    transform var(--m-press) var(--ease-ui);
+}
+
+.segmented-item:hover {
+  color: var(--text-primary);
+}
+
+.segmented-item:active {
+  transform: scale(0.97);
+}
+
+.segmented-item-active {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-pill);
+}
+
+/* Crisp Apple luminous card */
+.surface-card {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border-hairline);
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.dark .surface-card {
+  box-shadow: var(--shadow-card), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Interactive linked card: subtle 2px lift on hover */
+.card-interactive {
+  transition:
+    transform 180ms var(--ease-ui),
+    border-color 150ms var(--ease-ui),
+    background-color 150ms var(--ease-ui),
+    box-shadow 180ms var(--ease-ui);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-card-hover);
+  }
+}
+
+/* Photo frame smooth zoom (1.03 inside frame) */
+.photo-frame {
+  overflow: hidden;
+}
+
+.photo-frame img {
+  transition: transform 550ms var(--ease-enter);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .photo-frame:hover img {
+    transform: scale(1.03);
+  }
+}
+
+/* Smooth accordion expansion (CSS Grid + interpolate-size support, no abrupt jumps) */
+.accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms var(--ease-enter),
+    opacity 200ms var(--ease-ui);
+}
+
+.accordion-grid[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-inner {
+  overflow: hidden;
+}
+
+/* ----------------------------------------------------------------
+   Micro-Interaction Keyframes (GPU transform & opacity only)
+   ---------------------------------------------------------------- */
 
 @keyframes press-fill {
   from {
@@ -77,7 +384,7 @@
   animation: press-fill 450ms linear forwards;
 }
 
-@keyframes unslop-enter {
+@keyframes taste-enter {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -89,7 +396,196 @@
 }
 
 .animate-enter {
-  animation: unslop-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: taste-enter 280ms var(--ease-enter) both;
+}
+
+@keyframes photo-settle {
+  from {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.animate-photo-settle {
+  animation: photo-settle 650ms var(--ease-enter) both;
+}
+
+/* Modal & popover entry from scale(0.97) — never from 0 */
+@keyframes modal-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-sheet-in 220ms var(--ease-enter) both;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-popover-in {
+  animation: popover-in 150ms var(--ease-enter) both;
+}
+
+/* Exaggerated feedback: horizontal error shake */
+@keyframes error-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(2.5px);
+  }
+}
+
+.animate-shake {
+  animation: error-shake 340ms var(--ease-ui) both;
+}
+
+/* Squash & stretch pop on check confirmation */
+@keyframes check-squash-pop {
+  0% {
+    transform: scale(0.84);
+  }
+  45% {
+    transform: scale(1.13, 0.92);
+  }
+  75% {
+    transform: scale(0.96, 1.04);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+.animate-check-pop {
+  animation: check-squash-pop 280ms var(--ease-spring) both;
+}
+
+/* Secondary action: subtle expanding confirmation halo */
+@keyframes check-halo {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+
+.animate-check-halo {
+  animation: check-halo 360ms var(--ease-enter) forwards;
+}
+
+/* Tactile follow-through pop for stepper numbers */
+@keyframes qty-bump {
+  0% {
+    transform: scale(0.86);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-qty-bump {
+  animation: qty-bump 180ms var(--ease-spring) both;
+}
+
+/* Directional stepper / tab transitions */
+@keyframes slide-in-forward {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-backward {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-forward {
+  animation: slide-in-forward 220ms var(--ease-enter) both;
+}
+
+.animate-slide-backward {
+  animation: slide-in-backward 220ms var(--ease-enter) both;
+}
+
+/* Peak-end subtle breathing ring when 100% items are in cart */
+@keyframes goal-ready-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(25, 128, 66, 0.32), 0 4px 12px rgba(25, 128, 66, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(25, 128, 66, 0), 0 6px 16px rgba(25, 128, 66, 0.24);
+  }
+}
+
+.animate-goal-ready {
+  animation: goal-ready-ring 2.2s var(--ease-ui) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter,
+  .animate-photo-settle,
+  .animate-modal-in,
+  .animate-popover-in,
+  .animate-shake,
+  .animate-check-pop,
+  .animate-check-halo,
+  .animate-qty-bump,
+  .animate-slide-forward,
+  .animate-slide-backward,
+  .animate-goal-ready {
+    animation: none !important;
+  }
+
+  .card-interactive:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-tinted:hover,
+  .photo-frame:hover img {
+    transform: none !important;
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {

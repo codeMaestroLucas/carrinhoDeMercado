@@ -16,28 +16,30 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        className="animate-modal-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-medium text-[var(--text-primary)]">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
             Filtros da lista
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar filtros"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.8} />
           </button>
         </div>
 
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3">
+        <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3.5">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">
               Mostrar itens no carrinho
@@ -52,19 +54,19 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
             aria-label="Alternar exibição de itens marcados"
             className={`relative h-7 w-12 rounded-full transition-colors duration-150 ease-ui ${
               showCheckedItems
-                ? 'bg-[var(--accent)]'
-                : 'bg-[var(--bg-subtle)] ring-1 ring-[var(--border-hairline)]'
+                ? 'bg-[var(--positive)]'
+                : 'bg-[var(--bg-subtle)] ring-1 ring-[var(--border-subtle)]'
             }`}
           >
             <span
-              className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-[var(--bg-surface)] shadow-2xs transition-transform duration-150 ease-ui ${
+              className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-xs transition-transform duration-150 ease-ui ${
                 showCheckedItems ? 'translate-x-5' : ''
               }`}
             />
           </button>
         </div>
 
-        <p className="mb-2 text-xs font-medium text-[var(--text-secondary)]">
+        <p className="mb-2.5 text-xs font-semibold text-[var(--text-secondary)]">
           Filtrar por categoria
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -74,9 +76,9 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
               setCategoryFilter(null);
               onClose();
             }}
-            className={`flex h-10 items-center justify-between rounded-lg border px-3 text-left text-xs font-medium transition-colors duration-150 ease-ui ${
+            className={`flex h-11 items-center justify-between rounded-2xl border px-3.5 text-left text-xs font-semibold transition-colors duration-150 ease-ui ${
               categoryFilter === null
-                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_8px_rgba(25,128,66,0.2)]'
                 : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
@@ -95,9 +97,9 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
                   setCategoryFilter(active ? null : cat.id);
                   onClose();
                 }}
-                className={`flex h-10 items-center justify-between rounded-lg border px-3 text-left text-xs font-medium transition-colors duration-150 ease-ui ${
+                className={`flex h-11 items-center justify-between rounded-2xl border px-3.5 text-left text-xs font-semibold transition-colors duration-150 ease-ui ${
                   active
-                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                    ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent-fg)]'
                     : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >

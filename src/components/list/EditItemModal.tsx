@@ -78,24 +78,26 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        className="animate-modal-in max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)]">
-              <CategoryIcon category={category} size={18} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)]">
+              <CategoryIcon category={category} size={19} />
             </div>
             <div>
-              <h2 className="text-base font-medium text-[var(--text-primary)]">
+              <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
                 Configurar item
               </h2>
               <p className="text-xs text-[var(--text-muted)]">
-                Preço, quantidade, categoria e mercado
+                Preço, quantidade, corredor e mercado
               </p>
             </div>
           </div>
@@ -103,21 +105,21 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             type="button"
             onClick={onClose}
             aria-label="Fechar edição"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.8} />
           </button>
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-[var(--negative)]/25 bg-[var(--negative-soft)] px-3 py-2 text-xs font-medium text-[var(--negative)]">
+            <div className="animate-shake rounded-2xl border border-[var(--negative)]/25 bg-[var(--negative-soft)] px-4 py-2.5 text-xs font-medium text-[var(--negative)]">
               {error}
             </div>
           )}
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
               Nome do produto
             </label>
             <input
@@ -127,13 +129,13 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                 setName(e.target.value);
                 setError(null);
               }}
-              className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              className="h-11 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
                 {isPriceTotal ? 'Preço total (R$)' : 'Preço unitário (R$)'}
               </label>
               <input
@@ -142,7 +144,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                 placeholder="0,00"
                 value={priceStr}
                 onChange={(e) => setPriceStr(e.target.value)}
-                className="font-mono-tabular h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                className="font-mono-tabular h-11 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
               />
               {lastPrice != null && !priceStr && (
                 <button
@@ -150,7 +152,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                   onClick={() =>
                     setPriceStr(lastPrice.toFixed(2).replace('.', ','))
                   }
-                  className="mt-1.5 text-xs font-medium text-[var(--accent-fg)] hover:underline"
+                  className="mt-1.5 text-xs font-semibold text-[var(--positive)] hover:underline"
                 >
                   Usar último ({AppFormatters.formatCurrency(lastPrice)})
                 </button>
@@ -158,7 +160,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
                 Quantidade e unidade
               </label>
               <div className="flex gap-2">
@@ -169,12 +171,12 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                   onChange={(e) =>
                     setQuantity(Math.max(1, Number(e.target.value) || 1))
                   }
-                  className="font-mono-tabular h-10 w-16 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 text-center text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                  className="font-mono-tabular h-11 w-16 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2 text-center text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
                 />
                 <select
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
-                  className="h-10 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                  className="h-11 flex-1 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
                 >
                   {UNITS.map((u) => (
                     <option key={u} value={u}>
@@ -186,24 +188,27 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3.5 py-2.5">
+          <div className="flex items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3">
             <div>
-              <p className="text-xs font-medium text-[var(--text-primary)]">
+              <p className="text-xs font-semibold text-[var(--text-primary)]">
                 {isPriceTotal
                   ? 'Preço informado é o total do pacote'
                   : 'Multiplicar preço pela quantidade'}
               </p>
-              <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                Total efetivo: {AppFormatters.formatCurrency(previewTotal)}
+              <p className="font-mono-tabular mt-0.5 text-xs text-[var(--text-muted)]">
+                Total efetivo:{' '}
+                <strong className="text-[var(--text-primary)]">
+                  {AppFormatters.formatCurrency(previewTotal)}
+                </strong>
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsPriceTotal((v) => !v)}
-              className={`h-8 rounded-lg px-3 text-xs font-medium transition-colors duration-150 ease-ui ${
+              className={`h-9 rounded-full px-3.5 text-xs font-semibold transition-colors duration-150 ease-ui ${
                 isPriceTotal
                   ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
-                  : 'border border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
+                  : 'border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]'
               }`}
             >
               {isPriceTotal ? 'Total' : 'Unitário'}
@@ -212,7 +217,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
                 Categoria (corredor)
               </label>
               <select
@@ -220,7 +225,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                 onChange={(e) =>
                   setCategory(e.target.value as ProductCategoryId)
                 }
-                className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                className="h-11 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3.5 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
               >
                 {PRODUCT_CATEGORIES.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -231,13 +236,13 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)]">
                 Preferência de mercado
               </label>
               <select
                 value={marketId}
                 onChange={(e) => setMarketId(e.target.value)}
-                className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                className="h-11 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3.5 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
               >
                 <option value="">Qualquer mercado</option>
                 {markets.map((m) => (
@@ -250,9 +255,9 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
           </div>
 
           {recommendations.length > 0 && (
-            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--accent-fg)]">
-                <TrendingDown size={15} strokeWidth={1.5} />
+            <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-4">
+              <div className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-[var(--positive)]">
+                <TrendingDown size={15} strokeWidth={1.9} />
                 <span>Histórico de preços por mercado</span>
               </div>
               <div className="space-y-1.5">
@@ -260,12 +265,14 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                   <div
                     key={rec.market.id}
                     onClick={() => setMarketId(rec.market.id)}
-                    className="flex cursor-pointer items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                    className="flex cursor-pointer items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs transition-colors duration-150 ease-ui hover:border-[var(--border-strong)]"
                   >
-                    <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+                    <span className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
                       <span
                         className={`font-mono-tabular ${
-                          idx === 0 ? 'text-[var(--accent-fg)]' : 'text-[var(--text-muted)]'
+                          idx === 0
+                            ? 'text-[var(--positive)]'
+                            : 'text-[var(--text-muted)]'
                         }`}
                       >
                         {idx + 1}.
@@ -282,22 +289,19 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2.5 pt-2">
             <button
               type="button"
               onClick={() => {
                 removeItem(item.id);
                 onClose();
               }}
-              className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-sm font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-5 text-sm font-semibold text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
             >
-              <Trash2 size={16} strokeWidth={1.5} />
+              <Trash2 size={16} strokeWidth={1.8} />
               Remover
             </button>
-            <button
-              type="submit"
-              className="h-10 flex-1 rounded-lg bg-[var(--accent)] text-sm font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
-            >
+            <button type="submit" className="btn-primary h-11 flex-1 text-sm">
               Salvar alterações
             </button>
           </div>

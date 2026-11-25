@@ -1,11 +1,10 @@
-import React, { memo, useRef, useState } from 'react';
-import { Check, Minus, Plus, Tag, Trash2 } from 'lucide-react';
+import React, { memo, useEffect, useRef, useState } from 'react';
+import { Check, Minus, Plus, Store, Tag, Trash2 } from 'lucide-react';
 import {
-  PRODUCT_CATEGORY_MAP,
   getEffectiveTotalAmount,
   type ShoppingItem,
 } from '../../types/shopping';
-import { CategoryDot, CategoryIcon } from '../common/CategoryIcon';
+import { CategoryBadge } from '../common/CategoryIcon';
 import { AppFormatters } from '../../utils/formatters';
 
 interface SwipeableShoppingItemRowProps {
@@ -28,17 +27,29 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
   const [translateX, setTranslateX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [justChecked, setJustChecked] = useState(false);
 
   const startXRef = useRef<number>(0);
   const startYRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
   const currentDeltaXRef = useRef<number>(0);
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const isPressActiveRef = useRef(false);
   const lastPointerEventAtRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevCheckedRef = useRef(item.isChecked);
 
-  const catInfo = PRODUCT_CATEGORY_MAP[item.category];
+  useEffect(() => {
+    if (!prevCheckedRef.current && item.isChecked) {
+      setJustChecked(true);
+      const t = setTimeout(() => setJustChecked(false), 380);
+      prevCheckedRef.current = item.isChecked;
+      return () => clearTimeout(t);
+    }
+    prevCheckedRef.current = item.isChecked;
+  }, [item.isChecked]);
+
   const total = getEffectiveTotalAmount(item);
   const hasPrice = item.price != null && item.price > 0;
 
@@ -82,30 +93,35 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
     const { clientX, clientY } = getCoords(e);
     startXRef.current = clientX;
     startYRef.current = clientY;
+    startTimeRef.current = Date.now();
     currentDeltaXRef.current = 0;
     isHorizontalSwipeRef.current = null;
     isLongPressTriggeredRef.current = false;
     clearLongPressTimer();
 
     longPressTimerRef.current = setTimeout(() => {
-      isLongPressTriggeredRef.current = true;
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate(40);
-        } catch (_) {}
+      if (
+        isPressActiveRef.current &&
+        Math.abs(currentDeltaXRef.current) < 10 &&
+        isHorizontalSwipeRef.current !== true
+      ) {
+        isLongPressTriggeredRef.current = true;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate(25);
+          } catch {
+            // Ignore vibration failures
+          }
+        }
+        onOpenEdit(item);
       }
-      onOpenEdit(item);
     }, 500);
   };
 
   const handlePressMove = (e: React.SyntheticEvent) => {
-    if (e.type.startsWith('pointer')) {
-      lastPointerEventAtRef.current = Date.now();
-    } else if (isMouseDuplicateAfterPointer(e)) {
-      return;
-    }
+    if (isMouseDuplicateAfterPointer(e)) return;
+    if (!isPressActiveRef.current || isDismissed) return;
 
-    if (isDismissed || !isPressActiveRef.current) return;
     const { clientX, clientY } = getCoords(e);
     const deltaX = clientX - startXRef.current;
     const deltaY = clientY - startYRef.current;
@@ -113,24 +129,25 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
     if (isHorizontalSwipeRef.current === null) {
       if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
         isHorizontalSwipeRef.current = Math.abs(deltaX) > Math.abs(deltaY);
-        if (isHorizontalSwipeRef.current) {
-          clearLongPressTimer();
-        }
+        clearLongPressTimer();
       }
     }
 
     if (isHorizontalSwipeRef.current) {
-      clearLongPressTimer();
-      currentDeltaXRef.current = deltaX;
+      setIsSwiping(true);
       if (deltaX < 0) {
-        setIsSwiping(true);
-        const damped = deltaX < -120 ? -120 + (deltaX + 120) * 0.25 : deltaX;
-        setTranslateX(damped);
+        // Elastic rubber-banding resistance past -140px
+        const damped =
+          deltaX < -140 ? -140 + (deltaX + 140) * 0.25 : deltaX;
+        const clamped = Math.max(-185, damped);
+        currentDeltaXRef.current = clamped;
+        setTranslateX(clamped);
       } else {
-        setTranslateX(0);
+        // Progressive rubber-banding when pulling beyond left edge (0)
+        const elasticRight = Math.min(24, deltaX * 0.22);
+        currentDeltaXRef.current = elasticRight;
+        setTranslateX(elasticRight);
       }
-    } else if (Math.abs(deltaY) > 8) {
-      clearLongPressTimer();
     }
   };
 
@@ -153,18 +170,27 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
       return;
     }
 
-    if (isSwiping || currentDeltaXRef.current < -15) {
-      setIsSwiping(false);
-      if (currentDeltaXRef.current < -85) {
+    const finalDeltaX = currentDeltaXRef.current;
+    const wasHorizontal = isHorizontalSwipeRef.current === true;
+    const elapsedMs = Math.max(16, Date.now() - startTimeRef.current);
+    const velocityPxPerMs = finalDeltaX / elapsedMs;
+    setIsSwiping(false);
+
+    if (wasHorizontal) {
+      // Velocity-aware dismissal: fast flick OR crossing the -85px threshold
+      const shouldDismiss =
+        finalDeltaX <= -85 || (velocityPxPerMs < -0.55 && finalDeltaX <= -45);
+
+      if (shouldDismiss) {
         setIsDismissed(true);
-        setTranslateX(-500);
+        setTranslateX(-400);
         setTimeout(() => {
           onRemove(item.id);
-        }, 220);
-        return;
+        }, 180);
+      } else {
+        setTranslateX(0);
+        currentDeltaXRef.current = 0;
       }
-      setTranslateX(0);
-      currentDeltaXRef.current = 0;
       return;
     }
 
@@ -183,23 +209,23 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl select-none transition-[opacity,transform] duration-200 ease-ui ${
+      className={`relative overflow-hidden rounded-2xl select-none transition-[opacity,transform] duration-200 ease-ui ${
         isDismissed ? 'pointer-events-none h-0 opacity-0' : 'opacity-100'
       }`}
     >
       {/* Delete reveal layer */}
       <div
-        className={`absolute inset-0 flex items-center justify-end rounded-xl bg-[var(--negative)] px-4 text-[#FDFBF7] transition-opacity duration-150 ease-ui ${
+        className={`absolute inset-0 flex items-center justify-end rounded-2xl bg-[var(--negative)] px-5 text-white transition-opacity duration-150 ease-ui ${
           translateX < -5 ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
-        <div className="flex items-center gap-2 text-xs font-medium">
+        <div className="flex items-center gap-2 text-xs font-semibold">
           <span>Remover</span>
-          <Trash2 size={16} strokeWidth={1.5} />
+          <Trash2 size={16} strokeWidth={1.8} />
         </div>
       </div>
 
-      {/* Foreground product card */}
+      {/* Foreground product row */}
       <div
         onPointerDown={handlePressStart}
         onPointerMove={handlePressMove}
@@ -211,31 +237,44 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
         onContextMenu={(e) => e.preventDefault()}
         style={{
           transform: `translateX(${translateX}px)`,
-          transition: isSwiping ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: isSwiping
+            ? 'none'
+            : 'transform 260ms cubic-bezier(0.34, 1.24, 0.64, 1)',
         }}
-        className={`relative flex cursor-pointer touch-pan-y items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3 shadow-2xs transition-colors duration-150 ease-ui ${
-          item.isChecked ? 'opacity-70' : ''
+        className={`card-interactive relative flex cursor-pointer touch-pan-y items-center gap-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-3 shadow-[var(--shadow-card)] sm:px-4 sm:py-3.5 ${
+          item.isChecked ? 'opacity-65' : ''
         }`}
       >
-        {/* Status / Category Box */}
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-150 ease-ui ${
-            item.isChecked
-              ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]'
-              : 'border-[var(--border-hairline)] bg-[var(--bg-subtle)]'
-          }`}
-        >
-          {item.isChecked ? (
-            <Check size={16} strokeWidth={2} />
-          ) : (
-            <CategoryIcon category={item.category} size={18} />
+        {/* Apple Reminders Circular Check Control with Squash & Stretch + Secondary Halo */}
+        <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+          {justChecked && (
+            <span
+              aria-hidden="true"
+              className="animate-check-halo pointer-events-none absolute inset-0 rounded-full bg-[var(--accent)]"
+            />
           )}
+          <div
+            className={`relative flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors duration-150 ease-ui ${
+              item.isChecked
+                ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]'
+                : 'border-[var(--border-strong)] bg-[var(--bg-surface)]'
+            } ${justChecked ? 'animate-check-pop' : ''}`}
+          >
+            {item.isChecked && <Check size={14} strokeWidth={2.75} />}
+          </div>
         </div>
 
-        {/* Product Information */}
+        {/* Bright Apple Pastel Category Icon Tile */}
+        <CategoryBadge
+          category={item.category}
+          size={16}
+          className="h-9 w-9 shrink-0 rounded-xl"
+        />
+
+        {/* Product Info */}
         <div className="min-w-0 flex-1">
           <p
-            className={`truncate text-sm font-medium leading-5 ${
+            className={`truncate text-[15px] font-medium leading-snug transition-colors duration-150 ${
               item.isChecked
                 ? 'text-[var(--text-muted)] line-through'
                 : 'text-[var(--text-primary)]'
@@ -244,27 +283,23 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
             {item.name}
           </p>
 
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs leading-4 text-[var(--text-muted)]">
-            <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
-              <CategoryDot category={item.category} />
-              {catInfo.label}
-            </span>
-            {total > 0 ? (
-              <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
-                {AppFormatters.formatCurrency(total)}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
+            {hasPrice && item.quantity > 1 && !item.isPriceTotal && (
+              <span className="font-mono-tabular">
+                {AppFormatters.formatCurrency(item.price!)}/{item.unit}
               </span>
-            ) : (
-              <span>Sem preço</span>
             )}
-            {cheapestMarketName && (
-              <span className="rounded bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-                Menor em {cheapestMarketName}
+
+            {cheapestMarketName && !item.isChecked && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-fg)]">
+                <Store size={11} strokeWidth={2} />
+                <span className="max-w-[140px] truncate">{cheapestMarketName}</span>
               </span>
             )}
           </div>
         </div>
 
-        {/* Right Controls */}
+        {/* Right Controls: Price trigger + Tactile Quantity stepper */}
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -275,19 +310,28 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
             }}
             title={hasPrice ? 'Editar produto e preço' : 'Informar preço'}
             aria-label={`Editar ${item.name}`}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-[color,background-color,border-color,transform] duration-150 ease-ui active:scale-[0.98] ${
+            className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition-[background-color,color,transform] duration-100 ease-ui active:scale-[0.97] ${
               hasPrice
-                ? 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent-fg)]'
-                : 'border-[var(--border-hairline)] text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
+                ? 'bg-[var(--accent-soft)] text-[var(--accent-fg)]'
+                : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Tag size={15} strokeWidth={1.5} />
+            {hasPrice ? (
+              <span className="font-mono-tabular font-semibold">
+                {AppFormatters.formatCurrency(total)}
+              </span>
+            ) : (
+              <>
+                <Tag size={13} strokeWidth={1.8} />
+                <span className="hidden sm:inline">Preço</span>
+              </>
+            )}
           </button>
 
           <div
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1"
+            className="flex h-9 items-center gap-0.5 rounded-full bg-[var(--bg-subtle)] p-0.5"
           >
             <button
               type="button"
@@ -296,12 +340,18 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
                 onUpdateQuantity(item.id, Math.max(1, item.quantity - 1));
               }}
               aria-label="Diminuir quantidade"
-              className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-[background-color,color,transform] duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-[0.98]"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-[background-color,color,transform] duration-100 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-95"
             >
-              <Minus size={14} strokeWidth={1.5} />
+              <Minus size={13} strokeWidth={2.1} />
             </button>
-            <span className="font-mono-tabular min-w-[40px] text-center text-xs font-medium text-[var(--text-primary)]">
-              {item.quantity} {item.unit}
+            <span
+              key={`${item.quantity}-${item.unit}`}
+              className="animate-qty-bump font-mono-tabular min-w-[36px] text-center text-xs font-semibold text-[var(--text-primary)]"
+            >
+              {item.quantity}
+              <span className="ml-0.5 font-normal text-[var(--text-muted)]">
+                {item.unit}
+              </span>
             </span>
             <button
               type="button"
@@ -310,9 +360,9 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
                 onUpdateQuantity(item.id, item.quantity + 1);
               }}
               aria-label="Aumentar quantidade"
-              className="flex h-6 w-6 items-center justify-center rounded text-[var(--text-secondary)] transition-[background-color,color,transform] duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-[0.98]"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-[background-color,color,transform] duration-100 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] active:scale-95"
             >
-              <Plus size={14} strokeWidth={1.5} />
+              <Plus size={13} strokeWidth={2.1} />
             </button>
           </div>
         </div>

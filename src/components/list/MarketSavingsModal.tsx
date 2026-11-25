@@ -27,18 +27,22 @@ export function MarketSavingsModal({
 }: MarketSavingsModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        className="animate-modal-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <PiggyBank size={18} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+        <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--positive-soft)] text-[var(--positive)]">
+              <PiggyBank size={20} strokeWidth={1.8} />
+            </div>
             <div>
-              <h2 className="text-base font-medium text-[var(--text-primary)]">
+              <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
                 Guia de economia
               </h2>
               <p className="text-xs text-[var(--text-muted)]">
@@ -50,20 +54,20 @@ export function MarketSavingsModal({
             type="button"
             onClick={onClose}
             aria-label="Fechar guia"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.8} />
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {groups.map((group) => (
             <div
               key={group.market.id}
-              className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3.5"
+              className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-4"
             >
-              <div className="mb-2.5 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-medium text-[var(--text-primary)]">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="font-display text-base font-semibold text-[var(--text-primary)]">
                   {group.market.name}
                 </h3>
                 <button
@@ -72,26 +76,26 @@ export function MarketSavingsModal({
                     onSelectMarket(group.market.id);
                     onClose();
                   }}
-                  className="h-8 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-hover)]"
+                  className="btn-primary h-8 px-3.5 text-xs"
                 >
                   Organizar corredores
                 </button>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {group.bargains.map((b) => (
                   <div
                     key={b.item.id}
-                    className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs"
+                    className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs"
                   >
                     <span className="font-medium text-[var(--text-primary)]">
                       {b.item.name}
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
+                      <span className="font-mono-tabular font-semibold text-[var(--positive)]">
                         {AppFormatters.formatCurrency(b.cheapestPrice)}
                       </span>
                       {b.savingsPercent >= 1 && (
-                        <span className="font-mono-tabular rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--accent-fg)]">
+                        <span className="font-mono-tabular rounded-full bg-[var(--positive-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--positive)]">
                           -{b.savingsPercent.toFixed(0)}%
                         </span>
                       )}

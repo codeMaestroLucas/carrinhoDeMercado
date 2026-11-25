@@ -58,17 +58,21 @@ export function ProductComparisonModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        className="animate-modal-in max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <GitCompareArrows size={18} strokeWidth={1.5} className="text-[var(--text-muted)]" />
-            <h2 className="text-base font-medium text-[var(--text-primary)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-hairline)] text-[var(--accent-fg)]">
+              <GitCompareArrows size={19} strokeWidth={1.8} />
+            </div>
+            <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
               Comparar produtos
             </h2>
           </div>
@@ -76,22 +80,22 @@ export function ProductComparisonModal({
             type="button"
             onClick={onClose}
             aria-label="Fechar comparação"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.8} />
           </button>
         </div>
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--accent-fg)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--accent-fg)]">
                 Produto A
               </label>
               <select
                 value={keyA}
                 onChange={(e) => setKeyA(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                className="h-10 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
               >
                 {allAggregates.map((agg) => (
                   <option key={agg.normalizedKey} value={agg.normalizedKey}>
@@ -102,13 +106,13 @@ export function ProductComparisonModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-[#B45309] dark:text-[#FBBF24]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--blue)]">
                 Produto B
               </label>
               <select
                 value={keyB}
                 onChange={(e) => setKeyB(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[#B45309]"
+                className="h-10 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--blue)]"
               >
                 {allAggregates.map((agg) => (
                   <option key={agg.normalizedKey} value={agg.normalizedKey}>
@@ -129,9 +133,9 @@ export function ProductComparisonModal({
                   key={s.product.normalizedKey}
                   type="button"
                   onClick={() => setKeyB(s.product.normalizedKey)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors duration-150 ease-ui ${
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors duration-150 ease-ui ${
                     keyB === s.product.normalizedKey
-                      ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
+                      ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)]'
                       : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                   }`}
                 >
@@ -142,8 +146,12 @@ export function ProductComparisonModal({
           )}
 
           {verdict && (
-            <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3 text-xs font-medium text-[var(--text-primary)]">
-              <Award size={16} strokeWidth={1.5} className="shrink-0 text-[var(--accent-fg)]" />
+            <div className="surface-card flex items-center gap-2.5 p-3.5 text-xs font-medium text-[var(--text-primary)]">
+              <Award
+                size={16}
+                strokeWidth={1.8}
+                className="shrink-0 text-[var(--positive)]"
+              />
               <span>{verdict}</span>
             </div>
           )}
@@ -153,25 +161,24 @@ export function ProductComparisonModal({
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { item: itemA, colorClass: 'text-[var(--accent-fg)]' },
-                  { item: itemB, colorClass: 'text-[#B45309] dark:text-[#FBBF24]' },
+                  { item: itemB, colorClass: 'text-[var(--blue)]' },
                 ].map(({ item, colorClass }) => (
-                  <div
-                    key={item.normalizedKey}
-                    className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3.5"
-                  >
-                    <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                  <div key={item.normalizedKey} className="surface-card p-4">
+                    <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
                       {item.displayName}
                     </p>
-                    <div className="mt-2 space-y-1 text-xs">
+                    <div className="mt-2.5 space-y-1.5 text-xs">
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">Média</span>
-                        <strong className={`font-mono-tabular font-medium ${colorClass}`}>
+                        <strong
+                          className={`font-mono-tabular font-semibold ${colorClass}`}
+                        >
                           {AppFormatters.formatCurrency(item.averagePrice)}
                         </strong>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">Menor</span>
-                        <strong className="font-mono-tabular font-medium text-[var(--text-primary)]">
+                        <strong className="font-mono-tabular font-semibold text-[var(--text-primary)]">
                           {item.minPriceOccurrence
                             ? AppFormatters.formatCurrency(
                                 item.minPriceOccurrence.price,
@@ -181,7 +188,7 @@ export function ProductComparisonModal({
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">Último</span>
-                        <strong className="font-mono-tabular font-medium text-[var(--text-primary)]">
+                        <strong className="font-mono-tabular font-semibold text-[var(--text-primary)]">
                           {AppFormatters.formatCurrency(item.lastPrice)}
                         </strong>
                       </div>
@@ -190,8 +197,8 @@ export function ProductComparisonModal({
                 ))}
               </div>
 
-              <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-                <h3 className="mb-3 text-xs font-medium text-[var(--text-primary)]">
+              <div className="surface-card p-4">
+                <h3 className="font-display mb-3 text-sm font-semibold text-[var(--text-primary)]">
                   Evolução comparativa
                 </h3>
                 <DualPriceComparisonChart itemA={itemA} itemB={itemB} />

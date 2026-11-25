@@ -18,17 +18,17 @@ export interface ProductCategoryInfo {
 }
 
 export const PRODUCT_CATEGORIES: ProductCategoryInfo[] = [
-  { id: 'alimentos', label: 'Alimentos', color: '#4CAF50' },
-  { id: 'hortifruti', label: 'Hortifruti', color: '#689F38' },
-  { id: 'congelados', label: 'Congelados', color: '#00ACC1' },
-  { id: 'bebidas', label: 'Bebidas', color: '#42A5F5' },
-  { id: 'limpeza', label: 'Limpeza', color: '#26A69A' },
-  { id: 'perfumaria_higiene', label: 'Perfumaria e Higiene', color: '#EC407A' },
-  { id: 'bebe_crianca', label: 'Bebê e Criança', color: '#AB47BC' },
-  { id: 'descartaveis', label: 'Descartáveis', color: '#FFA726' },
-  { id: 'pet_shop', label: 'PetShop', color: '#8D6E63' },
-  { id: 'bazar', label: 'Bazar', color: '#78909C' },
-  { id: 'diversos', label: 'Diversos', color: '#90A4AE' },
+  { id: 'alimentos', label: 'Alimentos', color: '#198042' },
+  { id: 'hortifruti', label: 'Hortifruti', color: '#2DA44E' },
+  { id: 'congelados', label: 'Congelados', color: '#0095B6' },
+  { id: 'bebidas', label: 'Bebidas', color: '#0071E3' },
+  { id: 'limpeza', label: 'Limpeza', color: '#0D9488' },
+  { id: 'perfumaria_higiene', label: 'Perfumaria e Higiene', color: '#E14D72' },
+  { id: 'bebe_crianca', label: 'Bebê e Criança', color: '#E68A00' },
+  { id: 'descartaveis', label: 'Descartáveis', color: '#D97706' },
+  { id: 'pet_shop', label: 'PetShop', color: '#A27B5C' },
+  { id: 'bazar', label: 'Bazar', color: '#58728A' },
+  { id: 'diversos', label: 'Diversos', color: '#86868B' },
 ];
 
 export const PRODUCT_CATEGORY_MAP: Record<ProductCategoryId, ProductCategoryInfo> =

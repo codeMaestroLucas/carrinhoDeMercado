@@ -30,7 +30,8 @@ import { useShoppingStore } from '../store/useShoppingStore';
 import { CategoryClassifier } from '../services/categoryClassifier';
 import { buildAllProductAggregates } from '../services/productHistoryService';
 import { AppFormatters } from '../utils/formatters';
-import { CategoryIcon } from '../components/common/CategoryIcon';
+import { CategoryDot } from '../components/common/CategoryIcon';
+import { SmartTooltip } from '../components/common/SmartTooltip';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { PwaInstallBanner } from '../components/layout/PwaInstallBanner';
 import { EditItemModal } from '../components/list/EditItemModal';
@@ -81,6 +82,7 @@ export function ShoppingListPage({
   const [showFinish, setShowFinish] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [inputShake, setInputShake] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,22 +108,10 @@ export function ShoppingListPage({
       clearTimeout(toastTimerRef.current);
     }
     toastTimerRef.current = setTimeout(() => {
-      toastTimerRef.current = null;
       setToastMsg(null);
+      toastTimerRef.current = null;
     }, 2800);
   }, []);
-
-  const handleOpenEdit = useCallback((it: ShoppingItem) => {
-    setEditingItem(it);
-  }, []);
-
-  const handleRemoveItem = useCallback(
-    (id: string) => {
-      removeItem(id);
-      showToast('Item removido da lista');
-    },
-    [removeItem, showToast],
-  );
 
   const selectedMarket = useMemo(
     () => markets.find((m) => m.id === selectedMarketId) ?? markets[0],
@@ -137,23 +127,26 @@ export function ShoppingListPage({
     return CategoryClassifier.parsePastedList(trimmed);
   }, [inputText]);
 
+  const allHistoryAggregates = useMemo(
+    () => buildAllProductAggregates(history),
+    [history],
+  );
+
   const historicalSuggestions = useMemo(() => {
-    const q = inputText.trim();
+    const q = CategoryClassifier.normalize(inputText);
     if (q.length < 2 || detectedBulkItems.length > 1) return [];
-    const normQ = CategoryClassifier.normalize(q);
-    if (!normQ) return [];
-    const allAggs = buildAllProductAggregates(history);
-    return allAggs
-      .filter((agg) =>
-        CategoryClassifier.normalize(agg.displayName).includes(normQ),
-      )
+    return allHistoryAggregates
+      .filter((agg) => agg.normalizedKey.includes(q))
       .slice(0, 5);
-  }, [inputText, detectedBulkItems.length, history]);
+  }, [allHistoryAggregates, inputText, detectedBulkItems.length]);
+
+  const categoryOrderMap = useMemo(() => {
+    const map = new Map<ProductCategoryId, number>();
+    selectedMarket.categoryOrder.forEach((catId, idx) => map.set(catId, idx));
+    return map;
+  }, [selectedMarket]);
 
   const filteredAndSortedItems = useMemo(() => {
-    const orderMap = new Map<ProductCategoryId, number>();
-    selectedMarket.categoryOrder.forEach((cat, idx) => orderMap.set(cat, idx));
-
     return items
       .filter((item) => {
         if (!showCheckedItems && item.isChecked) return false;
@@ -161,16 +154,52 @@ export function ShoppingListPage({
         return true;
       })
       .sort((a, b) => {
-        const idxA = orderMap.get(a.category) ?? 999;
-        const idxB = orderMap.get(b.category) ?? 999;
-        if (idxA !== idxB) return idxA - idxB;
         if (a.isChecked !== b.isChecked) return a.isChecked ? 1 : -1;
-        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        const catA = categoryOrderMap.get(a.category) ?? 999;
+        const catB = categoryOrderMap.get(b.category) ?? 999;
+        if (catA !== catB) return catA - catB;
+        return a.name.localeCompare(b.name);
       });
-  }, [items, selectedMarket, showCheckedItems, categoryFilter]);
+  }, [items, showCheckedItems, categoryFilter, categoryOrderMap]);
 
-  // Precompute market price recommendations once per history/markets change
-  // so checking/unchecking items never re-scans the entire purchase history.
+  // Group unchecked items by aisle category in selectedMarket.categoryOrder
+  const { pendingGroups, checkedItemsList } = useMemo(() => {
+    const groupsMap = new Map<ProductCategoryId, ShoppingItem[]>();
+    const checked: ShoppingItem[] = [];
+
+    for (const item of filteredAndSortedItems) {
+      if (item.isChecked) {
+        checked.push(item);
+        continue;
+      }
+      const list = groupsMap.get(item.category);
+      if (list) {
+        list.push(item);
+      } else {
+        groupsMap.set(item.category, [item]);
+      }
+    }
+
+    const orderedGroups: Array<{
+      category: ProductCategoryId;
+      aisleIndex: number;
+      items: ShoppingItem[];
+    }> = [];
+
+    for (const [category, groupItems] of groupsMap.entries()) {
+      const idx = categoryOrderMap.get(category) ?? 99;
+      orderedGroups.push({
+        category,
+        aisleIndex: idx + 1,
+        items: groupItems,
+      });
+    }
+
+    orderedGroups.sort((a, b) => a.aisleIndex - b.aisleIndex);
+
+    return { pendingGroups: orderedGroups, checkedItemsList: checked };
+  }, [filteredAndSortedItems, categoryOrderMap]);
+
   const recommendationsByProduct = useMemo(() => {
     const byId = new Map<string, MarketProfile>();
     const byNormName = new Map<string, MarketProfile>();
@@ -248,8 +277,6 @@ export function ShoppingListPage({
         ((highest.averagePrice - cheapest.averagePrice) /
           highest.averagePrice) *
         100;
-      if (savingsPercent < 1) continue;
-
       const bargain: MarketBargainItem = {
         item,
         cheapestPrice: cheapest.averagePrice,
@@ -272,26 +299,60 @@ export function ShoppingListPage({
   }, [items, recommendationsByProduct]);
 
   const activeMarketBargainGroup = useMemo(() => {
-    return bargainGroups.find((g) => g.market.id === selectedMarketId) ?? null;
-  }, [bargainGroups, selectedMarketId]);
+    return (
+      bargainGroups.find((g) => g.market.id === selectedMarket.id) ?? null
+    );
+  }, [bargainGroups, selectedMarket.id]);
 
-  const totalEstimated = useMemo(
-    () => items.reduce((sum, item) => sum + getEffectiveTotalAmount(item), 0),
-    [items],
+  const handleOpenEdit = useCallback((item: ShoppingItem) => {
+    setEditingItem(item);
+  }, []);
+
+  const handleRemoveItem = useCallback(
+    (id: string) => {
+      removeItem(id);
+      showToast('Item removido da lista');
+    },
+    [removeItem, showToast],
   );
-  const checkedTotal = useMemo(
-    () =>
-      items
-        .filter((i) => i.isChecked)
-        .reduce((sum, item) => sum + getEffectiveTotalAmount(item), 0),
-    [items],
-  );
-  const checkedCount = items.filter((i) => i.isChecked).length;
+
+  const { totalEstimated, checkedTotal, checkedCount } = useMemo(() => {
+    let estimated = 0;
+    let checkedSum = 0;
+    let count = 0;
+    for (const item of items) {
+      const amount = getEffectiveTotalAmount(item);
+      estimated += amount;
+      if (item.isChecked) {
+        checkedSum += amount;
+        count++;
+      }
+    }
+    return {
+      totalEstimated: estimated,
+      checkedTotal: checkedSum,
+      checkedCount: count,
+    };
+  }, [items]);
+
+  const progressPct =
+    items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0;
+
+  const triggerInputShake = () => {
+    setInputShake(false);
+    requestAnimationFrame(() => {
+      setInputShake(true);
+      setTimeout(() => setInputShake(false), 380);
+    });
+  };
 
   const handleAddSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     const raw = inputText.trim();
-    if (!raw) return;
+    if (!raw) {
+      triggerInputShake();
+      return;
+    }
 
     if (detectedBulkItems.length > 1) {
       const report = addItemsFromPastedTextWithReport(raw);
@@ -305,6 +366,7 @@ export function ShoppingListPage({
           }`,
         );
       } else {
+        triggerInputShake();
         showToast('Todos os itens colados já estavam na lista');
       }
       return;
@@ -314,30 +376,25 @@ export function ShoppingListPage({
     if (added) {
       setInputText('');
     } else {
+      triggerInputShake();
       showToast('Este item já está na sua lista');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] pb-36 pt-safe">
-      {/* Top Hero Moment: natural kraft bag photograph blended seamlessly into warm surface */}
-      <div className="relative overflow-hidden border-b border-[var(--border-hairline)]">
-        <div className="pointer-events-none absolute inset-0">
-          <img
-            src="/assets/ListTop.jpg"
-            alt="Sacola de compras com hortifrúti"
-            className="h-full w-full object-cover object-right opacity-85 dark:opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-app)] via-[var(--bg-app)]/85 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[var(--bg-app)] to-transparent" />
-        </div>
-
-        <div className="relative z-10 mx-auto max-w-2xl px-4 pt-3 pb-4">
-          {/* Top quiet utility bar */}
-          <div className="flex items-center justify-between gap-2">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-44 pt-safe md:pb-28">
+      {/* Editorial Top Hero Band */}
+      <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
+        <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+          {/* Mobile Quiet Utility Row */}
+          <div className="mb-4 flex items-center justify-between gap-2 md:hidden">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-3 text-xs font-medium text-[var(--text-primary)] shadow-2xs backdrop-blur-sm">
-                <ShoppingCart size={16} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+              <span className="font-display inline-flex items-center gap-1.5 text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
+                Carrinho
+              </span>
+              <div className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 text-xs font-medium text-[var(--text-secondary)]">
+                <ShoppingCart size={13} strokeWidth={1.8} className="text-[var(--accent-fg)]" />
                 <span className="font-mono-tabular">
                   {items.length} {items.length === 1 ? 'item' : 'itens'}
                 </span>
@@ -352,173 +409,205 @@ export function ShoppingListPage({
                         ? 'Sincronizando com a família'
                         : `Sincronizado (${sharedSpaceCode})`
                   }
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-2.5 text-xs font-medium text-[var(--text-secondary)] shadow-2xs backdrop-blur-sm"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 text-xs font-medium text-[var(--text-secondary)]"
                 >
                   {hasPendingCloudPush ? (
-                    <CloudOff size={14} strokeWidth={1.5} className="text-[#B45309] dark:text-[#FBBF24]" />
+                    <CloudOff size={13} strokeWidth={1.8} className="text-[var(--amber)]" />
                   ) : (
-                    <Cloud size={14} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+                    <Cloud size={13} strokeWidth={1.8} className="text-[var(--positive)]" />
                   )}
                   <span className="font-mono-tabular">{sharedSpaceCode}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {checkedCount > 0 && (
-                <button
-                  type="button"
-                  onClick={clearCheckedItems}
-                  title="Remover itens marcados"
-                  className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-3 text-xs font-medium text-[var(--text-primary)] shadow-2xs backdrop-blur-sm transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-subtle)] active:scale-[0.98]"
-                >
-                  <Trash2 size={15} strokeWidth={1.5} className="text-[var(--text-muted)]" />
-                  <span className="font-mono-tabular">Limpar ({checkedCount})</span>
-                </button>
-              )}
-              <ThemeToggleButton variant="glass" />
-            </div>
+            <ThemeToggleButton />
           </div>
 
-          {/* Quick-add bar anchored in the calm left space */}
-          <form onSubmit={handleAddSubmit} className="relative mt-6">
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-1.5 pl-3.5 shadow-sm transition-colors duration-150 ease-ui focus-within:border-[var(--accent)]">
-              <textarea
-                ref={inputRef}
-                rows={detectedBulkItems.length > 1 ? 3 : 1}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === 'Enter' &&
-                    !e.shiftKey &&
-                    detectedBulkItems.length <= 1
-                  ) {
-                    e.preventDefault();
-                    handleAddSubmit();
-                  }
-                }}
-                placeholder="Adicionar item ou colar lista"
-                className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!inputText.trim()}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 text-xs font-medium text-[var(--accent-ink)] transition-[background-color,opacity,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-40"
-              >
-                {detectedBulkItems.length > 1 ? (
-                  <>
-                    <ClipboardPaste size={15} strokeWidth={1.5} />
-                    <span className="font-mono-tabular">Colar ({detectedBulkItems.length})</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} strokeWidth={1.5} />
-                    <span>Adicionar</span>
-                  </>
+          <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-12 lg:gap-8">
+            {/* Left Column: Title, Context & Quick-Add Command Bar */}
+            <div className="md:col-span-7">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {sharedSpaceCode && (
+                    <div className="mb-2 hidden items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] md:inline-flex">
+                      {hasPendingCloudPush ? (
+                        <CloudOff size={14} strokeWidth={1.8} className="text-[var(--amber)]" />
+                      ) : (
+                        <Cloud size={14} strokeWidth={1.8} className="text-[var(--positive)]" />
+                      )}
+                      <span>Espaço familiar</span>
+                      <span className="font-mono-tabular rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-primary)]">
+                        {sharedSpaceCode}
+                      </span>
+                    </div>
+                  )}
+                  <h1 className="font-display truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl lg:text-4xl">
+                    Lista • {selectedMarket.name}
+                  </h1>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    Itens organizados na ordem de setores de {selectedMarket.name}
+                  </p>
+                </div>
+              </div>
+
+              {/* Apple Spotlight-style Quick-Add Bar */}
+              <form onSubmit={handleAddSubmit} className="relative mt-5">
+                <div
+                  className={`flex items-center gap-2 rounded-2xl border bg-[var(--bg-subtle)] p-1.5 pl-4 transition-[border-color,background-color,box-shadow] duration-150 ease-ui focus-within:border-[var(--accent)]/40 focus-within:bg-[var(--bg-surface)] focus-within:ring-4 focus-within:ring-[var(--accent-ring)] ${
+                    inputShake
+                      ? 'animate-shake border-[var(--negative)]/60 ring-2 ring-[var(--negative-soft)]'
+                      : 'border-transparent'
+                  }`}
+                >
+                  <textarea
+                    ref={inputRef}
+                    rows={detectedBulkItems.length > 1 ? 3 : 1}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        detectedBulkItems.length <= 1
+                      ) {
+                        e.preventDefault();
+                        handleAddSubmit();
+                      }
+                    }}
+                    placeholder="Adicionar item ou colar lista"
+                    className="max-h-24 flex-1 resize-none bg-transparent py-2 text-sm leading-snug text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none sm:text-[15px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!inputText.trim()}
+                    className="btn-primary h-10 shrink-0 px-4 text-xs sm:px-5 sm:text-sm disabled:opacity-45"
+                  >
+                    {detectedBulkItems.length > 1 ? (
+                      <>
+                        <ClipboardPaste size={15} strokeWidth={1.9} />
+                        <span className="font-mono-tabular">
+                          Colar ({detectedBulkItems.length})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={16} strokeWidth={2.2} />
+                        <span>Adicionar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Autocomplete Suggestions Dropdown */}
+                {historicalSuggestions.length > 0 && (
+                  <div className="animate-popover-in absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-float)]">
+                    <div className="flex items-center gap-2 border-b border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-2 text-xs font-medium text-[var(--text-muted)]">
+                      <History size={14} strokeWidth={1.75} />
+                      <span>Do seu histórico de compras</span>
+                    </div>
+                    {historicalSuggestions.map((agg) => (
+                      <button
+                        key={agg.normalizedKey}
+                        type="button"
+                        onClick={() => {
+                          addSingleItem(agg.displayName, {
+                            category: agg.category,
+                            price: agg.lastPrice > 0 ? agg.lastPrice : null,
+                          });
+                          setInputText('');
+                        }}
+                        className="flex w-full items-center justify-between border-b border-[var(--border-hairline)] px-4 py-3 text-left text-sm transition-colors duration-150 ease-ui last:border-b-0 hover:bg-[var(--bg-app)]"
+                      >
+                        <span className="flex items-center gap-2.5 font-medium text-[var(--text-primary)]">
+                          <CategoryDot category={agg.category} />
+                          <span>{agg.displayName}</span>
+                        </span>
+                        <span className="font-mono-tabular text-xs font-medium text-[var(--positive)]">
+                          {agg.lastPrice > 0
+                            ? AppFormatters.formatCurrency(agg.lastPrice)
+                            : 'Sem preço'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </button>
+              </form>
             </div>
 
-            {/* Autocomplete suggestions dropdown */}
-            {historicalSuggestions.length > 0 && (
-              <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] shadow-lg">
-                <div className="flex items-center gap-2 border-b border-[var(--border-hairline)] px-3 py-2 text-xs font-medium text-[var(--text-muted)]">
-                  <History size={14} strokeWidth={1.5} />
-                  <span>Sugestões do seu histórico</span>
-                </div>
-                {historicalSuggestions.map((agg) => (
-                  <button
-                    key={agg.normalizedKey}
-                    type="button"
-                    onClick={() => {
-                      addSingleItem(agg.displayName, {
-                        category: agg.category,
-                        price: agg.lastPrice > 0 ? agg.lastPrice : null,
-                      });
-                      setInputText('');
-                    }}
-                    className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
-                  >
-                    <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
-                      <CategoryIcon category={agg.category} size={16} />
-                      {agg.displayName}
-                    </span>
-                    <span className="font-mono-tabular font-medium text-[var(--accent-fg)]">
-                      {AppFormatters.formatCurrency(agg.lastPrice)}
-                    </span>
-                  </button>
-                ))}
+            {/* Right Column: Clean Editorial Produce Photograph (Desktop / Tablet) */}
+            <div className="hidden md:col-span-5 md:block">
+              <div className="photo-frame h-48 w-full rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] lg:h-52">
+                <img
+                  src="/assets/ListTop.jpg"
+                  alt="Sacola kraft de compras com hortifrúti fresco"
+                  className="animate-photo-settle h-full w-full object-cover object-center"
+                />
               </div>
-            )}
-          </form>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       <PwaInstallBanner />
 
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
-        {/* Market Aisle Order Selector */}
-        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
-          {markets.map((m) => {
-            const active = selectedMarket.id === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => selectMarket(m.id)}
-                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-[color,background-color,border-color,transform] duration-150 ease-ui active:scale-[0.98] ${
-                  active
-                    ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
-                    : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {active ? (
-                  <Check size={14} strokeWidth={1.75} />
-                ) : (
-                  <Store size={14} strokeWidth={1.5} />
-                )}
-                <span>{m.name}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* List Title Row */}
+      <div className="mx-auto max-w-5xl space-y-5 px-4 pt-5 animate-enter sm:px-6 lg:px-8">
+        {/* Market Aisle Rail + Filters & Menu */}
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-medium tracking-tight text-[var(--text-primary)]">
-              Lista • {selectedMarket.name}
-            </h1>
-            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-              Itens organizados na ordem de setores de {selectedMarket.name}
-            </p>
+          <div className="no-scrollbar flex flex-1 items-center gap-2 overflow-x-auto py-0.5">
+            {markets.map((m) => {
+              const active = selectedMarket.id === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => selectMarket(m.id)}
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-ui active:scale-[0.98] ${
+                    active
+                      ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
+                      : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {active ? (
+                    <Check size={14} strokeWidth={2.4} />
+                  ) : (
+                    <Store size={14} strokeWidth={1.7} />
+                  )}
+                  <span>{m.name}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setShowFilters(true)}
-              aria-label="Filtros"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-            >
-              <SlidersHorizontal size={18} strokeWidth={1.5} />
-              {(categoryFilter || !showCheckedItems) && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--accent)]" />
-              )}
-            </button>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <SmartTooltip label="Filtros da lista">
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                aria-label="Filtros"
+                className="btn-secondary relative h-11 w-11 p-0"
+              >
+                <SlidersHorizontal size={17} strokeWidth={1.75} />
+                {(categoryFilter || !showCheckedItems) && (
+                  <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--accent)]" />
+                )}
+              </button>
+            </SmartTooltip>
 
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowListMenu(!showListMenu)}
-                aria-label="Mais opções"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-              >
-                <MoreVertical size={18} strokeWidth={1.5} />
-              </button>
+              <SmartTooltip label="Mais opções">
+                <button
+                  type="button"
+                  onClick={() => setShowListMenu(!showListMenu)}
+                  aria-label="Mais opções"
+                  className="btn-secondary h-11 w-11 p-0"
+                >
+                  <MoreVertical size={17} strokeWidth={1.75} />
+                </button>
+              </SmartTooltip>
 
               {showListMenu && (
-                <div className="absolute right-0 top-10 z-40 w-52 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-1.5 shadow-lg">
+                <div className="animate-popover-in absolute right-0 top-12 z-40 w-56 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-[var(--shadow-float)]">
                   {checkedCount > 0 && (
                     <button
                       type="button"
@@ -526,9 +615,9 @@ export function ShoppingListPage({
                         clearCheckedItems();
                         setShowListMenu(false);
                       }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                     >
-                      <Trash2 size={15} strokeWidth={1.5} />
+                      <Trash2 size={15} strokeWidth={1.75} />
                       <span>Limpar marcados ({checkedCount})</span>
                     </button>
                   )}
@@ -538,9 +627,9 @@ export function ShoppingListPage({
                       uncheckAllItems();
                       setShowListMenu(false);
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
                   >
-                    <RotateCcw size={15} strokeWidth={1.5} />
+                    <RotateCcw size={15} strokeWidth={1.75} />
                     <span>Desmarcar todos</span>
                   </button>
                   <button
@@ -555,20 +644,21 @@ export function ShoppingListPage({
                         setShowListMenu(false);
                       }
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                   >
-                    <Trash2 size={15} strokeWidth={1.5} />
+                    <Trash2 size={15} strokeWidth={1.75} />
                     <span>Limpar toda a lista</span>
                   </button>
+                  <div className="my-1 h-px bg-[var(--border-hairline)]" />
                   <button
                     type="button"
                     onClick={() => {
                       setShowFinish(true);
                       setShowListMenu(false);
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
                   >
-                    <ShoppingBag size={15} strokeWidth={1.5} />
+                    <ShoppingBag size={15} strokeWidth={1.8} />
                     <span>Finalizar compra</span>
                   </button>
                 </div>
@@ -577,34 +667,77 @@ export function ShoppingListPage({
           </div>
         </div>
 
+        {/* Live Cart Ledger Summary Strip (Goal-Gradient + Zeigarnik Effect) */}
+        {items.length > 0 && (
+          <div className="surface-card grid grid-cols-1 gap-4 p-4 sm:grid-cols-12 sm:items-center sm:px-5">
+            <div className="sm:col-span-5">
+              <div className="flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
+                <span>
+                  {checkedCount === items.length
+                    ? 'Tudo no carrinho!'
+                    : items.length - checkedCount === 1
+                      ? 'Falta 1 item'
+                      : `Faltam ${items.length - checkedCount} itens`}
+                </span>
+                <span className="font-mono-tabular font-semibold text-[var(--accent-fg)]">
+                  {checkedCount}/{items.length} ({progressPct}%)
+                </span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-hairline)] pt-3 sm:col-span-7 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">No carrinho</p>
+                <p className="font-mono-tabular mt-0.5 text-lg font-semibold text-[var(--positive)]">
+                  {AppFormatters.formatCurrency(checkedTotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Estimado total</p>
+                <p className="font-mono-tabular mt-0.5 text-lg font-semibold text-[var(--text-primary)]">
+                  {AppFormatters.formatCurrency(totalEstimated)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Market Bargain Banner */}
         {bargainGroups.length > 0 && (
           <button
             type="button"
             onClick={() => setShowSavings(true)}
-            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 py-3 text-left shadow-2xs transition-[background-color,border-color,transform] duration-150 ease-ui hover:bg-[var(--bg-subtle)] active:scale-[0.99]"
+            className="surface-card card-interactive flex w-full items-center gap-3.5 px-4 py-3.5 text-left"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-fg)]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--positive-soft)] text-[var(--positive)]">
               {activeMarketBargainGroup ? (
-                <Tag size={16} strokeWidth={1.5} />
+                <Tag size={18} strokeWidth={1.8} />
               ) : (
-                <PiggyBank size={16} strokeWidth={1.5} />
+                <PiggyBank size={18} strokeWidth={1.8} />
               )}
             </div>
             <div className="min-w-0 flex-1">
               {activeMarketBargainGroup ? (
-                <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                   Mais baratos no {activeMarketBargainGroup.market.name}:{' '}
-                  {activeMarketBargainGroup.bargains
-                    .map((b) => b.item.name)
-                    .join(', ')}
+                  <span className="text-[var(--text-secondary)]">
+                    {activeMarketBargainGroup.bargains
+                      .map((b) => b.item.name)
+                      .join(', ')}
+                  </span>
                 </p>
               ) : (
                 <>
-                  <p className="text-xs font-medium text-[var(--text-primary)]">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
                     Economia identificada no seu histórico
                   </p>
-                  <p className="truncate text-xs text-[var(--text-muted)]">
+                  <p className="truncate text-xs text-[var(--text-secondary)]">
                     {bargainGroups[0].market.name}:{' '}
                     {bargainGroups[0].bargains
                       .slice(0, 3)
@@ -614,85 +747,168 @@ export function ShoppingListPage({
                 </>
               )}
             </div>
-            <span className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)]">
-              Ver <ChevronRight size={14} strokeWidth={1.5} />
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--bg-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]">
+              Ver <ChevronRight size={14} strokeWidth={2} />
             </span>
           </button>
         )}
 
-        {/* Active category filter strip */}
+        {/* Active Category Filter Strip */}
         {categoryFilter && (
-          <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs">
-            <span className="font-medium text-[var(--text-primary)]">
-              Categoria: {PRODUCT_CATEGORY_MAP[categoryFilter].label}
+          <div className="surface-card flex items-center justify-between px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
+              <CategoryDot category={categoryFilter} />
+              <span>Filtrando: {PRODUCT_CATEGORY_MAP[categoryFilter].label}</span>
             </span>
             <button
               type="button"
               onClick={() => useShoppingStore.getState().setCategoryFilter(null)}
-              className="font-medium text-[var(--accent-fg)] hover:underline"
+              className="text-xs font-semibold text-[var(--accent-fg)] hover:underline"
             >
               Limpar filtro
             </button>
           </div>
         )}
 
-        {/* Shopping Items List */}
+        {/* Shopping Items Grouped by Market Aisle */}
         {filteredAndSortedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-surface)] px-6 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)]">
-              <ShoppingCart size={22} strokeWidth={1.5} />
+          <div className="surface-card flex flex-col items-center justify-center border-dashed px-6 py-16 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
+              <ShoppingCart size={24} strokeWidth={1.6} />
             </div>
-            <h2 className="mt-4 text-base font-medium text-[var(--text-primary)]">
+            <h2 className="font-display mt-5 text-xl font-semibold text-[var(--text-primary)]">
               Sua lista está vazia
             </h2>
-            <p className="mt-1 max-w-xs text-xs leading-5 text-[var(--text-secondary)]">
-              Digite um item acima ou cole uma lista inteira de supermercado, como 2kg Arroz, 3x Leite, Tomate
+            <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
+              Digite um item acima ou cole uma lista inteira de supermercado, como{' '}
+              <span className="font-mono-tabular text-[var(--text-primary)]">
+                2kg Arroz, 3x Leite, Tomate
+              </span>
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredAndSortedItems.map((item) => {
-              const bestRec =
-                recommendationsByProduct.get(
-                  CategoryClassifier.normalize(item.name),
-                )?.[0] ?? null;
-
+          <div className="space-y-6">
+            {pendingGroups.map((group) => {
+              const catInfo = PRODUCT_CATEGORY_MAP[group.category];
               return (
-                <SwipeableShoppingItemRow
-                  key={item.id}
-                  item={item}
-                  cheapestMarketName={bestRec ? bestRec.market.name : null}
-                  onToggleChecked={toggleItemChecked}
-                  onOpenEdit={handleOpenEdit}
-                  onRemove={handleRemoveItem}
-                  onUpdateQuantity={updateItemQuantity}
-                />
+                <section key={group.category} className="space-y-2.5">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono-tabular text-xs font-medium text-[var(--text-muted)]">
+                        {String(group.aisleIndex).padStart(2, '0')}
+                      </span>
+                      <CategoryDot category={group.category} />
+                      <h2 className="font-display text-base font-semibold text-[var(--text-primary)]">
+                        {catInfo.label}
+                      </h2>
+                    </div>
+                    <span className="font-mono-tabular rounded-full bg-[var(--bg-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
+                      {group.items.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {group.items.map((item) => {
+                      const bestRec =
+                        recommendationsByProduct.get(
+                          CategoryClassifier.normalize(item.name),
+                        )?.[0] ?? null;
+
+                      return (
+                        <SwipeableShoppingItemRow
+                          key={item.id}
+                          item={item}
+                          cheapestMarketName={bestRec ? bestRec.market.name : null}
+                          onToggleChecked={toggleItemChecked}
+                          onOpenEdit={handleOpenEdit}
+                          onRemove={handleRemoveItem}
+                          onUpdateQuantity={updateItemQuantity}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
               );
             })}
+
+            {checkedItemsList.length > 0 && (
+              <section className="space-y-2.5 pt-2">
+                <div className="flex items-center justify-between border-t border-[var(--border-hairline)] px-1 pt-5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--positive-soft)] text-[var(--positive)]">
+                      <Check size={12} strokeWidth={2.5} />
+                    </span>
+                    <h2 className="font-display text-base font-semibold text-[var(--text-secondary)]">
+                      No carrinho ({checkedItemsList.length})
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearCheckedItems}
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--negative-soft)] hover:text-[var(--negative)]"
+                  >
+                    <Trash2 size={13} strokeWidth={1.8} />
+                    <span>Limpar marcados</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {checkedItemsList.map((item) => (
+                    <SwipeableShoppingItemRow
+                      key={item.id}
+                      item={item}
+                      cheapestMarketName={null}
+                      onToggleChecked={toggleItemChecked}
+                      onOpenEdit={handleOpenEdit}
+                      onRemove={handleRemoveItem}
+                      onUpdateQuantity={updateItemQuantity}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
 
-      {/* Finish Purchase Action */}
+      {/* Apple Frosted-Glass Floating Checkout Bar */}
       {items.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowFinish(true)}
-          title={`Total no carrinho: ${AppFormatters.formatCurrency(checkedTotal)} | Estimado: ${AppFormatters.formatCurrency(totalEstimated)}`}
-          className="fixed right-4 bottom-20 z-30 flex h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-ink)] shadow-lg transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
-        >
-          <ShoppingBag size={18} strokeWidth={1.5} />
-          <span>
-            {checkedCount > 0
-              ? `Finalizar (${checkedCount})`
-              : 'Finalizar compra'}
-          </span>
-        </button>
+        <div className="pointer-events-none fixed inset-x-0 bottom-[74px] z-20 px-4 md:bottom-6">
+          <div className="apple-glass-strong pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-4 rounded-full border border-[var(--border-subtle)] py-2 pr-2 pl-5 text-[var(--text-primary)] shadow-[var(--shadow-float)]">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-[var(--text-muted)]">
+                {checkedCount > 0 ? 'No carrinho' : 'Total estimado'}
+              </p>
+              <p className="font-mono-tabular truncate text-base font-semibold leading-tight text-[var(--text-primary)]">
+                {AppFormatters.formatCurrency(
+                  checkedCount > 0 ? checkedTotal : totalEstimated,
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFinish(true)}
+              title={`Total no carrinho: ${AppFormatters.formatCurrency(checkedTotal)} | Estimado: ${AppFormatters.formatCurrency(totalEstimated)}`}
+              className={`btn-primary h-11 shrink-0 px-5 text-sm ${
+                checkedCount === items.length && items.length > 0
+                  ? 'animate-goal-ready'
+                  : ''
+              }`}
+            >
+              <ShoppingBag size={17} strokeWidth={2} />
+              <span>
+                {checkedCount > 0
+                  ? `Finalizar (${checkedCount})`
+                  : 'Finalizar compra'}
+              </span>
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Toast Feedback */}
+      {/* Apple Frosted HUD Toast Feedback */}
       {toastMsg && (
-        <div className="fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2 text-xs font-medium text-[var(--bg-app)] shadow-lg">
+        <div className="apple-glass-strong fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-24">
           {toastMsg}
         </div>
       )}

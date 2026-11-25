@@ -70,24 +70,21 @@ function SortableCategoryRow({
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex cursor-grab select-none items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,box-shadow] duration-150 ease-ui active:cursor-grabbing ${
+      className={`flex cursor-grab select-none items-center gap-3 rounded-2xl border px-3.5 py-3 transition-[background-color,border-color,box-shadow] duration-150 ease-ui active:cursor-grabbing ${
         isDragging
-          ? 'z-10 border-[var(--accent)] bg-[var(--bg-surface)] shadow-md'
-          : 'border-[var(--border-hairline)] bg-[var(--bg-app)]'
+          ? 'z-10 border-[var(--accent)] bg-[var(--bg-surface)] shadow-lg'
+          : 'border-[var(--border-hairline)] bg-[var(--bg-app)] hover:border-[var(--border-subtle)]'
       }`}
     >
-      <span
-        aria-hidden="true"
-        className="text-[var(--text-muted)]"
-      >
-        <GripVertical size={16} strokeWidth={1.5} />
+      <span aria-hidden="true" className="text-[var(--text-muted)]">
+        <GripVertical size={16} strokeWidth={1.7} />
       </span>
-      <span className="font-mono-tabular w-5 text-center text-xs font-medium text-[var(--text-muted)]">
-        {index + 1}
+      <span className="font-mono-tabular w-6 text-center text-xs font-semibold text-[var(--text-muted)]">
+        {String(index + 1).padStart(2, '0')}
       </span>
       <CategoryDot category={id} />
-      <CategoryIcon category={id} size={16} />
-      <span className="flex-1 text-xs font-medium text-[var(--text-primary)]">
+      <CategoryIcon category={id} size={17} />
+      <span className="flex-1 text-sm font-medium text-[var(--text-primary)]">
         {info.label}
       </span>
       <div
@@ -99,18 +96,18 @@ function SortableCategoryRow({
           disabled={index === 0}
           onClick={onMoveUp}
           aria-label="Mover para cima"
-          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-25"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-25"
         >
-          <ArrowUp size={15} strokeWidth={1.5} />
+          <ArrowUp size={15} strokeWidth={1.8} />
         </button>
         <button
           type="button"
           disabled={index === total - 1}
           onClick={onMoveDown}
           aria-label="Mover para baixo"
-          className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] disabled:opacity-25"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-25"
         >
-          <ArrowDown size={15} strokeWidth={1.5} />
+          <ArrowDown size={15} strokeWidth={1.8} />
         </button>
       </div>
     </div>
@@ -160,7 +157,7 @@ export function MarketConfigPage() {
   const [newKeywordInput, setNewKeywordInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(
-    typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false,
+    typeof document !== 'undefined' && Boolean(document.fullscreenElement),
   );
 
   const notify = (msg: string) => {
@@ -171,19 +168,13 @@ export function MarketConfigPage() {
   const toggleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-          setIsFullscreen(true);
-          notify('Modo tela cheia ativado');
-        }
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
       } else {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-          setIsFullscreen(false);
-          notify('Modo tela cheia desativado');
-        }
+        await document.exitFullscreen();
+        setIsFullscreen(false);
       }
-    } catch (_) {
+    } catch {
       notify('Tela cheia não suportada neste navegador');
     }
   };
@@ -234,458 +225,487 @@ export function MarketConfigPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] pb-24 pt-safe">
-      <header className="sticky top-0 z-20 border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+    <div className="min-h-screen bg-[var(--bg-app)] pb-28 pt-safe md:pb-16">
+      {/* Page Header Band */}
+      <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
           <div>
-            <h1 className="text-lg font-medium tracking-tight text-[var(--text-primary)]">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
               Mercados &amp; Ajustes
             </h1>
-            <p className="text-xs text-[var(--text-secondary)]">
-              Corredores, dicionário de classificação e nuvem
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Rota de corredores, sincronização familiar e dicionário inteligente
             </p>
           </div>
-          <ThemeToggleButton />
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-2xl space-y-4 px-4 pt-4 animate-enter">
-        {/* Cloud Sync */}
-        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
-          <div className="mb-3 flex items-start gap-2.5">
-            <span className="mt-0.5 text-[var(--text-muted)]">
-              {sharedSpaceCode ? (
-                <Cloud size={18} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
-              ) : (
-                <CloudOff size={18} strokeWidth={1.5} />
-              )}
-            </span>
-            <div>
-              <h2 className="text-sm font-medium text-[var(--text-primary)]">
-                Sincronização em família
-              </h2>
-              <p className="text-xs text-[var(--text-muted)]">
-                {sharedSpaceCode
-                  ? hasPendingCloudPush
-                    ? 'Alterações locais pendentes de envio'
-                    : isSyncingCloud
-                      ? 'Sincronizando com a nuvem'
-                      : lastSyncedAtIso
-                        ? `Sincronizado às ${new Date(lastSyncedAtIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                        : 'Conectado em tempo real'
-                  : 'Compartilhe listas e preços entre celulares'}
-              </p>
-            </div>
+          <div className="md:hidden">
+            <ThemeToggleButton />
           </div>
+        </div>
+      </section>
 
-          {cloudError && (
-            <div className="mb-3 rounded-xl border border-[var(--negative)]/25 bg-[var(--negative-soft)] p-3 text-xs font-medium text-[var(--negative)]">
-              {cloudError}
-            </div>
-          )}
-
-          {sharedSpaceCode ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3">
-                <div>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Código da família
-                  </span>
-                  <p className="font-mono-tabular mt-0.5 text-lg font-medium tracking-wider text-[var(--accent-fg)]">
-                    {sharedSpaceCode}
-                  </p>
+      <div className="mx-auto max-w-5xl px-4 pt-6 animate-enter sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+          {/* Left Column: Market Profiles & Aisle Order */}
+          <div className="space-y-6 md:col-span-7">
+            <section className="surface-card p-5 sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-app)] text-[var(--text-secondary)]">
+                    <Store size={19} strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
+                      Ordem dos corredores por mercado
+                    </h2>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Arraste ou use as setas para definir o trajeto dentro da loja
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(sharedSpaceCode);
-                    notify('Código copiado');
+                  onClick={() => setShowAddMarket((v) => !v)}
+                  className="btn-secondary h-9 shrink-0 px-3.5 text-xs"
+                >
+                  <Plus size={14} strokeWidth={2} />
+                  Novo
+                </button>
+              </div>
+
+              {showAddMarket && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newMarketName.trim()) return;
+                    addMarket(newMarketName);
+                    setNewMarketName('');
+                    setShowAddMarket(false);
+                    notify('Mercado adicionado');
                   }}
-                  className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                  className="mb-4 flex gap-2"
                 >
-                  <Copy size={15} strokeWidth={1.5} />
-                  Copiar
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void refreshCloudSync();
-                    notify('Sincronizado');
-                  }}
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-app)]"
-                >
-                  <RefreshCw size={15} strokeWidth={1.5} />
-                  Atualizar agora
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void disconnectSharedSpace()}
-                  className="h-9 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
-                >
-                  Desconectar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <button
-                type="button"
-                disabled={isSyncingCloud}
-                onClick={() => void handleCreateSpace()}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,opacity,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-50"
-              >
-                <Users size={16} strokeWidth={1.5} />
-                {isSyncingCloud ? 'Conectando' : 'Criar novo código familiar'}
-              </button>
-
-              <form onSubmit={handleJoinSpace} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Digite um código (ex: CASA-4829)"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  className="font-mono-tabular h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="submit"
-                  disabled={isSyncingCloud || !joinCodeInput.trim()}
-                  className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] transition-opacity duration-150 ease-ui disabled:opacity-40"
-                >
-                  Entrar
-                </button>
-              </form>
-            </div>
-          )}
-        </section>
-
-        {/* Market Profile & Aisle Order */}
-        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
-          <div className="mb-3 flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 text-[var(--text-muted)]">
-                <Store size={18} strokeWidth={1.5} />
-              </span>
-              <div>
-                <h2 className="text-sm font-medium text-[var(--text-primary)]">
-                  Ordem dos corredores por mercado
-                </h2>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Arraste para definir o trajeto dentro da loja
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAddMarket((v) => !v)}
-              className="flex h-8 items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-app)]"
-            >
-              <Plus size={14} strokeWidth={1.5} />
-              Novo
-            </button>
-          </div>
-
-          {showAddMarket && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!newMarketName.trim()) return;
-                addMarket(newMarketName);
-                setNewMarketName('');
-                setShowAddMarket(false);
-                notify('Mercado adicionado');
-              }}
-              className="mb-3 flex gap-2"
-            >
-              <input
-                type="text"
-                placeholder="Nome do mercado (ex: Carrefour)"
-                value={newMarketName}
-                onChange={(e) => setNewMarketName(e.target.value)}
-                className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                type="submit"
-                className="h-9 rounded-lg bg-[var(--accent)] px-3.5 text-xs font-medium text-[var(--accent-ink)]"
-              >
-                Criar
-              </button>
-            </form>
-          )}
-
-          <div className="no-scrollbar mb-3 flex items-center gap-2 overflow-x-auto pb-1">
-            {markets.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  selectMarket(m.id);
-                  setEditingMarketName(null);
-                }}
-                className={`h-8 shrink-0 rounded-lg border px-3 text-xs font-medium transition-[background-color,color,border-color] duration-150 ease-ui ${
-                  m.id === selectedMarket.id
-                    ? 'border-[var(--text-primary)] bg-[var(--text-primary)] text-[var(--bg-app)]'
-                    : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'
-                }`}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-2">
-            {editingMarketName !== null ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  renameMarket(selectedMarket.id, editingMarketName);
-                  setEditingMarketName(null);
-                }}
-                className="flex flex-1 gap-2"
-              >
-                <input
-                  type="text"
-                  value={editingMarketName}
-                  onChange={(e) => setEditingMarketName(e.target.value)}
-                  className="h-8 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2.5 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="submit"
-                  className="h-8 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)]"
-                >
-                  Salvar
-                </button>
-              </form>
-            ) : (
-              <>
-                <span className="text-xs font-medium text-[var(--text-primary)]">
-                  {selectedMarket.name}
-                </span>
-                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    placeholder="Nome do mercado (ex: Carrefour)"
+                    value={newMarketName}
+                    onChange={(e) => setNewMarketName(e.target.value)}
+                    className="h-10 flex-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
+                  />
                   <button
-                    type="button"
-                    onClick={() => setEditingMarketName(selectedMarket.name)}
-                    className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
-                    title="Renomear mercado"
+                    type="submit"
+                    className="btn-primary h-10 px-5 text-xs"
                   >
-                    <Edit3 size={15} strokeWidth={1.5} />
+                    Criar
                   </button>
-                  {markets.length > 1 && (
+                </form>
+              )}
+
+              <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+                {markets.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      selectMarket(m.id);
+                      setEditingMarketName(null);
+                    }}
+                    className={`h-9 shrink-0 rounded-full border px-4 text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-150 ease-ui ${
+                      m.id === selectedMarket.id
+                        ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
+                        : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-4 flex items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-4 py-2.5">
+                {editingMarketName !== null ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      renameMarket(selectedMarket.id, editingMarketName);
+                      setEditingMarketName(null);
+                    }}
+                    className="flex flex-1 gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={editingMarketName}
+                      onChange={(e) => setEditingMarketName(e.target.value)}
+                      className="h-9 flex-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3.5 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary h-9 px-4 text-xs"
+                    >
+                      Salvar
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">
+                      {selectedMarket.name}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingMarketName(selectedMarket.name)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                        title="Renomear mercado"
+                        aria-label="Renomear mercado"
+                      >
+                        <Edit3 size={15} strokeWidth={1.8} />
+                      </button>
+                      {markets.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            deleteMarket(selectedMarket.id);
+                            notify('Mercado removido');
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+                          title="Excluir mercado"
+                          aria-label="Excluir mercado"
+                        >
+                          <Trash2 size={15} strokeWidth={1.8} />
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={selectedMarket.categoryOrder}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {selectedMarket.categoryOrder.map((catId, index) => (
+                      <SortableCategoryRow
+                        key={catId}
+                        id={catId}
+                        index={index}
+                        total={selectedMarket.categoryOrder.length}
+                        onMoveUp={() =>
+                          moveMarketCategory(selectedMarket.id, index, index - 1)
+                        }
+                        onMoveDown={() =>
+                          moveMarketCategory(selectedMarket.id, index, index + 1)
+                        }
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </section>
+          </div>
+
+          {/* Right Column: Cloud Sync, Display & Category Dictionary */}
+          <div className="space-y-6 md:col-span-5">
+            {/* Cloud Sync */}
+            <section className="surface-card p-5 sm:p-6">
+              <div className="mb-4 flex items-start gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    sharedSpaceCode
+                      ? 'bg-[var(--positive-soft)] text-[var(--positive)]'
+                      : 'bg-[var(--bg-app)] text-[var(--text-secondary)]'
+                  }`}
+                >
+                  {sharedSpaceCode ? (
+                    <Cloud size={19} strokeWidth={1.8} />
+                  ) : (
+                    <CloudOff size={19} strokeWidth={1.75} />
+                  )}
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
+                    Sincronização em família
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {sharedSpaceCode
+                      ? hasPendingCloudPush
+                        ? 'Alterações locais pendentes de envio'
+                        : isSyncingCloud
+                          ? 'Sincronizando com a nuvem'
+                          : lastSyncedAtIso
+                            ? `Sincronizado às ${new Date(lastSyncedAtIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Conectado em tempo real'
+                      : 'Compartilhe listas e histórico entre celulares'}
+                  </p>
+                </div>
+              </div>
+
+              {cloudError && (
+                <div className="animate-shake mb-4 rounded-2xl border border-[var(--negative)]/25 bg-[var(--negative-soft)] p-3 text-xs font-medium text-[var(--negative)]">
+                  {cloudError}
+                </div>
+              )}
+
+              {sharedSpaceCode ? (
+                <div className="space-y-3">
+                  {/* Luminous Apple Mint Family Code Pass (Chunked monospaced code) */}
+                  <div className="flex items-center justify-between rounded-2xl border border-[var(--accent)]/20 bg-gradient-to-br from-[var(--accent-soft)] to-[var(--bg-surface)] px-4 py-4">
+                    <div>
+                      <span className="text-[11px] font-semibold text-[var(--accent-fg)]">
+                        Código da família
+                      </span>
+                      <p className="font-mono-tabular mt-0.5 text-xl font-semibold tracking-[0.14em] text-[var(--text-primary)]">
+                        {sharedSpaceCode}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        deleteMarket(selectedMarket.id);
-                        notify('Mercado removido');
+                        void navigator.clipboard?.writeText(sharedSpaceCode);
+                        notify('Código copiado');
                       }}
-                      className="rounded-lg p-1.5 text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
-                      title="Excluir mercado"
+                      className="btn-secondary h-9 px-3.5 text-xs font-semibold text-[var(--accent-fg)]"
                     >
-                      <Trash2 size={15} strokeWidth={1.5} />
+                      <Copy size={14} strokeWidth={1.9} />
+                      Copiar
                     </button>
-                  )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void refreshCloudSync();
+                        notify('Sincronizado');
+                      }}
+                      className="btn-secondary h-10 flex-1 text-xs"
+                    >
+                      <RefreshCw size={15} strokeWidth={1.8} />
+                      Atualizar agora
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void disconnectSharedSpace()}
+                      className="inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-xs font-semibold text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+                    >
+                      Desconectar
+                    </button>
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={selectedMarket.categoryOrder}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {selectedMarket.categoryOrder.map((catId, index) => (
-                  <SortableCategoryRow
-                    key={catId}
-                    id={catId}
-                    index={index}
-                    total={selectedMarket.categoryOrder.length}
-                    onMoveUp={() =>
-                      moveMarketCategory(selectedMarket.id, index, index - 1)
-                    }
-                    onMoveDown={() =>
-                      moveMarketCategory(selectedMarket.id, index, index + 1)
-                    }
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </section>
-
-        {/* Fullscreen Mode */}
-        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 text-[var(--text-muted)]">
-                <Maximize2 size={18} strokeWidth={1.5} />
-              </span>
-              <div>
-                <h2 className="text-sm font-medium text-[var(--text-primary)]">
-                  Modo tela cheia
-                </h2>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Oculta barras do navegador durante as compras
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--bg-app)] active:scale-[0.98]"
-            >
-              {isFullscreen ? (
-                <Minimize2 size={15} strokeWidth={1.5} />
               ) : (
-                <Maximize2 size={15} strokeWidth={1.5} />
-              )}
-              <span>{isFullscreen ? 'Sair' : 'Ativar'}</span>
-            </button>
-          </div>
-        </section>
-
-        {/* Smart Category Dictionary */}
-        <section className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 shadow-2xs">
-          <div className="mb-3 flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 text-[var(--text-muted)]">
-                <BookOpen size={18} strokeWidth={1.5} />
-              </span>
-              <div>
-                <h2 className="text-sm font-medium text-[var(--text-primary)]">
-                  Dicionário de categorias
-                </h2>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Palavras usadas na classificação automática
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                resetCategoryDictionary();
-                notify('Dicionário restaurado ao padrão');
-              }}
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] px-2.5 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-            >
-              <RotateCcw size={13} strokeWidth={1.5} />
-              Resetar
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {PRODUCT_CATEGORIES.filter((c) => c.id !== 'diversos').map((cat) => {
-              const keywords = categoryDictionary[cat.id] ?? [];
-              const isOpen = expandedCategory === cat.id;
-
-              return (
-                <div
-                  key={cat.id}
-                  className="overflow-hidden rounded-xl border border-[var(--border-hairline)]"
-                >
+                <div className="space-y-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setExpandedCategory(isOpen ? null : cat.id);
-                      setShowAllKeywords(false);
-                      setNewKeywordInput('');
-                    }}
-                    className="flex w-full items-center justify-between bg-[var(--bg-app)] px-3 py-2.5 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                    disabled={isSyncingCloud}
+                    onClick={() => void handleCreateSpace()}
+                    className="btn-primary h-11 w-full text-sm disabled:opacity-50"
                   >
-                    <span className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
-                      <CategoryDot category={cat.id} />
-                      <CategoryIcon category={cat.id} size={16} />
-                      {cat.label}
-                    </span>
-                    <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                      {keywords.length} termos
-                    </span>
+                    <Users size={16} strokeWidth={1.9} />
+                    {isSyncingCloud ? 'Conectando' : 'Criar novo código familiar'}
                   </button>
 
-                  {isOpen && (
-                    <div className="space-y-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3">
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (addKeywordToCategory(cat.id, newKeywordInput)) {
-                            setNewKeywordInput('');
-                          }
-                        }}
-                        className="flex gap-2"
-                      >
-                        <input
-                          type="text"
-                          placeholder="Nova palavra-chave"
-                          value={newKeywordInput}
-                          onChange={(e) => setNewKeywordInput(e.target.value)}
-                          className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-                        />
-                        <button
-                          type="submit"
-                          className="h-9 rounded-lg bg-[var(--accent)] px-3 text-xs font-medium text-[var(--accent-ink)]"
-                        >
-                          Adicionar
-                        </button>
-                      </form>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {(showAllKeywords
-                          ? keywords
-                          : keywords.slice(0, 40)
-                        ).map((kw) => (
-                          <span
-                            key={kw}
-                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 py-1 text-xs text-[var(--text-primary)]"
-                          >
-                            {kw}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeKeywordFromCategory(cat.id, kw)
-                              }
-                              aria-label={`Remover ${kw}`}
-                              className="text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:text-[var(--negative)]"
-                            >
-                              <X size={12} strokeWidth={1.5} />
-                            </button>
-                          </span>
-                        ))}
-                        {keywords.length > 40 && !showAllKeywords && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllKeywords(true)}
-                            className="font-mono-tabular rounded-md border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 py-1 text-xs font-medium text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
-                          >
-                            +{keywords.length - 40} termos
-                          </button>
-                        )}
-                        {keywords.length > 40 && showAllKeywords && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllKeywords(false)}
-                            className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-                          >
-                            Mostrar menos
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <form onSubmit={handleJoinSpace} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Código (ex: CASA-4829)"
+                      value={joinCodeInput}
+                      onChange={(e) =>
+                        setJoinCodeInput(e.target.value.toUpperCase())
+                      }
+                      className="font-mono-tabular h-10 flex-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 text-xs font-semibold text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSyncingCloud || !joinCodeInput.trim()}
+                      className="btn-tinted h-10 px-5 text-xs disabled:opacity-40"
+                    >
+                      Entrar
+                    </button>
+                  </form>
                 </div>
-              );
-            })}
+              )}
+            </section>
+
+            {/* Fullscreen Mode */}
+            <section className="surface-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-app)] text-[var(--text-secondary)]">
+                    <Maximize2 size={18} strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-base font-semibold text-[var(--text-primary)]">
+                      Modo tela cheia
+                    </h2>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Oculta barras do navegador no mercado
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="btn-secondary h-9 shrink-0 px-3.5 text-xs"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 size={14} strokeWidth={1.8} />
+                  ) : (
+                    <Maximize2 size={14} strokeWidth={1.8} />
+                  )}
+                  <span>{isFullscreen ? 'Sair' : 'Ativar'}</span>
+                </button>
+              </div>
+            </section>
+
+            {/* Smart Category Dictionary */}
+            <section className="surface-card p-5 sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-app)] text-[var(--text-secondary)]">
+                    <BookOpen size={18} strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-base font-semibold text-[var(--text-primary)]">
+                      Dicionário de categorias
+                    </h2>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Palavras usadas na classificação automática
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetCategoryDictionary();
+                    notify('Dicionário restaurado ao padrão');
+                  }}
+                  className="btn-secondary h-8 shrink-0 px-3 text-xs"
+                >
+                  <RotateCcw size={13} strokeWidth={1.8} />
+                  Resetar
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {PRODUCT_CATEGORIES.filter((c) => c.id !== 'diversos').map(
+                  (cat) => {
+                    const keywords = categoryDictionary[cat.id] ?? [];
+                    const isOpen = expandedCategory === cat.id;
+
+                    return (
+                      <div
+                        key={cat.id}
+                        className="overflow-hidden rounded-2xl border border-[var(--border-hairline)]"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedCategory(isOpen ? null : cat.id);
+                            setShowAllKeywords(false);
+                            setNewKeywordInput('');
+                          }}
+                          className="flex w-full items-center justify-between bg-[var(--bg-app)] px-3.5 py-3 text-left transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                        >
+                          <span className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+                            <CategoryDot category={cat.id} />
+                            <CategoryIcon category={cat.id} size={15} />
+                            {cat.label}
+                          </span>
+                          <span className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                            {keywords.length} termos
+                          </span>
+                        </button>
+
+                        <div className="accordion-grid" data-open={isOpen}>
+                          <div className="accordion-inner">
+                            <div className="space-y-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] p-3.5">
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  if (
+                                    addKeywordToCategory(cat.id, newKeywordInput)
+                                  ) {
+                                    setNewKeywordInput('');
+                                  }
+                                }}
+                                className="flex gap-2"
+                              >
+                                <input
+                                  type="text"
+                                  placeholder="Nova palavra-chave"
+                                  value={newKeywordInput}
+                                  onChange={(e) =>
+                                    setNewKeywordInput(e.target.value)
+                                  }
+                                  className="h-9 flex-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                                />
+                                <button
+                                  type="submit"
+                                  className="btn-primary h-9 px-3.5 text-xs"
+                                >
+                                  Adicionar
+                                </button>
+                              </form>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                {(showAllKeywords
+                                  ? keywords
+                                  : keywords.slice(0, 40)
+                                ).map((kw) => (
+                                  <span
+                                    key={kw}
+                                    className="inline-flex items-center gap-1 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 py-1 text-xs text-[var(--text-primary)]"
+                                  >
+                                    {kw}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeKeywordFromCategory(cat.id, kw)
+                                      }
+                                      aria-label={`Remover ${kw}`}
+                                      className="text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:text-[var(--negative)]"
+                                    >
+                                      <X size={12} strokeWidth={1.8} />
+                                    </button>
+                                  </span>
+                                ))}
+                                {keywords.length > 40 && !showAllKeywords && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllKeywords(true)}
+                                    className="font-mono-tabular rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1 text-xs font-semibold text-[var(--accent-fg)] transition-colors hover:bg-[var(--bg-app)]"
+                                  >
+                                    +{keywords.length - 40} termos
+                                  </button>
+                                )}
+                                {keywords.length > 40 && showAllKeywords && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllKeywords(false)}
+                                    className="rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                                  >
+                                    Mostrar menos
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
       </div>
 
       {feedback && (
-        <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2 text-xs font-medium text-[var(--bg-app)] shadow-lg">
+        <div className="apple-glass-strong fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-8">
           {feedback}
         </div>
       )}

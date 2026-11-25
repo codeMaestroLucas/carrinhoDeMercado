@@ -36,17 +36,17 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
           <CartesianGrid
             vertical={false}
             strokeDasharray="3 3"
-            stroke="#8A847A"
-            strokeOpacity={0.2}
+            stroke="#86868B"
+            strokeOpacity={0.18}
           />
           <XAxis
             dataKey="dateLabel"
-            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#8A847A', fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => `R$${v.toFixed(0)}`}
@@ -56,11 +56,13 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
               if (!active || !payload?.length) return null;
               const point = payload[0].payload as (typeof data)[number];
               return (
-                <div className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs shadow-md">
-                  <p className="font-mono-tabular font-medium text-[var(--accent-fg)]">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs shadow-lg">
+                  <p className="font-mono-tabular font-semibold text-[var(--accent-fg)]">
                     {AppFormatters.formatCurrency(point.price)}
                   </p>
-                  <p className="text-[var(--text-primary)]">{point.marketName}</p>
+                  <p className="mt-0.5 font-medium text-[var(--text-primary)]">
+                    {point.marketName}
+                  </p>
                   <p className="font-mono-tabular text-[11px] text-[var(--text-muted)]">
                     {point.dateLabel}
                   </p>
@@ -72,10 +74,10 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
             type="monotone"
             dataKey="price"
             stroke="var(--accent)"
-            strokeWidth={2}
+            strokeWidth={2.2}
             fill="url(#priceTrendFill)"
-            dot={{ r: 3, fill: 'var(--accent)', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: 'var(--accent)' }}
+            dot={{ r: 3.5, fill: 'var(--accent)', strokeWidth: 0 }}
+            activeDot={{ r: 5.5, fill: 'var(--accent)' }}
           />
         </AreaChart>
       </ResponsiveContainer>

@@ -86,16 +86,28 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement;
+    // Prevent cascading transition glitches across unrelated elements during theme swap
+    root.classList.add('theme-switching');
     if (isDarkMode) {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
+    // Force style recalculation while transitions are paused
+    void root.offsetHeight;
+    const raf = requestAnimationFrame(() => {
+      root.classList.remove('theme-switching');
+    });
 
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', isDarkMode ? '#0E0E10' : '#F7F4EE');
+      metaTheme.setAttribute('content', isDarkMode ? '#0B0B0D' : '#F5F5F7');
     }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      root.classList.remove('theme-switching');
+    };
   }, [isDarkMode]);
 
   const pendingCount = items.filter((i) => !i.isChecked).length;
@@ -107,27 +119,27 @@ export function App() {
       )}
 
       {isOffline && (
-        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 border-b border-[var(--border-hairline)] bg-[#D97706] px-4 py-1.5 text-xs font-medium text-[#FDFBF7]">
-          <WifiOff size={14} strokeWidth={1.5} />
-          <span>Modo offline ativo, alterações salvas localmente</span>
+        <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-2 border-b border-[var(--border-hairline)] bg-[var(--amber-soft)] px-4 py-1.5 text-xs font-medium text-[var(--amber)] md:top-[64px]">
+          <WifiOff size={14} strokeWidth={1.8} />
+          <span>Modo offline ativo — alterações salvas localmente</span>
         </div>
       )}
 
       {needRefresh && (
-        <div className="fixed inset-x-4 top-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--text-primary)] px-4 py-2.5 text-xs text-[var(--bg-app)] shadow-lg">
-          <span className="font-medium">Nova versão disponível</span>
+        <div className="apple-glass-strong fixed inset-x-4 top-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--text-primary)] shadow-[var(--shadow-float)] md:top-20">
+          <span className="pl-1 font-medium">Nova versão disponível</span>
           <button
             type="button"
             onClick={() => void updateServiceWorker(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui active:scale-[0.98]"
+            className="btn-primary h-8 px-3.5 text-xs"
           >
-            <RefreshCw size={14} strokeWidth={1.5} />
+            <RefreshCw size={13} strokeWidth={1.9} />
             Atualizar
           </button>
         </div>
       )}
 
-      <main className="min-h-screen">
+      <main className="min-h-screen md:pt-[64px]">
         {activeTab === 'home' && <HomePage />}
         {activeTab === 'list' && (
           <ShoppingListPage

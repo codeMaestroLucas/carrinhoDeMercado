@@ -35,20 +35,45 @@ interface CategoryIconProps {
   category: ProductCategoryId;
   size?: number;
   className?: string;
+  colored?: boolean;
 }
 
 export function CategoryIcon({
   category,
   size = 18,
   className = '',
+  colored = true,
 }: CategoryIconProps) {
   const Icon = ICON_MAP[category] ?? Grid;
+  const info = PRODUCT_CATEGORY_MAP[category];
   return (
     <Icon
       size={size}
-      strokeWidth={1.5}
-      className={`text-[var(--text-muted)] ${className}`}
+      strokeWidth={1.75}
+      style={colored && info ? { color: info.color } : undefined}
+      className={colored ? className : `text-[var(--text-muted)] ${className}`}
     />
+  );
+}
+
+export function CategoryBadge({
+  category,
+  size = 16,
+  className = '',
+}: {
+  category: ProductCategoryId;
+  size?: number;
+  className?: string;
+}) {
+  const info = PRODUCT_CATEGORY_MAP[category];
+  const color = info?.color ?? '#86868B';
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-xl ${className}`}
+      style={{ backgroundColor: `${color}1A` }}
+    >
+      <CategoryIcon category={category} size={size} colored />
+    </span>
   );
 }
 
@@ -64,7 +89,7 @@ export function CategoryDot({
     <span
       aria-hidden="true"
       className={`inline-block h-2 w-2 shrink-0 rounded-full ${className}`}
-      style={{ backgroundColor: info?.color ?? '#8A847A' }}
+      style={{ backgroundColor: info?.color ?? '#86868B' }}
     />
   );
 }

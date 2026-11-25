@@ -134,20 +134,22 @@ function EditScannedItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-xs sm:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-2xl sm:rounded-2xl"
+        className="animate-modal-in max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)]">
               <CategoryIcon category={category} size={20} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
                 {isNew
                   ? 'Adicionar item à nota'
                   : `Editar item #${String(itemNumber).padStart(2, '0')}`}
@@ -163,15 +165,15 @@ function EditScannedItemModal({
             type="button"
             onClick={onClose}
             aria-label="Fechar edição do item"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.8} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-[var(--negative)]/25 bg-[var(--negative-soft)] px-3 py-2 text-xs font-medium text-[var(--negative)]">
+            <div className="animate-shake rounded-lg border border-[var(--negative)]/25 bg-[var(--negative-soft)] px-3 py-2 text-xs font-medium text-[var(--negative)]">
               {error}
             </div>
           )}
@@ -288,9 +290,9 @@ function EditScannedItemModal({
           <div className="space-y-2 pt-2">
             <button
               type="submit"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-medium text-[var(--accent-ink)] transition-transform duration-150 ease-ui active:scale-[0.98]"
+              className="btn-primary h-11 w-full text-sm"
             >
-              <Check size={18} strokeWidth={1.5} />
+              <Check size={18} strokeWidth={2} />
               {isNew ? 'Adicionar à lista' : 'Salvar alterações'}
             </button>
             {!isNew && (
@@ -300,9 +302,9 @@ function EditScannedItemModal({
                   onRemove(item.id);
                   onClose();
                 }}
-                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border-hairline)] text-xs font-medium text-[var(--negative)] transition-colors hover:bg-[var(--negative-soft)]"
+                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-[var(--border-hairline)] text-xs font-semibold text-[var(--negative)] transition-colors hover:bg-[var(--negative-soft)]"
               >
-                <Trash2 size={15} strokeWidth={1.5} />
+                <Trash2 size={15} strokeWidth={1.8} />
                 Excluir item da lista
               </button>
             )}
@@ -627,6 +629,7 @@ export function ReceiptImportModal({
   const addPurchaseFromItems = useShoppingStore((s) => s.addPurchaseFromItems);
 
   const [mode, setMode] = useState<ImportMode>('qr');
+  const [modeDirection, setModeDirection] = useState<'forward' | 'backward'>('forward');
   const [marketId, setMarketId] = useState(selectedMarketId);
   const [newMarketName, setNewMarketName] = useState('');
   const [isCreatingMarket, setIsCreatingMarket] = useState(false);
@@ -948,7 +951,7 @@ export function ReceiptImportModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
         onClick={() => {
           void stopCamera();
           onClose();
@@ -956,11 +959,13 @@ export function ReceiptImportModal({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+          className="animate-modal-in max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+
+          <div className="mb-5 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-medium text-[var(--text-primary)]">
+              <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
                 Importar cupom fiscal
               </h2>
               <p className="text-xs text-[var(--text-muted)]">
@@ -974,36 +979,38 @@ export function ReceiptImportModal({
                 onClose();
               }}
               aria-label="Fechar importação"
-              className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
             >
-              <X size={18} strokeWidth={1.5} />
+              <X size={18} strokeWidth={1.8} />
             </button>
           </div>
 
-          {/* Mode Tabs */}
-          <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1">
+          {/* Mode Tabs — Apple Segmented Control */}
+          <div className="segmented-track mb-5 grid w-full grid-cols-3">
             {[
-              { id: 'qr' as const, label: 'QR Code', icon: QrCode },
-              { id: 'ocr' as const, label: 'Foto OCR', icon: Camera },
-              { id: 'paste' as const, label: 'Texto / Manual', icon: FileText },
+              { id: 'qr' as const, label: 'QR Code', icon: QrCode, idx: 0 },
+              { id: 'ocr' as const, label: 'Foto OCR', icon: Camera, idx: 1 },
+              { id: 'paste' as const, label: 'Texto / Manual', icon: FileText, idx: 2 },
             ].map((tab) => {
               const Icon = tab.icon;
               const active = mode === tab.id;
+              const currentIdx = mode === 'qr' ? 0 : mode === 'ocr' ? 1 : 2;
               return (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => {
                     if (mode === 'qr' && tab.id !== 'qr') void stopCamera();
+                    setModeDirection(tab.idx >= currentIdx ? 'forward' : 'backward');
                     setMode(tab.id);
                   }}
-                  className={`flex h-8 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
+                  className={`segmented-item flex h-9 items-center justify-center gap-1.5 text-xs ${
                     active
-                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      ? 'segmented-item-active text-[var(--accent-fg)]'
+                      : ''
                   }`}
                 >
-                  <Icon size={15} strokeWidth={1.5} />
+                  <Icon size={15} strokeWidth={1.8} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1050,7 +1057,14 @@ export function ReceiptImportModal({
 
             {/* QR Code Mode */}
             {mode === 'qr' && (
-              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <div
+                key="mode-qr"
+                className={`space-y-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 ${
+                  modeDirection === 'forward'
+                    ? 'animate-slide-forward'
+                    : 'animate-slide-backward'
+                }`}
+              >
                 <div
                   id={qrRegionId}
                   className={`overflow-hidden rounded-xl bg-black ${
@@ -1088,7 +1102,7 @@ export function ReceiptImportModal({
                     type="button"
                     disabled={!qrInput.trim() || isProcessing}
                     onClick={() => void handleProcessQrOrKey(qrInput)}
-                    className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] disabled:opacity-40"
+                    className="btn-tinted h-9 px-4 text-xs disabled:opacity-40"
                   >
                     Ler
                   </button>
@@ -1114,7 +1128,14 @@ export function ReceiptImportModal({
 
             {/* OCR Photo Mode */}
             {mode === 'ocr' && (
-              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-center">
+              <div
+                key="mode-ocr"
+                className={`space-y-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-center ${
+                  modeDirection === 'forward'
+                    ? 'animate-slide-forward'
+                    : 'animate-slide-backward'
+                }`}
+              >
                 <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-8 transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]">
                   <Upload size={22} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
                   <span className="text-xs font-medium text-[var(--text-primary)]">
@@ -1150,7 +1171,14 @@ export function ReceiptImportModal({
 
             {/* Paste Text / HTML / Manual Mode */}
             {mode === 'paste' && (
-              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <div
+                key="mode-paste"
+                className={`space-y-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 ${
+                  modeDirection === 'forward'
+                    ? 'animate-slide-forward'
+                    : 'animate-slide-backward'
+                }`}
+              >
                 <textarea
                   rows={4}
                   value={pasteText}
@@ -1189,16 +1217,16 @@ export function ReceiptImportModal({
                   <button
                     type="submit"
                     aria-label="Adicionar item manual"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text-primary)] text-[var(--bg-app)]"
+                    className="btn-primary h-9 w-9 p-0"
                   >
-                    <Plus size={16} strokeWidth={1.5} />
+                    <Plus size={16} strokeWidth={2} />
                   </button>
                 </form>
               </div>
             )}
 
             {statusError && (
-              <div className="rounded-xl border border-[#B45309]/25 bg-[#FEF3C7]/60 p-3 text-xs font-medium text-[#92400E] dark:bg-[#78350F]/25 dark:text-[#FCD34D]">
+              <div className="animate-shake rounded-2xl border border-[#B45309]/25 bg-[#FEF3C7]/60 p-3 text-xs font-medium text-[#92400E] dark:bg-[#78350F]/25 dark:text-[#FCD34D]">
                 {statusError}
               </div>
             )}
@@ -1274,9 +1302,9 @@ export function ReceiptImportModal({
                 <button
                   type="button"
                   onClick={handleSavePurchase}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+                  className="btn-primary h-11 w-full text-sm"
                 >
-                  <Check size={16} strokeWidth={1.5} />
+                  <Check size={17} strokeWidth={2} />
                   Salvar compra no histórico
                 </button>
               </div>
