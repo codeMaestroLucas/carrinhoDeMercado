@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ReceiptImportModal } from '../src/components/history/ReceiptImportModal';
 import { useShoppingStore } from '../src/store/useShoppingStore';
 
@@ -24,7 +24,7 @@ describe('ReceiptImportModal item editing', () => {
     });
   });
 
-  it('allows full editing of name, category, quantity, unit and price on identified items', async () => {
+  it('allows editing an item via edit button and saving changes to purchase history', () => {
     render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
     // Switch to Texto / Manual tab
@@ -43,42 +43,46 @@ describe('ReceiptImportModal item editing', () => {
     // Verify it appeared in the identified items list
     expect(screen.getByText(/Itens identificados/)).toBeInTheDocument();
     expect(screen.getByText('Total: R$ 15,90')).toBeInTheDocument();
+    expect(screen.getByText('Ovo Bco Grande')).toBeInTheDocument();
 
-    const identifiedNameInput = screen.getByLabelText('Nome do produto #1');
-    expect(identifiedNameInput).toHaveValue('Ovo Bco Grande');
+    // Click edit button (pencil)
+    const editBtn = screen.getByLabelText('Editar Ovo Bco Grande');
+    fireEvent.click(editBtn);
 
-    // 1. Edit Product Name
-    fireEvent.change(identifiedNameInput, {
+    // Verify Edit Modal opened
+    expect(screen.getByText('Editar item #01')).toBeInTheDocument();
+
+    // 1. Edit Name
+    const modalNameInput = screen.getByPlaceholderText('Ex: Leite Integral');
+    expect(modalNameInput).toHaveValue('Ovo Bco Grande');
+    fireEvent.change(modalNameInput, {
       target: { value: 'Ovo Branco Grande C/30' },
     });
-    expect(identifiedNameInput).toHaveValue('Ovo Branco Grande C/30');
 
     // 2. Edit Quantity
-    const qtyInput = screen.getByLabelText('Quantidade #1');
+    const qtyInput = screen.getByPlaceholderText('1');
     expect(qtyInput).toHaveValue('1');
     fireEvent.change(qtyInput, { target: { value: '4' } });
-    fireEvent.blur(qtyInput);
-    expect(qtyInput).toHaveValue('4');
 
     // 3. Edit Unit
-    const unitSelect = screen.getByLabelText('Unidade de medida #1');
-    expect(unitSelect).toHaveValue('un');
+    const unitSelect = screen.getByDisplayValue('un');
     fireEvent.change(unitSelect, { target: { value: 'cx' } });
-    expect(unitSelect).toHaveValue('cx');
 
     // 4. Edit Price
-    const itemPriceInput = screen.getByLabelText('Preço total #1');
-    expect(itemPriceInput).toHaveValue('15,90');
-    fireEvent.change(itemPriceInput, { target: { value: '25,50' } });
-    fireEvent.blur(itemPriceInput);
-
-    // Header total should update dynamically
-    expect(screen.getByText('Total: R$ 25,50')).toBeInTheDocument();
+    const modalPriceInput = screen.getByDisplayValue('15,90');
+    fireEvent.change(modalPriceInput, { target: { value: '25,50' } });
 
     // 5. Edit Category
-    const catSelect = screen.getByLabelText('Categoria do produto #1');
+    const catSelect = screen.getByDisplayValue('Alimentos');
     fireEvent.change(catSelect, { target: { value: 'bazar' } });
-    expect(catSelect).toHaveValue('bazar');
+
+    // Save modal
+    fireEvent.click(screen.getByText('Salvar alterações'));
+
+    // Modal should close and row should be updated
+    expect(screen.queryByText('Editar item #01')).not.toBeInTheDocument();
+    expect(screen.getByText('Ovo Branco Grande C/30')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 25,50')).toBeInTheDocument();
 
     // 6. Save Purchase
     const saveBtn = screen.getByText('Salvar compra no histórico');
@@ -97,7 +101,40 @@ describe('ReceiptImportModal item editing', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('supports decimal quantities for weight-based items and removing items', () => {
+  it('triggers item editing by holding (long-press) the item on touch/mobile', () => {
+    vi.useFakeTimers();
+    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+
+    // Switch to Texto / Manual tab
+    fireEvent.click(screen.getByText('Texto / Manual'));
+
+    // Add item
+    fireEvent.change(screen.getByPlaceholderText('Item manual'), {
+      target: { value: 'Queijo Mussarela' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Preço'), {
+      target: { value: '14,00' },
+    });
+    fireEvent.click(screen.getByLabelText('Adicionar item manual'));
+
+    const itemCard = screen.getByText('Queijo Mussarela').closest('.group')!;
+    expect(itemCard).toBeInTheDocument();
+
+    // Simulate pointer down (start holding)
+    fireEvent.pointerDown(itemCard, { clientX: 100, clientY: 200 });
+
+    // Advance timers for long-press threshold (450ms)
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Edit modal should now be open
+    expect(screen.getByText('Editar item #01')).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it('adds items via "+ Adicionar item" modal and supports removing items', () => {
     render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
     // Switch to Texto / Manual tab
@@ -112,36 +149,33 @@ describe('ReceiptImportModal item editing', () => {
     });
     fireEvent.click(screen.getByLabelText('Adicionar item manual'));
 
-    // Change unit to kg and quantity to 0,820
-    const unitSelect = screen.getByLabelText('Unidade de medida #1');
-    fireEvent.change(unitSelect, { target: { value: 'kg' } });
+    expect(screen.getByText('Pimentao Verde')).toBeInTheDocument();
+    expect(screen.getByText('Total: R$ 8,93')).toBeInTheDocument();
 
-    const qtyInput = screen.getByLabelText('Quantidade #1');
-    fireEvent.change(qtyInput, { target: { value: '0,820' } });
-    fireEvent.blur(qtyInput);
-    expect(qtyInput).toHaveValue('0,82');
-
-    // Add item 2 via "+ Adicionar item" button in list
+    // Click "+ Adicionar item" button
     fireEvent.click(screen.getByText('Adicionar item'));
-    expect(screen.getByLabelText('Nome do produto #2')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Nome do produto #2'), {
-      target: { value: 'Tomate Salada' },
-    });
-    fireEvent.change(screen.getByLabelText('Preço total #2'), {
-      target: { value: '9,63' },
-    });
-    fireEvent.blur(screen.getByLabelText('Preço total #2'));
+    // New item modal should open
+    expect(screen.getByText('Adicionar item à nota')).toBeInTheDocument();
 
+    const nameInput = screen.getByPlaceholderText('Ex: Leite Integral');
+    fireEvent.change(nameInput, { target: { value: 'Tomate Salada' } });
+
+    const priceInput = screen.getByPlaceholderText('0,00');
+    fireEvent.change(priceInput, { target: { value: '9,63' } });
+
+    fireEvent.click(screen.getByText('Adicionar à lista'));
+
+    // Both items should be in the list
+    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
     expect(screen.getByText('Total: R$ 18,56')).toBeInTheDocument();
 
     // Remove item 1
     const removeBtn = screen.getByLabelText('Remover item Pimentao Verde');
     fireEvent.click(removeBtn);
 
-    // Now only Tomate Salada remains
-    expect(screen.queryByLabelText('Nome do produto #2')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Nome do produto #1')).toHaveValue('Tomate Salada');
+    expect(screen.queryByText('Pimentao Verde')).not.toBeInTheDocument();
+    expect(screen.getByText('Tomate Salada')).toBeInTheDocument();
     expect(screen.getByText('Total: R$ 9,63')).toBeInTheDocument();
   });
 });

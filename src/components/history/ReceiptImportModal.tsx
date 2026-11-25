@@ -4,6 +4,7 @@ import {
   Check,
   ExternalLink,
   FileText,
+  Pencil,
   Plus,
   QrCode,
   Trash2,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   PRODUCT_CATEGORIES,
+  PRODUCT_CATEGORY_MAP,
   type ProductCategoryId,
   type PurchaseHistoryItem,
   type ScannedReceiptItem,
@@ -20,6 +22,7 @@ import { useShoppingStore } from '../../store/useShoppingStore';
 import { NfceScannerService } from '../../services/nfceParserService';
 import { ReceiptScannerService } from '../../services/receiptParserService';
 import { AppFormatters } from '../../utils/formatters';
+import { CategoryIcon } from '../common/CategoryIcon';
 
 const DEFAULT_UNITS = ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'];
 
@@ -63,6 +66,251 @@ function toEditableItem(
   };
 }
 
+interface EditScannedItemModalProps {
+  item: EditableReceiptItem;
+  itemNumber: number;
+  isNew?: boolean;
+  onSave: (updated: EditableReceiptItem) => void;
+  onRemove: (id: string) => void;
+  onClose: () => void;
+}
+
+function EditScannedItemModal({
+  item,
+  itemNumber,
+  isNew = false,
+  onSave,
+  onRemove,
+  onClose,
+}: EditScannedItemModalProps) {
+  const [name, setName] = useState(item.name);
+  const [category, setCategory] = useState<ProductCategoryId>(item.category);
+  const [quantityStr, setQuantityStr] = useState(item.quantityStr);
+  const [unit, setUnit] = useState(item.unit || 'un');
+  const [priceStr, setPriceStr] = useState(item.priceStr);
+  const [error, setError] = useState<string | null>(null);
+
+  const availableUnits = Array.from(
+    new Set([...DEFAULT_UNITS, unit || 'un']),
+  );
+
+  const parsedPrice = AppFormatters.parsePrice(priceStr) ?? 0;
+  const parsedQty = AppFormatters.parseQuantity(quantityStr, unit) ?? 1;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Informe o nome do produto');
+      return;
+    }
+
+    const finalPrice = AppFormatters.parsePrice(priceStr) ?? item.price;
+    const finalQty =
+      AppFormatters.parseQuantity(quantityStr, unit) ??
+      (item.quantity > 0 ? item.quantity : 1);
+    const finalUnitPrice =
+      finalQty > 0
+        ? Number((finalPrice / finalQty).toFixed(2))
+        : finalPrice;
+
+    onSave({
+      ...item,
+      name: name.trim(),
+      category,
+      quantity: finalQty,
+      quantityStr:
+        finalQty === Math.round(finalQty)
+          ? String(finalQty)
+          : finalQty.toString().replace('.', ','),
+      unit,
+      price: finalPrice,
+      priceStr: finalPrice > 0 ? finalPrice.toFixed(2).replace('.', ',') : '',
+      unitPrice: finalUnitPrice,
+    });
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-xs sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-5 pb-8 shadow-2xl sm:rounded-2xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)]">
+              <CategoryIcon category={category} size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">
+                {isNew
+                  ? 'Adicionar item à nota'
+                  : `Editar item #${String(itemNumber).padStart(2, '0')}`}
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                {isNew
+                  ? 'Informe os dados do produto'
+                  : 'Ajuste nome, quantidade, unidade, categoria e preço'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar edição do item"
+            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+          >
+            <X size={18} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-[var(--negative)]/25 bg-[var(--negative-soft)] px-3 py-2 text-xs font-medium text-[var(--negative)]">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              Nome do produto
+            </label>
+            <input
+              type="text"
+              autoFocus={isNew}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError(null);
+              }}
+              placeholder="Ex: Leite Integral"
+              className="h-11 w-full rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-base sm:text-sm font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--bg-surface)] focus:ring-1 focus:ring-[var(--accent)]"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              Categoria
+            </label>
+            <select
+              value={category}
+              onChange={(e) =>
+                setCategory(e.target.value as ProductCategoryId)
+              }
+              className="h-11 w-full rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-base sm:text-sm font-medium text-[var(--text-secondary)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
+            >
+              {PRODUCT_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+                Quantidade
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="1"
+                value={quantityStr}
+                onChange={(e) => setQuantityStr(e.target.value)}
+                className="font-mono-tabular h-11 w-full rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-center text-base sm:text-sm font-medium text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+                Unidade
+              </label>
+              <select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="h-11 w-full rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-base sm:text-sm font-medium text-[var(--text-secondary)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
+              >
+                {availableUnits.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
+              Preço total na nota (R$)
+            </label>
+            <div className="flex h-11 items-center rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 transition-colors focus-within:border-[var(--accent)] focus-within:bg-[var(--bg-surface)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
+              <span className="select-none text-sm font-semibold text-[var(--text-muted)] mr-2">
+                R$
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={priceStr}
+                onChange={(e) => setPriceStr(e.target.value)}
+                className="font-mono-tabular w-full bg-transparent text-right text-base sm:text-sm font-bold text-[var(--accent-fg)] outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Resumo e Cálculo */}
+          <div className="flex items-center justify-between rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3.5">
+            <div>
+              <p className="text-xs font-medium text-[var(--text-primary)]">
+                Total deste item
+              </p>
+              {parsedQty > 0 && Math.abs(parsedQty - 1) > 0.001 && parsedPrice > 0 ? (
+                <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                  Preço unitário: {AppFormatters.formatCurrency(parsedPrice / parsedQty)} / {unit}
+                </p>
+              ) : (
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {parsedQty} {unit}
+                </p>
+              )}
+            </div>
+            <span className="font-mono-tabular text-base font-bold text-[var(--accent-fg)]">
+              {AppFormatters.formatCurrency(parsedPrice)}
+            </span>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <button
+              type="submit"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-medium text-[var(--accent-ink)] transition-transform duration-150 ease-ui active:scale-[0.98]"
+            >
+              <Check size={18} strokeWidth={1.5} />
+              {isNew ? 'Adicionar à lista' : 'Salvar alterações'}
+            </button>
+            {!isNew && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRemove(item.id);
+                  onClose();
+                }}
+                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border-hairline)] text-xs font-medium text-[var(--negative)] transition-colors hover:bg-[var(--negative-soft)]"
+              >
+                <Trash2 size={15} strokeWidth={1.5} />
+                Excluir item da lista
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 type ImportMode = 'qr' | 'ocr' | 'paste';
 
 interface ReceiptImportModalProps {
@@ -95,11 +343,65 @@ export function ReceiptImportModal({
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const [scannedItems, setScannedItems] = useState<EditableReceiptItem[]>([]);
+  const [editingItem, setEditingItem] = useState<EditableReceiptItem | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+
   const [manualName, setManualName] = useState('');
   const [manualPrice, setManualPrice] = useState('');
 
   const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
   const qrRegionId = 'nfce-qr-reader-region';
+
+  // Long press refs for mobile holding interaction
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const isPressActiveRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, item: EditableReceiptItem) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+
+    isPressActiveRef.current = true;
+    startXRef.current = e.clientX;
+    startYRef.current = e.clientY;
+    clearLongPressTimer();
+
+    longPressTimerRef.current = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate(40);
+        } catch (_) {}
+      }
+      setIsAddingNew(false);
+      setEditingItem(item);
+    }, 450);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isPressActiveRef.current) return;
+    const deltaX = Math.abs(e.clientX - startXRef.current);
+    const deltaY = Math.abs(e.clientY - startYRef.current);
+    if (deltaX > 8 || deltaY > 8) {
+      clearLongPressTimer();
+    }
+  };
+
+  const handlePointerUp = () => {
+    isPressActiveRef.current = false;
+    clearLongPressTimer();
+  };
+
+  const handlePointerCancel = () => {
+    isPressActiveRef.current = false;
+    clearLongPressTimer();
+  };
 
   const stopCamera = async () => {
     if (scannerRef.current) {
@@ -115,6 +417,7 @@ export function ReceiptImportModal({
 
   useEffect(() => {
     return () => {
+      clearLongPressTimer();
       void stopCamera();
     };
   }, []);
@@ -301,97 +604,24 @@ export function ReceiptImportModal({
       priceStr: '',
       itemIndex: scannedItems.length + 1,
     };
-    setScannedItems((prev) => [...prev, newItem]);
+    setIsAddingNew(true);
+    setEditingItem(newItem);
   };
 
   const handleClearAllItems = () => {
     setScannedItems([]);
   };
 
-  const handleNameChange = (id: string, name: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, name } : it)),
-    );
-  };
-
-  const handleCategoryChange = (id: string, category: ProductCategoryId) => {
-    setScannedItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, category } : it)),
-    );
-  };
-
-  const handleQuantityChange = (id: string, val: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
-        const parsed = AppFormatters.parseQuantity(val, it.unit);
-        return {
-          ...it,
-          quantityStr: val,
-          quantity: parsed != null && parsed > 0 ? parsed : it.quantity,
-        };
-      }),
-    );
-  };
-
-  const handleQuantityBlur = (id: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
-        const parsed = AppFormatters.parseQuantity(it.quantityStr, it.unit);
-        const finalQty =
-          parsed != null && parsed > 0
-            ? parsed
-            : it.quantity > 0
-              ? it.quantity
-              : 1;
-        const formattedStr =
-          finalQty === Math.round(finalQty)
-            ? String(finalQty)
-            : finalQty.toString().replace('.', ',');
-        return {
-          ...it,
-          quantity: finalQty,
-          quantityStr: formattedStr,
-        };
-      }),
-    );
-  };
-
-  const handleUnitChange = (id: string, unit: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, unit } : it)),
-    );
-  };
-
-  const handlePriceChange = (id: string, val: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
-        const parsed = AppFormatters.parsePrice(val);
-        return {
-          ...it,
-          priceStr: val,
-          price: parsed != null && parsed >= 0 ? parsed : it.price,
-        };
-      }),
-    );
-  };
-
-  const handlePriceBlur = (id: string) => {
-    setScannedItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
-        const parsed = AppFormatters.parsePrice(it.priceStr);
-        const finalPrice = parsed != null && parsed >= 0 ? parsed : it.price;
-        return {
-          ...it,
-          price: finalPrice,
-          priceStr:
-            finalPrice > 0 ? finalPrice.toFixed(2).replace('.', ',') : '',
-        };
-      }),
-    );
+  const handleSaveModalItem = (updated: EditableReceiptItem) => {
+    if (isAddingNew) {
+      setScannedItems((prev) => [...prev, updated]);
+    } else {
+      setScannedItems((prev) =>
+        prev.map((it) => (it.id === updated.id ? updated : it)),
+      );
+    }
+    setEditingItem(null);
+    setIsAddingNew(false);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -450,456 +680,422 @@ export function ReceiptImportModal({
   }, 0);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
-      onClick={() => {
-        void stopCamera();
-        onClose();
-      }}
-    >
+    <>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center"
+        onClick={() => {
+          void stopCamera();
+          onClose();
+        }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-medium text-[var(--text-primary)]">
-              Importar cupom fiscal
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              QR Code NFC-e, foto OCR ou entrada manual
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              void stopCamera();
-              onClose();
-            }}
-            aria-label="Fechar importação"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
-          >
-            <X size={18} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {/* Mode Tabs */}
-        <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1">
-          {[
-            { id: 'qr' as const, label: 'QR Code', icon: QrCode },
-            { id: 'ocr' as const, label: 'Foto OCR', icon: Camera },
-            { id: 'paste' as const, label: 'Texto / Manual', icon: FileText },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = mode === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  if (mode === 'qr' && tab.id !== 'qr') void stopCamera();
-                  setMode(tab.id);
-                }}
-                className={`flex h-8 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
-                  active
-                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Icon size={15} strokeWidth={1.5} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="space-y-4">
-          {/* Target Market */}
-          <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium text-[var(--text-secondary)]">
-                Supermercado da compra
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsCreatingMarket((v) => !v)}
-                className="text-xs font-medium text-[var(--accent-fg)] hover:underline"
-              >
-                {isCreatingMarket ? 'Escolher existente' : 'Novo mercado'}
-              </button>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-5 pb-8 shadow-xl sm:rounded-2xl"
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-medium text-[var(--text-primary)]">
+                Importar cupom fiscal
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                QR Code NFC-e, foto OCR ou entrada manual
+              </p>
             </div>
-            {isCreatingMarket ? (
-              <input
-                type="text"
-                placeholder="Nome do supermercado"
-                value={newMarketName}
-                onChange={(e) => setNewMarketName(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-              />
-            ) : (
-              <select
-                value={marketId}
-                onChange={(e) => setMarketId(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-              >
-                {markets.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                void stopCamera();
+                onClose();
+              }}
+              aria-label="Fechar importação"
+              className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]"
+            >
+              <X size={18} strokeWidth={1.5} />
+            </button>
           </div>
 
-          {/* QR Code Mode */}
-          {mode === 'qr' && (
-            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-              <div
-                id={qrRegionId}
-                className={`overflow-hidden rounded-xl bg-black ${
-                  isCameraActive ? 'block min-h-[240px]' : 'hidden'
-                }`}
-              />
-              {!isCameraActive ? (
+          {/* Mode Tabs */}
+          <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-1">
+            {[
+              { id: 'qr' as const, label: 'QR Code', icon: QrCode },
+              { id: 'ocr' as const, label: 'Foto OCR', icon: Camera },
+              { id: 'paste' as const, label: 'Texto / Manual', icon: FileText },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const active = mode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    if (mode === 'qr' && tab.id !== 'qr') void stopCamera();
+                    setMode(tab.id);
+                  }}
+                  className={`flex h-8 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-[background-color,color] duration-150 ease-ui ${
+                    active
+                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <Icon size={15} strokeWidth={1.5} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-4">
+            {/* Target Market */}
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-xs font-medium text-[var(--text-secondary)]">
+                  Supermercado da compra
+                </label>
                 <button
                   type="button"
-                  onClick={() => void startQrCamera()}
+                  onClick={() => setIsCreatingMarket((v) => !v)}
+                  className="text-xs font-medium text-[var(--accent-fg)] hover:underline"
+                >
+                  {isCreatingMarket ? 'Escolher existente' : 'Novo mercado'}
+                </button>
+              </div>
+              {isCreatingMarket ? (
+                <input
+                  type="text"
+                  placeholder="Nome do supermercado"
+                  value={newMarketName}
+                  onChange={(e) => setNewMarketName(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                />
+              ) : (
+                <select
+                  value={marketId}
+                  onChange={(e) => setMarketId(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                >
+                  {markets.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* QR Code Mode */}
+            {mode === 'qr' && (
+              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+                <div
+                  id={qrRegionId}
+                  className={`overflow-hidden rounded-xl bg-black ${
+                    isCameraActive ? 'block min-h-[240px]' : 'hidden'
+                  }`}
+                />
+                {!isCameraActive ? (
+                  <button
+                    type="button"
+                    onClick={() => void startQrCamera()}
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+                  >
+                    <QrCode size={16} strokeWidth={1.5} />
+                    Abrir câmera para ler QR Code
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void stopCamera()}
+                    className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--negative-soft)] text-xs font-medium text-[var(--negative)]"
+                  >
+                    Parar câmera
+                  </button>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Link da SEFAZ ou chave de 44 dígitos"
+                    value={qrInput}
+                    onChange={(e) => setQrInput(e.target.value)}
+                    className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    disabled={!qrInput.trim() || isProcessing}
+                    onClick={() => void handleProcessQrOrKey(qrInput)}
+                    className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] disabled:opacity-40"
+                  >
+                    Ler
+                  </button>
+                </div>
+
+                {resolvedSefazUrl && (
+                  <div className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2 text-xs">
+                    <span className="truncate font-medium text-[var(--text-primary)]">
+                      Portal SEFAZ identificado
+                    </span>
+                    <a
+                      href={resolvedSefazUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 flex shrink-0 items-center gap-1 font-medium text-[var(--accent-fg)] hover:underline"
+                    >
+                      Abrir nota <ExternalLink size={13} strokeWidth={1.5} />
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* OCR Photo Mode */}
+            {mode === 'ocr' && (
+              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-center">
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-8 transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]">
+                  <Upload size={22} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
+                  <span className="text-xs font-medium text-[var(--text-primary)]">
+                    Fotografar ou escolher imagem do cupom
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Reconhecimento direto no navegador
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => void handlePhotoUpload(e)}
+                    className="hidden"
+                  />
+                </label>
+
+                {ocrProgress != null && (
+                  <div className="space-y-1.5">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                      <div
+                        className="h-full bg-[var(--accent)] transition-[width] duration-150 ease-ui"
+                        style={{ width: `${ocrProgress}%` }}
+                      />
+                    </div>
+                    <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                      Lendo cupom fiscal ({ocrProgress}%)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Paste Text / HTML / Manual Mode */}
+            {mode === 'paste' && (
+              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+                <textarea
+                  rows={4}
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder="Cole aqui o texto copiado da página da SEFAZ ou do cupom fiscal"
+                  className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  type="button"
+                  disabled={!pasteText.trim()}
+                  onClick={handleParsePastedContent}
+                  className="h-9 w-full rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] disabled:opacity-40"
+                >
+                  Extrair itens do texto
+                </button>
+
+                <form
+                  onSubmit={handleAddManualItem}
+                  className="flex gap-2 border-t border-[var(--border-hairline)] pt-3"
+                >
+                  <input
+                    type="text"
+                    placeholder="Item manual"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Preço"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    className="font-mono-tabular h-9 w-24 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    type="submit"
+                    aria-label="Adicionar item manual"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text-primary)] text-[var(--bg-app)]"
+                  >
+                    <Plus size={16} strokeWidth={1.5} />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {statusError && (
+              <div className="rounded-xl border border-[#B45309]/25 bg-[#FEF3C7]/60 p-3 text-xs font-medium text-[#92400E] dark:bg-[#78350F]/25 dark:text-[#FCD34D]">
+                {statusError}
+              </div>
+            )}
+
+            {/* Extracted Items Preview */}
+            {scannedItems.length > 0 && (
+              <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
+                <div className="flex items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)]">
+                      Itens identificados (<span className="font-mono-tabular">{scannedItems.length}</span>)
+                    </h3>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Segure um item para editá-lo ou use o botão de edição
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono-tabular text-xs font-semibold text-[var(--accent-fg)]">
+                      Total: {AppFormatters.formatCurrency(totalExtracted)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddNewItem}
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:bg-[var(--bg-surface)]"
+                  >
+                    <Plus size={14} strokeWidth={1.5} />
+                    Adicionar item
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearAllItems}
+                    className="text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--negative)] hover:underline"
+                  >
+                    Limpar lista
+                  </button>
+                </div>
+
+                <div className="max-h-80 space-y-2 overflow-y-auto pr-1 sm:max-h-96">
+                  {scannedItems.map((item, idx) => {
+                    const categoryInfo = PRODUCT_CATEGORY_MAP[item.category];
+                    const showUnitPrice =
+                      item.quantity > 0 &&
+                      Math.abs(item.quantity - 1) > 0.001 &&
+                      item.price > 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        onPointerDown={(e) => handlePointerDown(e, item)}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerCancel}
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ touchAction: 'pan-y' }}
+                        className="group relative flex items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 transition-[background-color,border-color,transform] duration-150 ease-ui select-none active:scale-[0.99] active:bg-[var(--bg-subtle)] hover:border-[var(--border-subtle)]"
+                      >
+                        {/* Left: Index badge + Name + Category + Qty/Unit */}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="font-mono-tabular flex h-5 w-6 shrink-0 items-center justify-center rounded bg-[var(--bg-subtle)] text-[10px] font-bold text-[var(--text-muted)] border border-[var(--border-hairline)]"
+                              title={`Item #${idx + 1}`}
+                            >
+                              #{String(idx + 1).padStart(2, '0')}
+                            </span>
+                            <p className="truncate text-xs font-medium text-[var(--text-primary)] sm:text-sm">
+                              {item.name || '(Sem nome)'}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
+                            <span className="rounded bg-[var(--bg-subtle)] px-2 py-0.5 font-medium text-[var(--text-secondary)]">
+                              {categoryInfo?.label ?? item.category}
+                            </span>
+                            <span className="font-mono-tabular font-medium text-[var(--text-muted)]">
+                              {AppFormatters.formatQuantity(item.quantity, item.unit)}
+                            </span>
+                            {showUnitPrice && (
+                              <span className="font-mono-tabular text-[10px] text-[var(--text-muted)] hidden sm:inline">
+                                ({AppFormatters.formatCurrency(item.price / item.quantity)}/{item.unit})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Price + Action buttons */}
+                        <div className="flex shrink-0 items-center gap-2.5">
+                          <span className="font-mono-tabular text-xs font-semibold text-[var(--accent-fg)] sm:text-sm">
+                            {AppFormatters.formatCurrency(item.price)}
+                          </span>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAddingNew(false);
+                                setEditingItem(item);
+                              }}
+                              aria-label={`Editar ${item.name || idx + 1}`}
+                              title="Editar item (ou segure o item)"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-fg)] active:scale-[0.96]"
+                            >
+                              <Pencil size={14} strokeWidth={1.5} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveItem(item.id);
+                              }}
+                              aria-label={`Remover item ${item.name || idx + 1}`}
+                              title="Remover item"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[var(--negative)] transition-colors hover:bg-[var(--negative-soft)] active:scale-[0.96]"
+                            >
+                              <Trash2 size={14} strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSavePurchase}
                   className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
                 >
-                  <QrCode size={16} strokeWidth={1.5} />
-                  Abrir câmera para ler QR Code
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void stopCamera()}
-                  className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--negative-soft)] text-xs font-medium text-[var(--negative)]"
-                >
-                  Parar câmera
-                </button>
-              )}
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Link da SEFAZ ou chave de 44 dígitos"
-                  value={qrInput}
-                  onChange={(e) => setQrInput(e.target.value)}
-                  className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="button"
-                  disabled={!qrInput.trim() || isProcessing}
-                  onClick={() => void handleProcessQrOrKey(qrInput)}
-                  className="h-9 rounded-lg bg-[var(--text-primary)] px-4 text-xs font-medium text-[var(--bg-app)] disabled:opacity-40"
-                >
-                  Ler
+                  <Check size={16} strokeWidth={1.5} />
+                  Salvar compra no histórico
                 </button>
               </div>
-
-              {resolvedSefazUrl && (
-                <div className="flex items-center justify-between rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 py-2 text-xs">
-                  <span className="truncate font-medium text-[var(--text-primary)]">
-                    Portal SEFAZ identificado
-                  </span>
-                  <a
-                    href={resolvedSefazUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-2 flex shrink-0 items-center gap-1 font-medium text-[var(--accent-fg)] hover:underline"
-                  >
-                    Abrir nota <ExternalLink size={13} strokeWidth={1.5} />
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* OCR Photo Mode */}
-          {mode === 'ocr' && (
-            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4 text-center">
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-8 transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]">
-                <Upload size={22} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
-                <span className="text-xs font-medium text-[var(--text-primary)]">
-                  Fotografar ou escolher imagem do cupom
-                </span>
-                <span className="text-xs text-[var(--text-muted)]">
-                  Reconhecimento direto no navegador
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => void handlePhotoUpload(e)}
-                  className="hidden"
-                />
-              </label>
-
-              {ocrProgress != null && (
-                <div className="space-y-1.5">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
-                    <div
-                      className="h-full bg-[var(--accent)] transition-[width] duration-150 ease-ui"
-                      style={{ width: `${ocrProgress}%` }}
-                    />
-                  </div>
-                  <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                    Lendo cupom fiscal ({ocrProgress}%)
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Paste Text / HTML / Manual Mode */}
-          {mode === 'paste' && (
-            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-              <textarea
-                rows={4}
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                placeholder="Cole aqui o texto copiado da página da SEFAZ ou do cupom fiscal"
-                className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                type="button"
-                disabled={!pasteText.trim()}
-                onClick={handleParsePastedContent}
-                className="h-9 w-full rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] disabled:opacity-40"
-              >
-                Extrair itens do texto
-              </button>
-
-              <form
-                onSubmit={handleAddManualItem}
-                className="flex gap-2 border-t border-[var(--border-hairline)] pt-3"
-              >
-                <input
-                  type="text"
-                  placeholder="Item manual"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  className="h-9 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-                />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Preço"
-                  value={manualPrice}
-                  onChange={(e) => setManualPrice(e.target.value)}
-                  className="font-mono-tabular h-9 w-24 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="submit"
-                  aria-label="Adicionar item manual"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text-primary)] text-[var(--bg-app)]"
-                >
-                  <Plus size={16} strokeWidth={1.5} />
-                </button>
-              </form>
-            </div>
-          )}
-
-          {statusError && (
-            <div className="rounded-xl border border-[#B45309]/25 bg-[#FEF3C7]/60 p-3 text-xs font-medium text-[#92400E] dark:bg-[#78350F]/25 dark:text-[#FCD34D]">
-              {statusError}
-            </div>
-          )}
-
-          {/* Extracted Items Preview */}
-          {scannedItems.length > 0 && (
-            <div className="space-y-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-4">
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-2.5">
-                <div>
-                  <h3 className="text-xs font-semibold text-[var(--text-primary)]">
-                    Itens identificados (<span className="font-mono-tabular">{scannedItems.length}</span>)
-                  </h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    Edite nome, categoria, quantidade, unidade e preço livremente
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono-tabular text-xs font-semibold text-[var(--accent-fg)]">
-                    Total: {AppFormatters.formatCurrency(totalExtracted)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={handleAddNewItem}
-                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:bg-[var(--bg-surface)]"
-                >
-                  <Plus size={14} strokeWidth={1.5} />
-                  Adicionar item
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearAllItems}
-                  className="text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--negative)] hover:underline"
-                >
-                  Limpar lista
-                </button>
-              </div>
-
-              <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1 sm:max-h-96">
-                {scannedItems.map((item, idx) => {
-                  const availableUnits = Array.from(
-                    new Set([...DEFAULT_UNITS, item.unit || 'un']),
-                  );
-                  const effectiveQty =
-                    AppFormatters.parseQuantity(item.quantityStr, item.unit) ??
-                    item.quantity;
-                  const effectivePrice =
-                    AppFormatters.parsePrice(item.priceStr) ?? item.price;
-                  const showUnitPrice =
-                    effectiveQty > 0 &&
-                    Math.abs(effectiveQty - 1) > 0.001 &&
-                    effectivePrice > 0;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="space-y-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-2.5 transition-colors focus-within:border-[var(--accent)]/60 sm:p-3"
-                    >
-                      {/* Linha 1: Índice, Nome do Produto com foco nítido e botão de excluir */}
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="font-mono-tabular flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] text-[10px] font-bold text-[var(--text-muted)]"
-                          title={`Item #${idx + 1}`}
-                        >
-                          #{String(idx + 1).padStart(2, '0')}
-                        </span>
-
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) =>
-                            handleNameChange(item.id, e.target.value)
-                          }
-                          placeholder="Nome do produto"
-                          aria-label={`Nome do produto #${idx + 1}`}
-                          className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2.5 text-xs font-medium text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none transition-[border-color,background-color] focus:border-[var(--accent)] focus:bg-[var(--bg-surface)] focus:ring-1 focus:ring-[var(--accent)]"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(item.id)}
-                          aria-label={`Remover item ${item.name || idx + 1}`}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
-                          title="Remover este item"
-                        >
-                          <Trash2 size={15} strokeWidth={1.5} />
-                        </button>
-                      </div>
-
-                      {/* Linha 2: Categoria, Quantidade + Unidade, Preço Total */}
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        {/* Categoria */}
-                        <div className="min-w-[120px] flex-1">
-                          <select
-                            value={item.category}
-                            onChange={(e) =>
-                              handleCategoryChange(
-                                item.id,
-                                e.target.value as ProductCategoryId,
-                              )
-                            }
-                            aria-label={`Categoria do produto #${idx + 1}`}
-                            className="h-7 w-full rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-2 text-[11px] font-medium text-[var(--text-secondary)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
-                          >
-                            {PRODUCT_CATEGORIES.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Quantidade e Unidade */}
-                        <div
-                          className="flex items-center rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] focus-within:border-[var(--accent)] focus-within:bg-[var(--bg-surface)]"
-                          title="Quantidade e unidade de medida"
-                        >
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="1"
-                            value={item.quantityStr}
-                            onChange={(e) =>
-                              handleQuantityChange(item.id, e.target.value)
-                            }
-                            onBlur={() => handleQuantityBlur(item.id)}
-                            aria-label={`Quantidade #${idx + 1}`}
-                            className="font-mono-tabular h-7 w-12 rounded-l-md bg-transparent px-1.5 text-center text-xs font-medium text-[var(--text-primary)] outline-none sm:w-14"
-                          />
-                          <div className="h-4 w-px bg-[var(--border-hairline)]" />
-                          <select
-                            value={item.unit}
-                            onChange={(e) =>
-                              handleUnitChange(item.id, e.target.value)
-                            }
-                            aria-label={`Unidade de medida #${idx + 1}`}
-                            className="h-7 rounded-r-md bg-transparent px-1.5 text-[11px] font-medium text-[var(--text-secondary)] outline-none"
-                          >
-                            {availableUnits.map((u) => (
-                              <option key={u} value={u}>
-                                {u}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Preço Total */}
-                        <div
-                          className="flex items-center rounded-md border border-[var(--border-hairline)] bg-[var(--bg-subtle)] focus-within:border-[var(--accent)] focus-within:bg-[var(--bg-surface)]"
-                          title="Preço total deste item (R$)"
-                        >
-                          <span className="select-none pl-2 text-[11px] font-medium text-[var(--text-muted)]">
-                            R$
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="0,00"
-                            value={item.priceStr}
-                            onChange={(e) =>
-                              handlePriceChange(item.id, e.target.value)
-                            }
-                            onBlur={() => handlePriceBlur(item.id)}
-                            aria-label={`Preço total #${idx + 1}`}
-                            className="font-mono-tabular h-7 w-20 rounded-r-md bg-transparent px-2 text-right text-xs font-semibold text-[var(--accent-fg)] outline-none sm:w-22"
-                          />
-                        </div>
-
-                        {/* Indicador de Preço Unitário */}
-                        {showUnitPrice && (
-                          <span
-                            className="font-mono-tabular hidden text-[10px] text-[var(--text-muted)] sm:inline"
-                            title="Preço unitário calculado com base no total e quantidade"
-                          >
-                            ({AppFormatters.formatCurrency(effectivePrice / effectiveQty)}/{item.unit})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSavePurchase}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-xs font-medium text-[var(--accent-ink)] transition-[background-color,transform] duration-150 ease-ui hover:bg-[var(--accent-hover)] active:scale-[0.98]"
-              >
-                <Check size={16} strokeWidth={1.5} />
-                Salvar compra no histórico
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {editingItem && (
+        <EditScannedItemModal
+          item={editingItem}
+          itemNumber={
+            isAddingNew
+              ? scannedItems.length + 1
+              : scannedItems.findIndex((it) => it.id === editingItem.id) + 1 ||
+                1
+          }
+          isNew={isAddingNew}
+          onSave={handleSaveModalItem}
+          onRemove={handleRemoveItem}
+          onClose={() => {
+            setEditingItem(null);
+            setIsAddingNew(false);
+          }}
+        />
+      )}
+    </>
   );
 }
