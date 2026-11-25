@@ -10,10 +10,10 @@ const IGNORED_RECEIPT_KEYWORDS = [
   'nota fiscal', 'cupom fiscal', 'consumidor', 'danfe',
   'qtd. total', 'qtd total', 'qtde. total', 'qtde total',
   'total de itens', 'total itens', 'qtd itens', 'qtde itens',
-  'valor total', 'ualor total',
+  'valor total', 'ualor total', 'vhlor total', 'vmlor total', 'uml or total',
   'valor total a pagar', 'ualor total a pagar', 'total a pagar',
   'valor a pagar', 'ualor a pagar', 'total geral', 'valor geral',
-  'ualor geral', 'total pago', 'valor pago', 'ualor pago',
+  'ualor geral', 'total pago', 'valor pago', 'ualor pago', 'malor pago',
   'total liquido', 'valor liquido', 'ualor liquido', 'total bruto',
   'valor bruto', 'ualor bruto', 'total produtos', 'valor produtos',
   'ualor produtos', 'total dos produtos', 'valor dos produtos',
@@ -24,9 +24,11 @@ const IGNORED_RECEIPT_KEYWORDS = [
   'ul total a pagar', 'subtotal', 'sub-total', 'sub total', 't0tal',
   'desconto', 'descontos', 'valor desconto', 'ualor desconto',
   'acrescimo', 'acrescimos', 'valor acrescimo', 'forma de pagamento',
-  'forma pagamento', 'meio de pagamento', 'cartao de credito',
-  'cartao de debito', 'cartao credito', 'cartao debito', 'credito',
-  'debito', 'dinheiro', 'troco', 'valor troco', 'ualor troco',
+  'forma pagamento', 'forna de pagamento', 'meio de pagamento',
+  'cartao de credito', 'cartao de debito', 'cartao credito', 'cartao debito',
+  'cart credito', 'cart debito', 'cartao alimentacao', 'cartao refeicao',
+  'cart alimentacao', 'cart refeicao', 'credito', 'debito', 'dinheiro',
+  'troco', 'valor troco', 'ualor troco',
   'valor recebido', 'ualor recebido', 'total recebido', 'tributos',
   'trib aprox', 'trib. aprox', 'val aprox', 'fonte ibpt',
   'aproximados', 'lei federal', 'ibpt', 'procon', 'decon',
@@ -309,6 +311,12 @@ export const PHRASE_ABBREV_MAP: Record<string, string> = {
   'MANTEIG S/SAL': 'Manteiga sem Sal',
   'LAV PERF': 'Lavagem Perfeita',
   'LAVAGEM PERF': 'Lavagem Perfeita',
+  'FITA DF': 'Fita Dupla Face',
+  'FILTRO LINHA': 'Filtro de Linha',
+  'DESENG WD-40': 'Desengripante WD-40',
+  'DESENG WD 40': 'Desengripante WD-40',
+  'DESENG WVD-40': 'Desengripante WD-40',
+  'USO GERAL': 'Uso Geral',
 };
 
 export const ABBREV_MAP: Record<string, string> = {
@@ -441,6 +449,8 @@ export const ABBREV_MAP: Record<string, string> = {
   ACET: 'Acetona', CICATR: 'Cicatricure', PH: 'Papel Higiênico', HIG: 'Higiênico',
   ALCAL: 'Alcalina', ALMOF: 'Almofadado', INTEGR: 'Integral', INST: 'Instantâneo', INSTANT: 'Instantâneo',
   UALOR: 'Valor', VALOR: 'Valor',
+  BCO: 'Branco', FT: 'Fatiado', TESOU: 'Tesoura', TRAM: 'Tramontina',
+  EXTENSAO: 'Extensão', DOBRAVEL: 'Dobrável', ALICATE: 'Alicate', PIMENTAO: 'Pimentão',
 };
 
 const RECEIPT_WORD_FIXES: Record<string, string> = {
@@ -465,6 +475,17 @@ const RECEIPT_WORD_FIXES: Record<string, string> = {
   MVFFIN: 'Muffin', TRVFA: 'Trufa', SAGV: 'Sagu', GLVTEN: 'Gluten',
   LVA: 'Lua', PLVS: 'Plus', SVRF: 'Surf', AZVL: 'Azul', LVZ: 'Luz',
   CRVNCH: 'Crunch', LEGVM: 'Legum', MVSSE: 'Musse',
+  PARAFUSOBUCHA: 'Parafuso Bucha', PARAFUSOIBUCHA: 'Parafuso Bucha',
+  PARAFYBUCHA: 'Parafuso Bucha', PARAFIBUCHA: 'Parafuso Bucha',
+  PARAFUSOBUCH: 'Parafuso Bucha',
+  PINENIAO: 'Pimentão', PINENIAAO: 'Pimentão', PINENIAU: 'Pimentão',
+  PINENTAU: 'Pimentão', PINENIÃO: 'Pimentão',
+  FILIRO: 'Filtro', FILIKO: 'Filtro', FILIRKO: 'Filtro',
+  IESOU: 'Tesoura', JESOU: 'Tesoura',
+  ESTILEIE: 'Estilete', ALICAIE: 'Alicate',
+  CARANELO: 'Caramelo', CANANELO: 'Caramelo',
+  TOMAIA: 'Tomate', IOMAIE: 'Tomate', TOMAIE: 'Tomate',
+  CHAIA: 'Chata', IRAM: 'Tramontina', TIRAM: 'Tramontina',
 };
 
 const KNOWN_SINGLE_WORDS: Set<string> = (() => {
@@ -540,28 +561,40 @@ function repairOcrPricesInLine(line: string): string {
   return s;
 }
 
+function normalizeSummaryOcrText(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\b[uvmn][ahml]l\s*[o0]r\b/g, 'valor')
+    .replace(/\buml\s*[o0]r\b/g, 'valor')
+    .replace(/\bulr\b/g, 'vlr')
+    .replace(/\bul\b/g, 'vl')
+    .replace(/\b[tij1][o06][tij1][a4][l1i]\b/g, 'total')
+    .replace(/\bt\s*o\s*t\s*a\s*l\b/g, 'total')
+    .replace(/\bp[a4][g6][a4]r\b/g, 'pagar')
+    .replace(/\bp[a4][g6][a4]m[e3]n[ti1][o0]\b/g, 'pagamento')
+    .replace(/\bf[o0]r[mn][a4]\b/g, 'forma')
+    .replace(/\b[i1][tj][e3]ns\b/g, 'itens')
+    .replace(/\bq[ti1][dp]\.?\b/g, 'qtd');
+}
+
 function isReceiptTotalOrSummaryLine(line: string): boolean {
-  let clean = line
+  const clean = line
     .toLowerCase()
     .trim()
     .replace(/^\s*(?:item|it|cod|cód)?\s*#?\s*\d{1,6}[\s.-]+/i, '')
     .trim()
     .replace(/\s+/g, ' ');
 
-  const normalized = clean
-    .replace(/\bualor\b/g, 'valor')
-    .replace(/\bulr\b/g, 'vlr')
-    .replace(/\bul\b/g, 'vl')
-    .replace(/\bt0tal\b|\btota1\b/g, 'total')
-    .replace(/\bt\s*o\s*t\s*a\s*l\b/g, 'total');
+  const normalized = normalizeSummaryOcrText(clean);
 
   const summaryStartPattern =
-    /^(?:total|vlr?\.?\s*total(?:\s*a\s*pagar)?|vl\s*total(?:\s*a\s*pagar)?|valor\s*total(?:\s*a\s*pagar)?|subtotal|sub-total|sub\s+total|total\s*a\s*pagar|valor\s*a\s*pagar|total\s*pago|valor\s*pago|total\s*l[ií]quido|valor\s*l[ií]quido|total\s*bruto|valor\s*bruto|total\s*(?:dos\s*)?produtos|valor\s*(?:dos\s*)?produtos|valor\s*recebido|total\s*recebido|valor\s*troco|troco|desconto|descontos|acrescimo|acrescimos|forma\s*de\s*pagamento|total\s*geral|valor\s*geral)\b/i;
+    /^(?:total|vlr?\.?\s*total(?:\s*a\s*pagar)?|vl\s*total(?:\s*a\s*pagar)?|valor\s*total(?:\s*a\s*pagar)?|subtotal|sub-total|sub\s+total|total\s*a\s*pagar|valor\s*a\s*pagar|valor\s*[àa]\s*pagar|total\s*pago|valor\s*pago|total\s*l[ií]quido|valor\s*l[ií]quido|total\s*bruto|valor\s*bruto|total\s*(?:dos\s*)?produtos|valor\s*(?:dos\s*)?produtos|valor\s*recebido|total\s*recebido|valor\s*troco|troco|desconto|descontos|acrescimo|acrescimos|forma\s*(?:de|ce)\s*pagamento|total\s*geral|valor\s*geral|qtd\.?\s*total(?:\s*de)?\s*itens)\b/i;
 
   if (summaryStartPattern.test(normalized)) return true;
 
   if (
-    /\b(?:valor|vlr?\.?|vl)\s*(?:total(?:\s*a\s*pagar)?|geral|pago|a\s*pagar|l[ií]quido|bruto|recebido|troco|da\s*nota|do\s*cupom|(?:dos\s*)?produtos)\b/i.test(
+    /\b(?:valor|vlr?\.?|vl)\s*(?:total(?:\s*[àa]\s*pagar)?|geral|pago|[àa]\s*pagar|l[ií]quido|bruto|recebido|troco|da\s*nota|do\s*cupom|(?:dos\s*)?produtos)\b/i.test(
       normalized,
     )
   ) {
@@ -569,7 +602,7 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
   }
 
   if (
-    /\b(?:total)\s*(?:geral|pago|a\s*pagar|l[ií]quido|bruto|recebido|(?:dos\s*)?produtos|da\s*nota|do\s*cupom)\b/i.test(
+    /\b(?:total)\s*(?:geral|pago|[àa]\s*pagar|l[ií]quido|bruto|recebido|(?:dos\s*)?produtos|(?:de\s*)?itens|da\s*nota|do\s*cupom)\b/i.test(
       normalized,
     )
   ) {
@@ -593,7 +626,7 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
 
     if (
       !nonPriceText ||
-      /^(?:total|vlr?|vl|valor|liq|liquido|líquido|bruto|a|pagar|pago|geral|subtotal|sub|dos|produtos|itens|item|de|da|do|nota|cupom|fiscal|r\$|\s)+$/.test(
+      /^(?:total|vlr?|vl|valor|liq|liquido|líquido|bruto|a|à|pagar|pago|geral|subtotal|sub|dos|produtos|itens|item|de|da|do|nota|cupom|fiscal|r\$|\s)+$/.test(
         nonPriceText,
       )
     ) {
@@ -604,15 +637,40 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
   return false;
 }
 
+function isReceiptFooterBoundary(line: string): boolean {
+  const normalized = normalizeSummaryOcrText(line.replace(/\s+/g, ' '));
+  if (
+    /\b(?:qtd\.?|qtde\.?)\s*total\s*(?:de\s*)?itens\b/i.test(normalized) ||
+    /\bvalor\s*(?:total|[àa]\s*pagar|pago)\b/i.test(normalized) ||
+    /\btotal\s*[àa]\s*pagar\b/i.test(normalized) ||
+    /\bforma\s*(?:de|ce)\s*pagamento\b/i.test(normalized) ||
+    /\bmeio\s*(?:de|ce)\s*pagamento\b/i.test(normalized) ||
+    /\b(?:trib\.?\s*aprox|tributos|chave\s*de\s*acesso|consulte\s*pela)\b/i.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function shouldIgnoreReceiptLine(line: string): boolean {
-  const lower = line.toLowerCase();
+  const lower = normalizeSummaryOcrText(line);
   for (const keyword of IGNORED_RECEIPT_KEYWORDS) {
     if (lower.includes(keyword)) return true;
   }
   if (
-    /\b(?:pix|mastercard|visa\s*(?:electron|cr[eé]dito|d[eé]bito)?|elo\s*(?:cr[eé]dito|d[eé]bito)?|hipercard|amex|alelo|sodexo|pluxee|vale\s*alimenta[çc][ãa]o|vale\s*refei[çc][ãa]o)\b/i.test(
+    /\b(?:pix|mastercard|visa\s*(?:electron|cr[eé]dito|d[eé]bito)?|elo\s*(?:cr[eé]dito|d[eé]bito)?|hipercard|amex|alelo|sodexo|pluxee|voucher|ticket|cart(?:[aã]o)?\.?\s*(?:cr[eé]dito|d[eé]bito|alimenta[çc][aã]o|refei[çc][aã]o|presente)|(?:vale\s*)?(?:alimenta[çc][aã]o|refei[çc][aã]o))\b/i.test(
       lower,
     )
+  ) {
+    return true;
+  }
+  // Ignore receipt table column header lines (e.g. "ITEM | COD | DESC | QTDE | UN | VL. UNIT | VL. TOTAL R$")
+  if (
+    /\bdesc\b/i.test(lower) &&
+    /\b(?:qtde?|qide|unit|total)\b/i.test(lower) &&
+    !/\d+[,.]\d{2}\b/.test(lower)
   ) {
     return true;
   }
@@ -640,14 +698,7 @@ function shouldIgnoreReceiptLine(line: string): boolean {
 }
 
 export function isTotalProductName(name: string): boolean {
-  let lower = name
-    .toLowerCase()
-    .trim()
-    .replace(/\bualor\b/g, 'valor')
-    .replace(/\bulr\b/g, 'vlr')
-    .replace(/\bul\b/g, 'vl')
-    .replace(/\bt0tal\b|\btota1\b/g, 'total')
-    .replace(/\bt\s*o\s*t\s*a\s*l\b/g, 'total')
+  const lower = normalizeSummaryOcrText(name)
     .replace(/[:=\-*#.,]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -732,13 +783,14 @@ export function repairReceiptWord(word: string): string {
   if (upperWord === 'OL' || upperWord === 'SC') return word;
 
   const isMeasurement =
-    /^\d*(?:[,.]\d+)?[Oo0-9]+(?:g|kg|ml|l|lt|mg|un|pc|pct|cx|emb|%)$/i.test(
+    /^\d*(?:[,.]\d+)?[Oo0-9]+(?:g|kg|ml|l|lt|mg|mm|cm|m|un|pc|pct|cx|emb|p|a|v|w|%)$/i.test(
       word,
     ) ||
-    /^\d+\s*[xX*]\s*\d+(?:[,.]\d+)?(?:g|kg|ml|l|lt|mg|un|pc|pct|cx|emb)?$/i.test(
+    /^\d+\s*[xX*]\s*\d+(?:[,.]\d+)?(?:g|kg|ml|l|lt|mg|mm|cm|m|un|pc|pct|cx|emb)?$/i.test(
       word,
     ) ||
     /^\d+em\d+$/i.test(word) ||
+    /^[a-zA-Z]{1,4}-\d+$/i.test(word) ||
     /^C\/\d*$/i.test(word);
 
   let w = word;
@@ -875,6 +927,37 @@ export function mergeSplitWords(rawTokens: string[]): string[] {
   return result;
 }
 
+function isLikelyOcrBarcode(token: string): boolean {
+  const clean = token.replace(/^[([{"'`.,:;!|/-]+|[)\]}"'`.,:;!|/-]+$/g, '');
+  if (clean.length < 8 || clean.length > 16) return false;
+  const digitCount = (clean.match(/\d/g) ?? []).length;
+  if (clean.length >= 10 && digitCount >= 6 && /^[0-9a-zA-Z&/\\-]+$/.test(clean)) {
+    return !/\d+(?:g|gr|kg|ml|l|lt|mg|mm|cm|un)$/i.test(clean);
+  }
+  if (!/^[0-9OoQqDdIl|!SsBbGgZzAaTtEeHhRr&/\\-]+$/.test(clean)) return false;
+  return digitCount >= 6 && digitCount / clean.length >= 0.45;
+}
+
+function isLikelyOcrItemIndexPrefix(token: string, followedByBarcode: boolean): boolean {
+  const clean = token.replace(/^[([{"'`.,:;!|/-]+|[)\]}"'`.,:;!|/-]+$/g, '');
+  if (!clean || clean.length > 5) return false;
+  if (
+    /^\d+(?:[,.]\d+)?(?:g|gr|kg|ml|l|lt|mg|cm|mm|m|un|dz|cx|pct|p|a|v|w)$/i.test(
+      clean,
+    )
+  ) {
+    return false;
+  }
+  if (/^\d{1,4}$/.test(clean)) return true;
+  if (/^[0OQ][0-9OQUoglht%]{2,3}$/i.test(clean)) return true;
+  if (followedByBarcode) {
+    // When token[1] is a barcode, any short edge artifact or garbled index in token[0] is safe to drop
+    if (clean.length <= 4 && !/^[a-zA-ZÀ-ÿ]{3,}$/.test(clean)) return true;
+    if (/^(?:ol&|gi6|luta|duos|ou\d|goi|qu)$/i.test(clean)) return true;
+  }
+  return false;
+}
+
 export function cleanReceiptProductName(raw: string): string {
   if (!raw) return '';
 
@@ -934,7 +1017,7 @@ export function cleanReceiptProductName(raw: string): string {
 
   // 3. Remove leading stray symbols, item sequence indexes, and codes/barcodes
   const stripLeadingNoise = (input: string): string => {
-    let cur = input.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°]+/, '');
+    let cur = input.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°&]+/, '');
     cur = cur.replace(
       /^(?:item|it|c[óo]d(?:igo)?|n[º°o]?\.?)\s*#?[:.-]?\s*\d{1,18}(?:[-/]\d+)?[\s.:/)-]*/i,
       '',
@@ -947,9 +1030,37 @@ export function cleanReceiptProductName(raw: string): string {
       /^(?!\d+\s*(?:cora[çc][õo]es|queijos?|em\s+\d|belo|ervas?|cereais|gr[ãa]os|frutas?|leites?|un|kg|g|l|ml|mg|cm|m|rolos?|folhas?)\b)\d{1,3}\s+(?=[a-zA-ZÀ-ÿ])/i,
       '',
     );
-    return cur.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°]+/, '').trim();
+    return cur.replace(/^[\s*=_#|~<>.,;:/\\+\-()[\]{}•·—–"'`^°&]+/, '').trim();
   };
   s = stripLeadingNoise(s);
+  s = stripLeadingNoise(s);
+
+  // Strip OCR-garbled leading margin artifacts, item index, and EAN barcodes (e.g. "2X 01) 7694322644049 ...", "Ol& 7697186obas32 ...")
+  const leadTokens = s.split(/\s+/).filter(Boolean);
+  const barcodePos = leadTokens.findIndex(
+    (tok, idx) => idx <= 3 && isLikelyOcrBarcode(tok),
+  );
+  if (barcodePos !== -1 && barcodePos + 1 < leadTokens.length) {
+    s = leadTokens.slice(barcodePos + 1).join(' ');
+  } else if (
+    leadTokens.length >= 2 &&
+    isLikelyOcrItemIndexPrefix(leadTokens[0], false) &&
+    !/^(?:\d+\s*(?:cora[çc][õo]es|queijos?|em|belo|ervas?|cereais|gr[ãa]os|frutas?|leites?|un|kg|g|l|ml|mg|cm|m|rolos?|folhas?))$/i.test(
+      `${leadTokens[0]} ${leadTokens[1]}`,
+    )
+  ) {
+    s = leadTokens.slice(1).join(' ');
+    const afterIdx = s.split(/\s+/).filter(Boolean);
+    if (
+      afterIdx.length >= 2 &&
+      (isLikelyOcrItemIndexPrefix(afterIdx[0], false) || /^\d{2,6}$/.test(afterIdx[0])) &&
+      !/^(?:cora[çc][õo]es|queijos?|em|belo|ervas?|cereais|gr[ãa]os|frutas?|leites?)$/i.test(
+        afterIdx[1],
+      )
+    ) {
+      s = afterIdx.slice(1).join(' ');
+    }
+  }
   s = stripLeadingNoise(s);
 
   // 4. Preserve "Tipo 1" / "Tipo 2" before fiscal tag stripping
@@ -998,33 +1109,50 @@ export function cleanReceiptProductName(raw: string): string {
   );
 
   // 8. Clean stray punctuation & OCR symbols while preserving decimals, C/12, S/LACT, Coca-Cola
-  s = s.replace(/[*=_#|~<>•·…—–«»"'`^°¨§¬¢£¤¦©®™\\;!?@$]+/g, ' ');
+  s = s.replace(/[*=_#|~<>•·…—–«»"'`^°¨§¬¢£¤¦©®™\\;!?@$+&]+/g, ' ');
   s = s.replace(/[()[\]{}]+/g, ' ');
   // Abbreviation dots attached to letters: "CR.LEITE" -> "CR LEITE", "BISC." -> "BISC"
   s = s.replace(/([a-zA-ZÀ-ÿ])\.([a-zA-ZÀ-ÿ])/g, '$1 $2');
   s = s.replace(/(?<!\d)\.|\.(?!\d)/g, ' ');
   s = s.replace(/(?<!\d),|,(?!\d)/g, ' ');
   s = s.replace(/[:]+/g, ' ');
+  // Fix specific receipt OCR slashes & patterns (e.g. "OVO BLO GRANDE 6/30" -> "OVO BCO GRANDE c/30")
+  s = s.replace(/\bovo\s+(?:blo|hco|bc0)\b/gi, 'Ovo Bco');
+  s = s.replace(/(?<=\bgrande\s+)(?:6|0)\/30\b/gi, 'c/30');
+  s = s.replace(/\bpineni[ãa]+o\b/gi, 'Pimentão');
+  s = s.replace(/\bparaf[a-z]?bucha\b/gi, 'Parafuso Bucha');
   // Normalize slash notations (preserve C/12, CH/VERD, expand C/, S/, P/ before letters, drop stray slashes)
   s = s.replace(/\bS\/S\b/gi, 'Sem Semente');
   s = s.replace(/\bC\/(?=[a-zA-ZÀ-ÿ])/gi, 'Com ');
   s = s.replace(/\bS\/(?=[a-zA-ZÀ-ÿ])/gi, 'Sem ');
   s = s.replace(/\bP\/(?=[a-zA-ZÀ-ÿ])/gi, 'Para ');
   s = s.replace(/(?<![cCsSpP])\/|\/(?![a-zA-ZÀ-ÿ0-9])/g, ' ');
-  // Drop stray hyphens not joining two word characters (keep "COCA-COLA")
+  // Drop stray hyphens not joining two word characters (keep "COCA-COLA", "WD-40")
   s = s.replace(/(?<![a-zA-ZÀ-ÿ0-9])-+|-+(?![a-zA-ZÀ-ÿ0-9])/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
 
-  // 9. Standardize attached weight/volume tokens BEFORE abbreviation expansion
+  // 9. Standardize attached weight/volume/dimension tokens BEFORE abbreviation expansion
   // (e.g. "1 LT" -> "1l", preventing "LT" -> "Leite"!)
+  s = s.replace(/\b[wv]{1,2}d-?40\b/gi, 'WD-40');
+  s = s.replace(/\b(\d+)\s*tomadas?\b/gi, '$1 Tomadas');
+  s = s.replace(
+    /(?<=\b(?:linha|filiro|filiko|filtro)\s+)(?:s|5|si)[t1i][o0][nmh][a4]d[a4]s?\b/gi,
+    '5 Tomadas',
+  );
   s = s.replace(
     /\b(\d+(?:[,.]\d+)?)\s*(?:l|lt|lts|litros?)\b/gi,
     (_, n: string) => `${n.replace('.', ',')}l`,
   );
   s = s.replace(
-    /\b(\d+(?:[,.]\d+)?)\s*(?:ml|mls)\b/gi,
+    /\b(\d+(?:[,.]\d+)?)\s*(?:ml|mls|[hmw]l)\b/gi,
     (_, n: string) => `${n.replace('.', ',')}ml`,
   );
+  s = s.replace(
+    /\b(\d+(?:[,.]\d+)?)\s*(?:mm|mh|hm|mhm|nh)\b/gi,
+    (_, n: string) => `${n.replace('.', ',')}mm`,
+  );
+  s = s.replace(/\b(?:gmm|gnh|gnm|gnn)\b/gi, '6mm');
+  s = s.replace(/\b(?:bmm|bnm|bnn)\b/gi, '8mm');
   s = s.replace(
     /\b(\d+(?:[,.]\d+)?)\s*(?:kg|kilos?|quilos?)\b/gi,
     (_, n: string) => `${n.replace('.', ',')}kg`,
@@ -1132,7 +1260,7 @@ export function cleanReceiptProductName(raw: string): string {
     const prevLower = middleCleaned[middleCleaned.length - 2].toLowerCase();
 
     if (
-      /^\d+(?:[,.]\d+)?(?:g|kg|ml|l|mg|m|cm|mm|un|%)$/i.test(last) ||
+      /^\d+(?:[,.]\d+)?(?:g|kg|ml|l|mg|m|cm|mm|un|p|a|v|w|%)$/i.test(last) ||
       /^c\/\d+$/i.test(last)
     ) {
       break;
@@ -1174,7 +1302,9 @@ export function cleanReceiptProductName(raw: string): string {
   const minorPrepositions = new Set([
     'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'e', 'para',
   ]);
-  const uppercaseAcronyms = new Set(['UHT', 'EV', 'AA', 'AAA', 'XG', 'XXG', 'PVC']);
+  const uppercaseAcronyms = new Set([
+    'UHT', 'EV', 'AA', 'AAA', 'XG', 'XXG', 'PVC', 'WD-40',
+  ]);
   const finalTokens = s.split(' ');
 
   return finalTokens
@@ -1273,6 +1403,185 @@ export function accumulateScannedItems(
   return result;
 }
 
+const DISCRETE_UNITS = new Set(['un', 'pc', 'pct', 'cx', 'dz']);
+
+function normalizeOcrUnit(rawUnit: string, rawQtyStr?: string): string {
+  const lower = rawUnit.toLowerCase().trim();
+  if (lower === 'um' || lower === 'ln' || lower === 'on') return 'un';
+  if (
+    lower === 'ka' ||
+    lower === 'k3' ||
+    lower === 'kq' ||
+    lower === 'ha' ||
+    lower === 'bg' ||
+    lower === 'ng'
+  ) {
+    return 'kg';
+  }
+  const normalized = AppFormatters.normalizeUnit(rawUnit);
+  if (normalized === 'L' && rawQtyStr && /\d+[,.]\d{3}$/.test(rawQtyStr)) {
+    // e.g. "0,570" rarely uses bare "L" unless liquid; keep as L
+    return 'L';
+  }
+  return normalized;
+}
+
+function digitEditDistance(a: number, b: number): number {
+  const sa = a.toFixed(2);
+  const sb = b.toFixed(2);
+  if (sa === sb) return 0;
+  const m = sa.length;
+  const n = sb.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = sa[i - 1] === sb[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+function hasSingle6vs8Substitution(a: number, b: number): 'a_is_8' | 'b_is_8' | null {
+  const sa = a.toFixed(2);
+  const sb = b.toFixed(2);
+  if (sa.length !== sb.length) return null;
+  let diffIdx = -1;
+  for (let i = 0; i < sa.length; i++) {
+    if (sa[i] !== sb[i]) {
+      if (diffIdx !== -1) return null;
+      diffIdx = i;
+    }
+  }
+  if (diffIdx === -1) return null;
+  if (sa[diffIdx] === '8' && sb[diffIdx] === '6') return 'a_is_8';
+  if (sa[diffIdx] === '6' && sb[diffIdx] === '8') return 'b_is_8';
+  return null;
+}
+
+function pickPreferredSingleUnitPrice(unitPrice: number, totalPrice: number): number {
+  if (Math.abs(unitPrice - totalPrice) < 0.005) return totalPrice;
+  if (digitEditDistance(unitPrice, totalPrice) !== 1) return totalPrice;
+
+  const sub68 = hasSingle6vs8Substitution(unitPrice, totalPrice);
+  if (sub68 === 'a_is_8') return unitPrice;
+  if (sub68 === 'b_is_8') return totalPrice;
+
+  const sa = unitPrice.toFixed(2);
+  const sb = totalPrice.toFixed(2);
+  if (sa.length === sb.length) {
+    const scoreEnding = (s: string): number => {
+      if (s.endsWith('9') || s.endsWith('0')) return 2;
+      if (s.endsWith('5')) return 1;
+      return 0;
+    };
+    const scoreA = scoreEnding(sa);
+    const scoreB = scoreEnding(sb);
+    if (scoreA !== scoreB) return scoreA > scoreB ? unitPrice : totalPrice;
+  }
+
+  return totalPrice;
+}
+
+function reconcileReceiptAmounts(params: {
+  qty: number;
+  unit: string;
+  unitPrice: number | null;
+  totalPrice: number;
+  priceCount: number;
+}): { qty: number; unitPrice: number; totalPrice: number } {
+  let { qty, unit, unitPrice, totalPrice, priceCount } = params;
+
+  // 1. Clean up discrete-unit fractional OCR noise (e.g. "1.009 Un" or "1.600 Un x 8,49 8,49")
+  if (DISCRETE_UNITS.has(unit) && qty > 0 && Math.abs(qty - Math.round(qty)) > 0.001) {
+    if (unitPrice != null && unitPrice > 0 && totalPrice > 0) {
+      const ratio = totalPrice / unitPrice;
+      if (Math.abs(ratio - Math.round(ratio)) <= 0.08 && Math.round(ratio) >= 1) {
+        qty = Math.round(ratio);
+      } else if (Math.abs(qty - Math.round(qty)) <= 0.08) {
+        qty = Math.max(1, Math.round(qty));
+      }
+    } else if (Math.abs(qty - Math.round(qty)) <= 0.08) {
+      qty = Math.max(1, Math.round(qty));
+    }
+  }
+
+  // 2. If only 1 price was present on the line and qty > 1, multiply unitPrice * qty
+  if (
+    qty > 1 &&
+    unitPrice != null &&
+    unitPrice > 0 &&
+    (priceCount === 1 || totalPrice <= unitPrice)
+  ) {
+    if (
+      priceCount >= 2 &&
+      DISCRETE_UNITS.has(unit) &&
+      Math.abs(totalPrice - unitPrice) <= 0.02
+    ) {
+      // Both unitPrice and totalPrice columns say the exact same amount -> qty was misread (e.g. "4,000" instead of "1,000")
+      qty = 1;
+    } else {
+      const computed = Number((unitPrice * qty).toFixed(2));
+      return { qty, unitPrice, totalPrice: computed };
+    }
+  }
+
+  if (unitPrice == null || unitPrice <= 0) {
+    const derivedUp = qty > 0 ? totalPrice / qty : totalPrice;
+    return { qty, unitPrice: derivedUp, totalPrice };
+  }
+
+  if (Math.abs(qty - 1) <= 0.01) {
+    const chosen = pickPreferredSingleUnitPrice(unitPrice, totalPrice);
+    return { qty: 1, unitPrice: chosen, totalPrice: chosen };
+  }
+
+  // 3. Reconcile unitPrice * qty against totalPrice when both columns were captured
+  const expectedTot = Number((qty * unitPrice).toFixed(2));
+  if (Math.abs(expectedTot - totalPrice) <= 0.02) {
+    return { qty, unitPrice, totalPrice };
+  }
+
+  // Huge magnitude mismatch (e.g. 0.084 * 84.90 = 7.13 vs OCR "71.13" or "1.13")
+  if (
+    expectedTot > 0 &&
+    expectedTot < 10000 &&
+    (totalPrice > expectedTot * 4 || totalPrice < expectedTot * 0.25)
+  ) {
+    return { qty, unitPrice, totalPrice: expectedTot };
+  }
+
+  if (qty > 0) {
+    const impliedUp = Number((totalPrice / qty).toFixed(2));
+    const dTot = digitEditDistance(expectedTot, totalPrice);
+    const dUp = digitEditDistance(impliedUp, unitPrice);
+    if (dTot === 1 && dUp >= 2) {
+      return { qty, unitPrice, totalPrice: expectedTot };
+    }
+    if (dUp === 1 && dTot >= 2) {
+      return { qty, unitPrice: impliedUp, totalPrice };
+    }
+    if (dTot === 1 && dUp === 1) {
+      const subUp = hasSingle6vs8Substitution(impliedUp, unitPrice);
+      if (subUp === 'a_is_8') {
+        return { qty, unitPrice: impliedUp, totalPrice };
+      }
+      const subTot = hasSingle6vs8Substitution(expectedTot, totalPrice);
+      if (subTot === 'a_is_8') {
+        return { qty, unitPrice, totalPrice: expectedTot };
+      }
+    }
+  }
+
+  return { qty, unitPrice, totalPrice };
+}
+
 export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   if (!rawText.trim()) return [];
 
@@ -1289,10 +1598,14 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
     unit: string;
     unitPrice: number | null;
   } | null = null;
+  let inReceiptFooter = false;
 
   const priceRegex = /(\d{1,3}(?:\.\d{3})*[,.]\d{2})\b/g;
   const qtyMultiplierRegex =
-    /(\d+(?:[,.]\d+)?)\s*(un|und|unid|kg|g|l|lt|ml|pc|pct|cx|emb|dz|fd|bdj)?\s*[xX*]\s*(\d+[,.]\d{2,4})/i;
+    /(\d+(?:[,.]\d+)?)\s*(un|um|ln|on|und|unid|kg|ka|k3|kq|ha|bg|ng|g|l|lt|ml|pc|pct|cx|emb|dz|fd|bdj)?\s*[xX*×]\s*(\d+[,.]\d{2,4})/i;
+  // Fallback for 2nd-line detail rows where OCR turned 'x' into 'à'/'a'/'»'/'nx' or dropped it
+  const detailLineStartRegex =
+    /^[\s|:=•&$-]*(\d+(?:[,.]\d+)?)\s*(un|um|ln|on|und|unid|kg|ka|k3|kq|ha|bg|ng|g|gr|l|lt|ml|pc|pct|cx|emb|dz|fd|bdj)\b(?:\s*(?:[xX*×àa»]|nx)\b)?\s*(\d+[,.]\d{2,4})?/i;
   const sefazDetailRegex =
     /\b(?:qtde?|quant(?:idade)?)\.?\s*:?\s*\d|\bvl\.?\s*unit\.?\s*:|\bun\s*:\s*[a-z]{1,6}\b/i;
   const sefazItemTotalLabelRegex =
@@ -1336,6 +1649,19 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   for (const line of lines) {
     const rawLine = repairOcrPricesInLine(line);
 
+    if (
+      inReceiptFooter &&
+      /\b(?:documento\s+auxiliar|danfe|nota\s+fiscal|cupom\s+fiscal)\b/i.test(
+        rawLine,
+      )
+    ) {
+      inReceiptFooter = false;
+    }
+
+    if (inReceiptFooter) {
+      continue;
+    }
+
     // Handle SEFAZ copied "Vl. Total" / "Vl. Total: 29,94" line for an active pending item
     const itemTotalMatch = sefazItemTotalLabelRegex.exec(rawLine);
     if (itemTotalMatch && pendingProductName && !isTotalProductName(pendingProductName)) {
@@ -1363,6 +1689,15 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           pendingSefazDetail = null;
         }
       }
+      continue;
+    }
+
+    if (
+      (items.length > 0 || pendingProductName != null) &&
+      isReceiptFooterBoundary(rawLine)
+    ) {
+      flushPendingSefazDetail();
+      inReceiptFooter = true;
       continue;
     }
 
@@ -1445,54 +1780,73 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
     }
 
     const qtyMatch = qtyMultiplierRegex.exec(rawLine);
-    const nameBeforeQty = qtyMatch
+    const detailStartMatch = detailLineStartRegex.exec(rawLine);
+    const beforeQtyCleaned = qtyMatch
       ? cleanReceiptProductName(rawLine.slice(0, qtyMatch.index).trim())
       : '';
-    if (
-      qtyMatch &&
-      nameBeforeQty.length < 2 &&
-      pendingProductName &&
-      !isTotalProductName(pendingProductName)
-    ) {
-      const matches = Array.from(rawLine.matchAll(priceRegex));
-      if (matches.length > 0) {
-        const parsedPrice = AppFormatters.parsePrice(
-          matches[matches.length - 1][1],
-        );
-        if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
-          const unitStr = AppFormatters.normalizeUnit(qtyMatch[2] ?? 'un');
-          const parsedQty =
-            AppFormatters.parseQuantity(qtyMatch[1], unitStr) ?? 1.0;
-          const itemIdx = pendingItemIndex ?? extractItemIndex(rawLine);
-          const parsedUnitPrice = qtyMatch[3]
-            ? AppFormatters.parsePrice(qtyMatch[3])
-            : null;
-          const effectiveTotalPrice =
-            parsedQty > 1 &&
-            parsedUnitPrice != null &&
-            (parsedPrice <= parsedUnitPrice || matches.length === 1)
-              ? Number((parsedUnitPrice * parsedQty).toFixed(2))
-              : parsedPrice;
-          const effectiveUnitPrice =
-            parsedUnitPrice ??
-            (parsedQty > 0
-              ? effectiveTotalPrice / parsedQty
-              : effectiveTotalPrice);
+    const isDetailLineBeforeQtyNoise =
+      qtyMatch != null &&
+      pendingProductName != null &&
+      (beforeQtyCleaned.length < 2 ||
+        (beforeQtyCleaned.length <= 2 && !/^[a-zA-ZÀ-ÿ]{2,}$/.test(beforeQtyCleaned)) ||
+        /^(?:és|às|os|as|o|a|e|é|em|de|se|sã|â|sa)$/i.test(beforeQtyCleaned));
+    const activeDetailMatch = isDetailLineBeforeQtyNoise
+      ? qtyMatch
+      : detailStartMatch;
 
-          items.push({
-            name: pendingProductName,
-            price: effectiveTotalPrice,
-            unitPrice: effectiveUnitPrice,
-            quantity: parsedQty > 0 ? parsedQty : 1.0,
+    if (activeDetailMatch) {
+      if (pendingProductName && !isTotalProductName(pendingProductName)) {
+        const matches = Array.from(rawLine.matchAll(priceRegex));
+        const unitStr = normalizeOcrUnit(
+          activeDetailMatch[2] ?? 'un',
+          activeDetailMatch[1],
+        );
+        const parsedQty =
+          AppFormatters.parseQuantity(activeDetailMatch[1], unitStr) ?? 1.0;
+        const parsedUnitPrice = activeDetailMatch[3]
+          ? AppFormatters.parsePrice(activeDetailMatch[3])
+          : null;
+        const parsedPrice =
+          matches.length > 0
+            ? AppFormatters.parsePrice(matches[matches.length - 1][1])
+            : parsedUnitPrice;
+        // If unitPrice has 3+ decimals (e.g. "5,729"), priceRegex only matches totalPrice ("10.58"),
+        // so count unitPrice + trailing totalPrice as 2 distinct price columns.
+        const detailEndIdx = activeDetailMatch.index + activeDetailMatch[0].length;
+        const hasSeparateTrailingTotal =
+          parsedUnitPrice != null &&
+          matches.some((m) => (m.index ?? 0) >= detailEndIdx);
+        const effectivePriceCount = hasSeparateTrailingTotal
+          ? Math.max(2, matches.length)
+          : matches.length;
+
+        if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
+          const reconciled = reconcileReceiptAmounts({
+            qty: parsedQty > 0 ? parsedQty : 1.0,
             unit: unitStr || 'un',
-            category: CategoryClassifier.classify(pendingProductName),
-            itemIndex: itemIdx,
+            unitPrice: parsedUnitPrice,
+            totalPrice: parsedPrice,
+            priceCount: effectivePriceCount,
           });
-          pendingProductName = null;
-          pendingItemIndex = undefined;
-          pendingSefazDetail = null;
-          continue;
+          if (reconciled.totalPrice > 0 && reconciled.totalPrice < 10000) {
+            items.push({
+              name: pendingProductName,
+              price: reconciled.totalPrice,
+              unitPrice: reconciled.unitPrice,
+              quantity: reconciled.qty,
+              unit: unitStr || 'un',
+              category: CategoryClassifier.classify(pendingProductName),
+              itemIndex: pendingItemIndex ?? extractItemIndex(rawLine),
+            });
+            pendingProductName = null;
+            pendingItemIndex = undefined;
+            pendingSefazDetail = null;
+            continue;
+          }
         }
+      } else if (detailStartMatch) {
+        // Pure quantity/price detail line without a valid product header: never turn "Ka X 16,890" into an item name
+        continue;
       }
     }
 
@@ -1508,7 +1862,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
       let parsedUnitPrice: number | null = pendingSefazDetail?.unitPrice ?? null;
       if (qtyMatch && qtyMatch.index < (firstMatch.index ?? 0)) {
         beforePrices = rawLine.slice(0, qtyMatch.index).trim();
-        parsedUnit = AppFormatters.normalizeUnit(qtyMatch[2] ?? 'un');
+        parsedUnit = normalizeOcrUnit(qtyMatch[2] ?? 'un', qtyMatch[1]);
         parsedQty =
           AppFormatters.parseQuantity(qtyMatch[1], parsedUnit) ?? 1.0;
         if (qtyMatch[3]) {
@@ -1523,7 +1877,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
             ? trailingWeightQtyRegex.exec(beforePrices)
             : null);
         if (tabMatch) {
-          const u = AppFormatters.normalizeUnit(tabMatch[2]);
+          const u = normalizeOcrUnit(tabMatch[2], tabMatch[1]);
           const q = AppFormatters.parseQuantity(tabMatch[1], u);
           if (q != null && q > 0) {
             parsedQty = q;
@@ -1543,25 +1897,21 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
       const cleanedName = cleanReceiptProductName(beforePrices);
 
       if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
-        const effectiveTotalPrice =
-          parsedQty > 1 &&
-          parsedUnitPrice != null &&
-          parsedPrice <= parsedUnitPrice
-            ? Number((parsedUnitPrice * parsedQty).toFixed(2))
-            : parsedPrice;
-        const effectiveUnitPrice =
-          parsedUnitPrice ??
-          (parsedQty > 0
-            ? effectiveTotalPrice / parsedQty
-            : effectiveTotalPrice);
+        const reconciled = reconcileReceiptAmounts({
+          qty: parsedQty > 0 ? parsedQty : 1.0,
+          unit: parsedUnit || 'un',
+          unitPrice: parsedUnitPrice,
+          totalPrice: parsedPrice,
+          priceCount: priceMatches.length,
+        });
 
         if (cleanedName.length >= 2 && !isTotalProductName(cleanedName)) {
           flushPendingSefazDetail();
           items.push({
             name: cleanedName,
-            price: effectiveTotalPrice,
-            unitPrice: effectiveUnitPrice,
-            quantity: parsedQty > 0 ? parsedQty : 1.0,
+            price: reconciled.totalPrice,
+            unitPrice: reconciled.unitPrice,
+            quantity: reconciled.qty,
             unit: parsedUnit || 'un',
             category: CategoryClassifier.classify(cleanedName),
             itemIndex: lineItemIdx,
@@ -1576,9 +1926,9 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
         ) {
           items.push({
             name: pendingProductName,
-            price: effectiveTotalPrice,
-            unitPrice: effectiveUnitPrice,
-            quantity: parsedQty > 0 ? parsedQty : 1.0,
+            price: reconciled.totalPrice,
+            unitPrice: reconciled.unitPrice,
+            quantity: reconciled.qty,
             unit: parsedUnit || 'un',
             category: CategoryClassifier.classify(pendingProductName),
             itemIndex: pendingItemIndex ?? lineItemIdx,
@@ -1603,46 +1953,122 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   flushPendingSefazDetail();
 
   const filtered = items.filter((item) => !isTotalProductName(item.name));
-
-  const indexedCount = filtered.filter((it) => it.itemIndex != null).length;
-  if (indexedCount >= 2 && indexedCount >= filtered.length * 0.5) {
-    let lastIdx = 0;
-    for (const it of filtered) {
-      if (it.itemIndex != null) {
-        lastIdx = it.itemIndex;
-      } else {
-        lastIdx++;
-        it.itemIndex = lastIdx;
-      }
-    }
-    filtered.sort((a, b) => (a.itemIndex ?? 0) - (b.itemIndex ?? 0));
-  } else {
-    for (let i = 0; i < filtered.length; i++) {
-      filtered[i].itemIndex = i + 1;
-    }
+  for (let i = 0; i < filtered.length; i++) {
+    filtered[i].itemIndex = i + 1;
   }
 
   return accumulateScannedItems(filtered);
 }
 
+export function computeReceiptTargetDimensions(
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  const minSide = Math.max(1, Math.min(width, height));
+  const maxSide = Math.max(1, Math.max(width, height));
+  const desiredMinSide = 1350;
+  const maxDim = 3200;
+
+  let scale = minSide < desiredMinSide ? desiredMinSide / minSide : 1;
+  if (maxSide * scale > maxDim) {
+    scale = maxDim / maxSide;
+  }
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+export function applyLocalSauvolaSoftContrast(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8ClampedArray {
+  const totalPixels = width * height;
+  const luma = new Float32Array(totalPixels);
+  for (let i = 0; i < totalPixels; i++) {
+    const idx = i * 4;
+    luma[i] = 0.299 * rgba[idx] + 0.587 * rgba[idx + 1] + 0.114 * rgba[idx + 2];
+  }
+
+  const stride = width + 1;
+  const sum = new Float64Array(stride * (height + 1));
+  const sumSq = new Float64Array(stride * (height + 1));
+
+  for (let y = 1; y <= height; y++) {
+    let rowSum = 0;
+    let rowSq = 0;
+    const srcRow = (y - 1) * width;
+    const dstRow = y * stride;
+    const prevRow = (y - 1) * stride;
+    for (let x = 1; x <= width; x++) {
+      const v = luma[srcRow + (x - 1)];
+      rowSum += v;
+      rowSq += v * v;
+      sum[dstRow + x] = sum[prevRow + x] + rowSum;
+      sumSq[dstRow + x] = sumSq[prevRow + x] + rowSq;
+    }
+  }
+
+  const radius = Math.max(18, Math.min(36, Math.round(Math.min(width, height) * 0.022)));
+  const out = new Uint8ClampedArray(rgba.length);
+
+  for (let y = 0; y < height; y++) {
+    const y0 = Math.max(0, y - radius);
+    const y1 = Math.min(height - 1, y + radius);
+    const r0 = y0 * stride;
+    const r1 = (y1 + 1) * stride;
+    const rowLen = y1 - y0 + 1;
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.max(0, x - radius);
+      const x1 = Math.min(width - 1, x + radius);
+      const count = rowLen * (x1 - x0 + 1);
+      const s = sum[r1 + x1 + 1] - sum[r0 + x1 + 1] - sum[r1 + x0] + sum[r0 + x0];
+      const sq = sumSq[r1 + x1 + 1] - sumSq[r0 + x1 + 1] - sumSq[r1 + x0] + sumSq[r0 + x0];
+      const mean = s / count;
+      const std = Math.sqrt(Math.max(0, sq / count - mean * mean));
+      const sauvola = mean * (1 + 0.12 * (std / 128 - 1));
+      const diff = luma[y * width + x] - sauvola;
+      const gain = std < 10 ? 2.2 : 4.2;
+      const mapped = Math.max(0, Math.min(255, Math.round(165 + diff * gain)));
+      const idx = (y * width + x) * 4;
+      out[idx] = mapped;
+      out[idx + 1] = mapped;
+      out[idx + 2] = mapped;
+      out[idx + 3] = 255;
+    }
+  }
+
+  return out;
+}
+
 /**
- * Client-side OCR fallback using Tesseract.js with canvas preprocessing
- * (grayscale + contrast boost) for browser/PWA environments.
+ * Client-side OCR using Tesseract.js with receipt-tuned preprocessing
+ * (adaptive upscaling, local Sauvola illumination normalization, quiet-zone
+ * padding, lossless PNG, and single-column page segmentation).
  */
 export async function recognizeTextFromImageFile(
   file: File,
   onProgress?: (progress: number) => void,
 ): Promise<string> {
-  const { createWorker } = await import('tesseract.js');
+  const { createWorker, PSM } = await import('tesseract.js');
+  onProgress?.(5);
   const preprocessedUrl = await preprocessImageForOcr(file);
+  onProgress?.(12);
   const worker = await createWorker('por', undefined, {
     logger: (m) => {
       if (m.status === 'recognizing text' && onProgress) {
-        onProgress(Math.round((m.progress ?? 0) * 100));
+        onProgress(12 + Math.round((m.progress ?? 0) * 88));
       }
     },
   });
   try {
+    await worker.setParameters({
+      tessedit_pageseg_mode: PSM.SINGLE_COLUMN,
+      preserve_interword_spaces: '1',
+      user_defined_dpi: '300',
+    });
     const {
       data: { text },
     } = await worker.recognize(preprocessedUrl);
@@ -1665,39 +2091,48 @@ async function preprocessImageForOcr(file: File): Promise<string> {
       el.src = imgUrl;
     });
 
-    const maxDim = 2200;
-    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-    const width = Math.max(1, Math.round(img.width * scale));
-    const height = Math.max(1, Math.round(img.height * scale));
+    const { width, height } = computeReceiptTargetDimensions(
+      img.width,
+      img.height,
+    );
+    const pad = 36;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return imgUrl;
+    const workCanvas = document.createElement('canvas');
+    workCanvas.width = width;
+    workCanvas.height = height;
+    const workCtx = workCanvas.getContext('2d');
+    if (!workCtx) return imgUrl;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(img, 0, 0, width, height);
+    workCtx.fillStyle = '#FFFFFF';
+    workCtx.fillRect(0, 0, width, height);
+    workCtx.imageSmoothingEnabled = true;
+    workCtx.imageSmoothingQuality = 'high';
+    workCtx.drawImage(img, 0, 0, width, height);
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = width + pad * 2;
+    outCanvas.height = height + pad * 2;
+    const outCtx = outCanvas.getContext('2d');
+    if (!outCtx) return imgUrl;
+
+    outCtx.fillStyle = '#FFFFFF';
+    outCtx.fillRect(0, 0, outCanvas.width, outCanvas.height);
 
     try {
-      const imageData = ctx.getImageData(0, 0, width, height);
-      const data = imageData.data;
-      const contrast = 1.45;
-      for (let i = 0; i < data.length; i += 4) {
-        const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        const boosted = Math.max(0, Math.min(255, (luma - 128) * contrast + 128));
-        data[i] = boosted;
-        data[i + 1] = boosted;
-        data[i + 2] = boosted;
-      }
-      ctx.putImageData(imageData, 0, 0);
+      const imageData = workCtx.getImageData(0, 0, width, height);
+      const normalized = applyLocalSauvolaSoftContrast(
+        imageData.data,
+        width,
+        height,
+      );
+      const outData = new ImageData(normalized, width, height);
+      outCtx.putImageData(outData, pad, pad);
     } catch {
-      // Fallback if tainted canvas
+      outCtx.drawImage(workCanvas, pad, pad);
     }
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', 0.92),
+      outCanvas.toBlob(resolve, 'image/png'),
     );
     if (!blob) return imgUrl;
     URL.revokeObjectURL(imgUrl);

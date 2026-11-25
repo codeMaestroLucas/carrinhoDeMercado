@@ -295,6 +295,10 @@ export const COMMON_ABBREVIATIONS: Record<string, string> = {
   roupa: 'roupas',
   louc: 'loucas',
   louca: 'loucas',
+  paraf: 'parafuso',
+  tesou: 'tesoura',
+  ft: 'fatiado',
+  bco: 'branco',
 };
 
 export const DEFAULT_KEYWORD_DICTIONARY: Record<ProductCategoryId, string[]> = {
@@ -367,8 +371,12 @@ export const DEFAULT_KEYWORD_DICTIONARY: Record<ProductCategoryId, string[]> = {
     'panela', 'frigideira', 'copo de vidro', 'xícara', 'xicara', 'caneca',
     'prato', 'talher', 'faca', 'garfo', 'colher', 'abridor', 'tábua',
     'tabua', 'jarra', 'garrafa térmica', 'garrafa termica', 'pano de prato',
-    'toalha', 'cabide', 'fita adesiva', 'super bonder', 'cola escolar',
-    'cola bastão', 'extensão', 'extensao', 'adaptador', 'caderno', 'caneta',
+    'toalha', 'cabide', 'fita adesiva', 'fita dupla face', 'fita isolante',
+    'super bonder', 'cola escolar', 'cola bastão', 'extensão', 'extensao',
+    'adaptador', 'filtro de linha', 'tomada', 'pino t', 'pino 3 saidas',
+    'pino adaptador', 'parafuso', 'prego', 'alicate', 'estilete',
+    'chave allen', 'chave de fenda', 'tesoura', 'wd-40', 'desengripante',
+    'tramontina', 'ferramenta', 'caderno', 'caneta',
   ],
   hortifruti: [
     'tomate', 'cebola', 'alho', 'alface', 'rúcula', 'rucula', 'agrião',
@@ -428,7 +436,7 @@ export const DEFAULT_KEYWORD_DICTIONARY: Record<ProductCategoryId, string[]> = {
     'batata palha', 'batata frita', 'batata chips', 'chips batata',
     'chips de batata', 'pimenta', 'cominho', 'colorau', 'páprica',
     'paprica', 'caldo knorr', 'tempero', 'sazon', 'castanha', 'amendoim',
-    'nozes', 'pipoca', 'salgadinho', 'doritos', 'ruffles', 'cheetos',
+    'nozes', 'pipoca', 'salgado', 'salgadinho', 'doritos', 'ruffles', 'cheetos',
     'pringles', 'lays', 'fandangos', 'pão de queijo', 'pao de queijo',
     'lentilha', 'grão de bico', 'grao de bico',
   ],

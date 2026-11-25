@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyLocalSauvolaSoftContrast,
   cleanReceiptProductName,
+  computeReceiptTargetDimensions,
   isTotalProductName,
   repairReceiptWord,
   mergeSplitWords,
@@ -317,6 +319,154 @@ TRIB APROX R$ 11,20 FED EST
       expect(items[4].name).toBe('Refrigerante Coca-Cola 2l');
       expect(items[4].price).toBe(9.49);
       expect(items[5].name).toBe('Melão Amarelo');
+    });
+
+    it('handles two-line NFC-e OCR noise, math reconciliation, bazar items, and footer cutoff', () => {
+      const twoLineOcr = `
+DOCUMENTO AUXILIAR
+DA NOTA FISCAL DE CONSUMIDOR ELETRONICA
+ITEM | COD | DESC | QTDE | UN | VL. UNIT | VL. TOTAL R$
+001 7897542800037 OVO BCO GRANDE C/30
+4,000 Un x 15,90 15,90
+OU: 7koG2A56065460 SALG ARR KOD 70G CEB
+2,000 Un x 5,29 10,58
+004 1230 PEI PERU D SADIA FT
+0,084 kg x 84,90 71,13
+005 3954 PINENIÃAO VERDE ka
+0,820 Kg x 10,90 8,93
+ou7 69 TOMATE SALADA kg
+0,570 Ka x 16,90 9,63
+0,570 Ka x 16,890 9,63
+008 7E37186077215 PARAFUSO+BUCHA 6MM
+1.009 Un x 8,19 6,19
+009 7891040216260 FITA DF FIXA FORTE
+1,000 Un x 39,90 39,90
+4 010 T7695493990426 EXTENSAO 1.5 20A ILU
+2,000 Un x 63,50 127,00
+2X 011 7698322644049 FILIRO LINHA S1ONADA
+2,000 Un x 46,90 43,80
+012 7897186077772 CHAVE ALLEN DOBRAVEL
+o 1.000 Un x 24,49 24,48
+22 013 7657186077222 PARAFUSO +BUCHA 8MM
+És 1.000 Un x 8,49 6,49
+Ol& 7697186obas32 ESTILETE LARGO VESTE
+1,000 Un x 16,49 16,49
+& 016 7691112027015 IESOU USO GERAL TRAM
+1,000 Un x 22,90 22,90
+018 7898193140435 DESENG WD-40 300HL
+1,000 Un x 47,90 47,90
+QID. TOTAL DE IJENS 14
+VHL OR JOTAL R$ 551,12
+VALOR A PAGAR R$ 551,12
+Cart Credito 39,90
+Cartao Alimentacao 511,22
+Ão 551,12
+Ser 551,12
+`;
+
+      const items = ReceiptScannerService.parseReceiptText(twoLineOcr);
+      expect(items).toHaveLength(14);
+
+      expect(items[0].name).toBe('Ovo Branco Grande c/30');
+      expect(items[0].quantity).toBe(1);
+      expect(items[0].price).toBe(15.9);
+      expect(items[0].category).toBe('alimentos');
+
+      expect(items[1].name).toBe('Salgado Arroz Kod 70g Cebola');
+      expect(items[1].quantity).toBe(2);
+      expect(items[1].price).toBe(10.58);
+      expect(items[1].category).toBe('alimentos');
+
+      expect(items[2].name).toBe('Peito de Peru D Sadia Fatiado');
+      expect(items[2].quantity).toBeCloseTo(0.084);
+      expect(items[2].unit).toBe('kg');
+      expect(items[2].price).toBe(7.13);
+
+      expect(items[3].name).toBe('Pimentão Verde');
+      expect(items[3].category).toBe('hortifruti');
+      expect(items[3].price).toBe(8.93);
+
+      expect(items[4].name).toBe('Tomate Salada');
+      expect(items[4].unit).toBe('kg');
+      expect(items[4].price).toBe(9.63);
+
+      // Orphaned detail line ("0,570 Ka x 16,890 9,63") must NOT create a bogus item
+      expect(items.some((it) => it.name.includes('16,890'))).toBe(false);
+
+      expect(items[5].name).toBe('Parafuso Bucha 6mm');
+      expect(items[5].quantity).toBe(1);
+      expect(items[5].price).toBe(8.19);
+      expect(items[5].category).toBe('bazar');
+
+      expect(items[6].name).toBe('Fita Dupla Face Fixa Forte');
+      expect(items[6].category).toBe('bazar');
+
+      expect(items[7].name).toBe('Extensão 1.5 20a Ilu');
+      expect(items[7].price).toBe(127);
+      expect(items[7].category).toBe('bazar');
+
+      expect(items[8].name).toBe('Filtro de Linha 5 Tomadas');
+      expect(items[8].quantity).toBe(2);
+      expect(items[8].price).toBe(93.8);
+      expect(items[8].category).toBe('bazar');
+
+      expect(items[9].name).toBe('Chave Allen Dobrável');
+      expect(items[9].price).toBe(24.49);
+      expect(items[9].category).toBe('bazar');
+
+      expect(items[10].name).toBe('Parafuso Bucha 8mm');
+      expect(items[10].price).toBe(8.49);
+      expect(items[10].category).toBe('bazar');
+
+      expect(items[11].name).toBe('Estilete Largo Veste');
+      expect(items[11].category).toBe('bazar');
+
+      expect(items[12].name).toBe('Tesoura Uso Geral Tramontina');
+      expect(items[12].category).toBe('bazar');
+
+      expect(items[13].name).toBe('Desengripante WD-40 300ml');
+      expect(items[13].price).toBe(47.9);
+      expect(items[13].category).toBe('bazar');
+    });
+  });
+
+  describe('OCR image preprocessing helpers', () => {
+    it('upscales narrow receipt images and caps oversized images', () => {
+      const narrow = computeReceiptTargetDimensions(449, 1024);
+      expect(narrow.width).toBe(1350);
+      expect(narrow.height).toBe(3079);
+
+      const large = computeReceiptTargetDimensions(3000, 4000);
+      expect(large.width).toBe(2400);
+      expect(large.height).toBe(3200);
+    });
+
+    it('normalizes uneven lighting with local Sauvola soft contrast', () => {
+      const width = 48;
+      const height = 48;
+      const rgba = new Uint8ClampedArray(width * height * 4);
+      // Simulate bright top (luma 220) and shadowed bottom (luma 110) with dark ink block in center
+      for (let y = 0; y < height; y++) {
+        const bg = y < 24 ? 220 : 110;
+        for (let x = 0; x < width; x++) {
+          const isInk = x >= 20 && x <= 26 && y >= 28 && y <= 34;
+          const v = isInk ? 35 : bg;
+          const idx = (y * width + x) * 4;
+          rgba[idx] = v;
+          rgba[idx + 1] = v;
+          rgba[idx + 2] = v;
+          rgba[idx + 3] = 255;
+        }
+      }
+
+      const out = applyLocalSauvolaSoftContrast(rgba, width, height);
+      const topBg = out[(4 * width + 4) * 4];
+      const bottomShadowBg = out[(42 * width + 4) * 4];
+      const inkPixel = out[(31 * width + 23) * 4];
+
+      expect(topBg).toBeGreaterThan(200);
+      expect(bottomShadowBg).toBeGreaterThan(190);
+      expect(inkPixel).toBeLessThan(60);
     });
   });
 });
