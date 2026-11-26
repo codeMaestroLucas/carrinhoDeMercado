@@ -1,28 +1,10 @@
 import { useState } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  ArrowDown,
-  ArrowUp,
   BookOpen,
   Cloud,
   CloudOff,
   Copy,
   Edit3,
-  GripVertical,
   Maximize2,
   Minimize2,
   Plus,
@@ -35,90 +17,13 @@ import {
 } from 'lucide-react';
 import {
   PRODUCT_CATEGORIES,
-  PRODUCT_CATEGORY_MAP,
   type ProductCategoryId,
 } from '../types/shopping';
 import { useShoppingStore } from '../store/useShoppingStore';
 import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
 import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
+import { MarketAisleReorderList } from '../components/config/MarketAisleReorderList';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
-
-function SortableCategoryRow({
-  id,
-  index,
-  total,
-  onMoveUp,
-  onMoveDown,
-}: {
-  id: ProductCategoryId;
-  index: number;
-  total: number;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
-
-  const info = PRODUCT_CATEGORY_MAP[id];
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`t-reorder-item flex cursor-grab select-none items-center gap-3 rounded-2xl border px-3.5 py-3 ${
-        isDragging
-          ? 'is-dragging'
-          : 'border-[var(--border-hairline)] bg-[var(--bg-app)] hover:border-[var(--border-subtle)]'
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)] transition-colors group-active:text-[var(--accent-fg)]"
-      >
-        <GripVertical size={16} strokeWidth={1.8} />
-      </span>
-      <span className="font-mono-tabular w-6 text-center text-xs font-semibold text-[var(--text-muted)]">
-        {String(index + 1).padStart(2, '0')}
-      </span>
-      <CategoryDot category={id} />
-      <CategoryIcon category={id} size={17} />
-      <span className="flex-1 text-sm font-medium text-[var(--text-primary)]">
-        {info.label}
-      </span>
-      <div
-        className="flex items-center gap-1"
-        onPointerDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          disabled={index === 0}
-          onClick={onMoveUp}
-          aria-label="Mover para cima"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-25"
-        >
-          <ArrowUp size={15} strokeWidth={1.8} />
-        </button>
-        <button
-          type="button"
-          disabled={index === total - 1}
-          onClick={onMoveDown}
-          aria-label="Mover para baixo"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-25"
-        >
-          <ArrowDown size={15} strokeWidth={1.8} />
-        </button>
-      </div>
-    </li>
-  );
-}
 
 export function MarketConfigPage() {
   const markets = useShoppingStore((s) => s.markets);
@@ -196,32 +101,6 @@ export function MarketConfigPage() {
     setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
     selectMarket(nextId);
     setEditingMarketName(null);
-  };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 4 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 100,
-        tolerance: 8,
-      },
-    }),
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = selectedMarket.categoryOrder.indexOf(
-      active.id as ProductCategoryId,
-    );
-    const newIndex = selectedMarket.categoryOrder.indexOf(
-      over.id as ProductCategoryId,
-    );
-    if (oldIndex !== -1 && newIndex !== -1) {
-      moveMarketCategory(selectedMarket.id, oldIndex, newIndex);
-    }
   };
 
   const handleCreateSpace = async () => {
@@ -399,33 +278,12 @@ export function MarketConfigPage() {
                 )}
               </div>
 
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={selectedMarket.categoryOrder}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <ul className="t-reorder">
-                    {selectedMarket.categoryOrder.map((catId, index) => (
-                      <SortableCategoryRow
-                        key={catId}
-                        id={catId}
-                        index={index}
-                        total={selectedMarket.categoryOrder.length}
-                        onMoveUp={() =>
-                          moveMarketCategory(selectedMarket.id, index, index - 1)
-                        }
-                        onMoveDown={() =>
-                          moveMarketCategory(selectedMarket.id, index, index + 1)
-                        }
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
+              <MarketAisleReorderList
+                categoryOrder={selectedMarket.categoryOrder}
+                onMove={(fromIndex, toIndex) =>
+                  moveMarketCategory(selectedMarket.id, fromIndex, toIndex)
+                }
+              />
               </div>
             </section>
           </div>
