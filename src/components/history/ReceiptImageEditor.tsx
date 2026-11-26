@@ -377,10 +377,14 @@ export function ReceiptImageEditor({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex flex-col bg-[#0B0B0D]/95 text-[#F5F5F7] backdrop-blur-md"
+      className="fixed inset-0 z-[70] flex flex-col bg-[#0B0B0D]/95 text-[#F5F5F7] backdrop-blur-md touch-none select-none"
       role="dialog"
       aria-modal="true"
       aria-label="Editar foto do cupom"
+      data-disable-pull-to-refresh="true"
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       {/* Top Bar */}
       <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">

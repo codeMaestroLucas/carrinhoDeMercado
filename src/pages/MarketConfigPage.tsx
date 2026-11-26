@@ -66,19 +66,22 @@ function SortableCategoryRow({
   };
 
   return (
-    <div
+    <li
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className={`flex cursor-grab select-none items-center gap-3 rounded-2xl border px-3.5 py-3 transition-[background-color,border-color,box-shadow] duration-150 ease-ui active:cursor-grabbing ${
+      className={`t-reorder-item flex cursor-grab select-none items-center gap-3 rounded-2xl border px-3.5 py-3 ${
         isDragging
-          ? 'z-10 border-[var(--accent)] bg-[var(--bg-surface)] shadow-lg'
+          ? 'is-dragging'
           : 'border-[var(--border-hairline)] bg-[var(--bg-app)] hover:border-[var(--border-subtle)]'
       }`}
     >
-      <span aria-hidden="true" className="text-[var(--text-muted)]">
-        <GripVertical size={16} strokeWidth={1.7} />
+      <span
+        aria-hidden="true"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-subtle)] text-[var(--text-muted)] transition-colors group-active:text-[var(--accent-fg)]"
+      >
+        <GripVertical size={16} strokeWidth={1.8} />
       </span>
       <span className="font-mono-tabular w-6 text-center text-xs font-semibold text-[var(--text-muted)]">
         {String(index + 1).padStart(2, '0')}
@@ -91,6 +94,8 @@ function SortableCategoryRow({
       <div
         className="flex items-center gap-1"
         onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <button
           type="button"
@@ -111,7 +116,7 @@ function SortableCategoryRow({
           <ArrowDown size={15} strokeWidth={1.8} />
         </button>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -194,9 +199,14 @@ export function MarketConfigPage() {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 150, tolerance: 5 },
+      activationConstraint: {
+        delay: 100,
+        tolerance: 8,
+      },
     }),
   );
 
@@ -398,7 +408,7 @@ export function MarketConfigPage() {
                   items={selectedMarket.categoryOrder}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-2">
+                  <ul className="t-reorder">
                     {selectedMarket.categoryOrder.map((catId, index) => (
                       <SortableCategoryRow
                         key={catId}
@@ -413,7 +423,7 @@ export function MarketConfigPage() {
                         }
                       />
                     ))}
-                  </div>
+                  </ul>
                 </SortableContext>
               </DndContext>
               </div>

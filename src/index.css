@@ -48,6 +48,16 @@
     /* Semantic signals */
     --positive: #167A3E;
     --positive-hover: #126332;
+
+    /* To-do reorder motion tokens (transitions.dev) */
+    --reorder-shift: 220ms;
+    --reorder-lift-dur: 180ms;
+    --reorder-drop: 260ms;
+    --reorder-lift: 1.025;
+    --reorder-tilt: 0.6deg;
+    --reorder-gap: 8px;
+    --reorder-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --reorder-drop-ease: cubic-bezier(0.22, 1, 0.36, 1);
     --positive-soft: #E9F7EF;
 
     --negative: #D92D20;
@@ -608,7 +618,69 @@
   pointer-events: auto;
 }
 
+/* transitions.dev — To-do reorder namespaced CSS (.t-*) */
+.t-reorder {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--reorder-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.t-reorder-item {
+  position: relative;
+  z-index: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  transition:
+    transform var(--reorder-shift) var(--reorder-ease),
+    box-shadow var(--reorder-lift-dur) var(--reorder-ease),
+    background-color 160ms var(--reorder-ease),
+    border-color 160ms var(--reorder-ease);
+  will-change: transform;
+}
+
+.t-reorder-item.is-dragging {
+  z-index: 20 !important;
+  cursor: grabbing !important;
+  transform:
+    translate3d(0, var(--dy, 0px), 0)
+    scale(var(--reorder-lift))
+    rotate(var(--reorder-tilt)) !important;
+  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(25, 128, 66, 0.12) !important;
+  border-color: var(--accent) !important;
+  background-color: var(--bg-surface) !important;
+  transition:
+    box-shadow var(--reorder-lift-dur) var(--reorder-ease),
+    border-color var(--reorder-lift-dur) var(--reorder-ease) !important;
+}
+
+.t-reorder-item.is-settling {
+  z-index: 10;
+  animation: t-reorder-land var(--reorder-drop) var(--reorder-drop-ease) forwards;
+}
+
+@keyframes t-reorder-land {
+  from {
+    transform:
+      translate3d(0, var(--dy, 0px), 0)
+      scale(var(--reorder-lift))
+      rotate(var(--reorder-tilt));
+  }
+  to {
+    transform: translate3d(0, var(--rest, 0px), 0) scale(1) rotate(0deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .t-reorder-item {
+    transition: none !important;
+    animation: none !important;
+  }
+
   .animate-enter,
   .animate-photo-settle,
   .animate-modal-in,

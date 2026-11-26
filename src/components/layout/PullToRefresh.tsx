@@ -20,6 +20,11 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isRefreshing) return;
     if (typeof window !== 'undefined' && window.scrollY > 2) return;
+    // Do not initiate pull-to-refresh if touching an open dialog/editor (e.g. ReceiptImageEditor)
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('[role="dialog"], [data-disable-pull-to-refresh="true"]')) {
+      return;
+    }
     const touch = e.touches[0];
     if (!touch) return;
     startYRef.current = touch.clientY;
