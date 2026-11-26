@@ -428,6 +428,105 @@ Ser 551,12
       expect(items[13].price).toBe(47.9);
       expect(items[13].category).toBe('bazar');
     });
+
+    it('parses Dona de Casa thermal receipt with OCR distortions, barcodes, and weighed items', () => {
+      const donaDeCasaOcr = `
+CNPJ do Emitente 11.832.478/0015-08
+DONA DE CASA S/A
+RUA Q SEPN 506 BLOCO A LOJA 1 2 3 4, SN, ASA NORTE -
+BRASILIA DF, FONE (61)32464250
+Documento Auxiliar da Nota Fiscal de Consumidor Eletronica
+25/11/26 18:05:27 LJ 00014 PDV 001 DOC 95134 OP FISCAL SELF CHEC
+# | COD | DESCRICAO DO ITEM | QTD| UN | VL UNIT R$ | VL TOTAL R$
+Cooi 7bsbes3btib7t Queijo Nacon 200g Parmesao 1un 34.99 34.99
+Creme de Leite Ifálac 200g TP 1UN 4.49 4.49
+Co3 7bcscbogso222 Creme de Leite Italac 200g TP 1un 4.49 4.49
+7bsbobos4c222 Creme de Leite Italac 200g Tipo 1un 4.49 4.49
+005 33 Alho Ko O,iiok6 59,99 6,60
+006 82 Limão Siciliano Kg O,19ok6 19,90 3,78
+007 3 Cebola Ka O,336k6 14,99 5,04
+Dos 29404 Sacola Reutilizavel Und 2un 0,22 0,44
+Qtde. Total de Itens 8
+Velor É Pegar 64,32
+Cartao Debito 64,32
+`;
+
+      const items = ReceiptScannerService.parseReceiptText(donaDeCasaOcr);
+
+      // Footer "Velor É Pegar 64,32" and payment lines MUST NOT be parsed as items
+      expect(items.some((it) => /velor|pegar|debito|cartao/i.test(it.name))).toBe(false);
+
+      // Queijo Nacon
+      const queijo = items.find((it) => it.name.includes('Queijo'));
+      expect(queijo).toBeDefined();
+      expect(queijo?.name).toBe('Queijo Nacon 200g Parmesão');
+      expect(queijo?.price).toBe(34.99);
+      expect(queijo?.quantity).toBe(1);
+
+      // Creme de Leite Italac - 3 lines of 4.49 consolidated into 3 un, R$ 13.47
+      const cremeLeite = items.find((it) => it.name.includes('Creme de Leite'));
+      expect(cremeLeite).toBeDefined();
+      expect(cremeLeite?.name).toBe('Creme de Leite Italac 200g');
+      expect(cremeLeite?.quantity).toBe(3);
+      expect(cremeLeite?.price).toBe(13.47);
+      expect(cremeLeite?.unitPrice).toBe(4.49);
+
+      // Alho weighed (0.110 kg at 59.99/kg = 6.60)
+      const alho = items.find((it) => it.name.includes('Alho'));
+      expect(alho).toBeDefined();
+      expect(alho?.name).toBe('Alho');
+      expect(alho?.unit).toBe('kg');
+      expect(alho?.quantity).toBeCloseTo(0.11, 2);
+      expect(alho?.price).toBe(6.6);
+
+      // Limão Siciliano weighed (0.190 kg at 19.90/kg = 3.78)
+      const limao = items.find((it) => it.name.includes('Limão'));
+      expect(limao).toBeDefined();
+      expect(limao?.name).toBe('Limão Siciliano');
+      expect(limao?.unit).toBe('kg');
+      expect(limao?.quantity).toBeCloseTo(0.19, 2);
+      expect(limao?.price).toBe(3.78);
+
+      // Cebola weighed (0.336 kg at 14.99/kg = 5.04)
+      const cebola = items.find((it) => it.name.includes('Cebola'));
+      expect(cebola).toBeDefined();
+      expect(cebola?.name).toBe('Cebola');
+      expect(cebola?.unit).toBe('kg');
+      expect(cebola?.quantity).toBeCloseTo(0.336, 3);
+      expect(cebola?.price).toBe(5.04);
+
+      // Sacola Reutilizável (2 un at 0.22 = 0.44)
+      const sacola = items.find((it) => it.name.includes('Sacola'));
+      expect(sacola).toBeDefined();
+      expect(sacola?.name).toBe('Sacola Reutilizável');
+      expect(sacola?.quantity).toBe(2);
+      expect(sacola?.price).toBe(0.44);
+
+      // Total items identified = 6 consolidated items
+      expect(items).toHaveLength(6);
+      const total = items.reduce((acc, it) => acc + it.price, 0);
+      expect(total).toBeCloseTo(64.32, 2);
+    });
+
+    it('corrects hardware dimensions like 6mm (Gnmh) and 8mm (Bhn) and discrete unit noise', () => {
+      expect(cleanReceiptProductName('PARAFUSO BUCHA GNMH')).toBe('Parafuso Bucha 6mm');
+      expect(cleanReceiptProductName('PARAFUSO BUCHA BHN')).toBe('Parafuso Bucha 8mm');
+      expect(cleanReceiptProductName('PARAFUSO+BUCHA 6MM')).toBe('Parafuso Bucha 6mm');
+      expect(cleanReceiptProductName('PARAFUSO +BUCHA 8MM')).toBe('Parafuso Bucha 8mm');
+
+      // Test Prego Ferro discrete unit noise (1,609 un -> 1 un at R$ 8.49)
+      const pregoOcr = `
+019 7897186059013 PREGO FERRO 40MM 45P
+1,609 Un x 8,49 8,49
+VALOR A PAGAR R$ 8,49
+`;
+      const pregoItems = ReceiptScannerService.parseReceiptText(pregoOcr);
+      expect(pregoItems).toHaveLength(1);
+      expect(pregoItems[0].name).toBe('Prego Ferro 40mm 45p');
+      expect(pregoItems[0].quantity).toBe(1);
+      expect(pregoItems[0].unit).toBe('un');
+      expect(pregoItems[0].price).toBe(8.49);
+    });
   });
 
   describe('OCR image preprocessing helpers', () => {

@@ -395,6 +395,7 @@ export const ABBREV_MAP: Record<string, string> = {
   FUBA: 'Fubá', ALCOOL: 'Álcool', ORGANICO: 'Orgânico', ORGANICA: 'Orgânica',
   SALMAO: 'Salmão', CAMARAO: 'Camarão', AVELA: 'Avelã', FRANCES: 'Francês',
   PARMESAO: 'Parmesão', MUSCULO: 'Músculo', COXAO: 'Coxão',
+  REUTILIZAVEL: 'Reutilizável', REUTIL: 'Reutilizável',
   PACOCA: 'Paçoca', CAFEINA: 'Cafeína', SOLUVEL: 'Solúvel',
   CERV: 'Cerveja', CERVEJ: 'Cerveja', CHOP: 'Chopp', SUC: 'Suco',
   AG: 'Água', AGU: 'Água', MIN: 'Mineral', MINER: 'Mineral',
@@ -486,6 +487,11 @@ const RECEIPT_WORD_FIXES: Record<string, string> = {
   CARANELO: 'Caramelo', CANANELO: 'Caramelo',
   TOMAIA: 'Tomate', IOMAIE: 'Tomate', TOMAIE: 'Tomate',
   CHAIA: 'Chata', IRAM: 'Tramontina', TIRAM: 'Tramontina',
+  IFALAC: 'Italac', IFÁLAC: 'Italac', ITALAK: 'Italac',
+  GNMH: '6mm', '6NMH': '6mm', '6NM': '6mm',
+  BHN: '8mm', '8NMH': '8mm', '8NM': '8mm', BHM: '8mm',
+  '5TOMADA': '5 Tomadas', '5TOMADAS': '5 Tomadas', '5TOM': '5 Tomadas',
+  SACOLAREUTILIZAVEL: 'Sacola Reutilizável',
 };
 
 const KNOWN_SINGLE_WORDS: Set<string> = (() => {
@@ -565,17 +571,22 @@ function normalizeSummaryOcrText(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/\b[uvmn][ahml]l\s*[o0]r\b/g, 'valor')
+    .replace(/\b[uvmn][ahmli1e][l1]\s*[o0e]r\b/g, 'valor')
+    .replace(/\bv[eaiou]l[o0e]r\b/g, 'valor')
     .replace(/\buml\s*[o0]r\b/g, 'valor')
     .replace(/\bulr\b/g, 'vlr')
     .replace(/\bul\b/g, 'vl')
-    .replace(/\b[tij1][o06][tij1][a4][l1i]\b/g, 'total')
+    .replace(/\b[tij1][o06][tij1][a4e][l1i]\b/g, 'total')
     .replace(/\bt\s*o\s*t\s*a\s*l\b/g, 'total')
-    .replace(/\bp[a4][g6][a4]r\b/g, 'pagar')
-    .replace(/\bp[a4][g6][a4]m[e3]n[ti1][o0]\b/g, 'pagamento')
+    .replace(/\b(?:[aàáeé]|para)?\s*p[a4e][g6][a4e]r\b/g, 'pagar')
+    .replace(/\bp[a4e][g6][a4e]r\b/g, 'pagar')
+    .replace(/\bp[a4e][g6][a4e]m[e3]n[ti1][o0]\b/g, 'pagamento')
     .replace(/\bf[o0]r[mn][a4]\b/g, 'forma')
     .replace(/\b[i1][tj][e3]ns\b/g, 'itens')
-    .replace(/\bq[ti1][dp]\.?\b/g, 'qtd');
+    .replace(/\bq[ti1][dp]\.?\b/g, 'qtd')
+    .replace(/\bc[a4]rt[a4o][o0]?\b/g, 'cartao')
+    .replace(/\bd[eé3]b(?:[i1]t[o0])?\b/g, 'debito')
+    .replace(/\bcr[eé3]d(?:[i1]t[o0])?\b/g, 'credito');
 }
 
 function isReceiptTotalOrSummaryLine(line: string): boolean {
@@ -589,12 +600,12 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
   const normalized = normalizeSummaryOcrText(clean);
 
   const summaryStartPattern =
-    /^(?:total|vlr?\.?\s*total(?:\s*a\s*pagar)?|vl\s*total(?:\s*a\s*pagar)?|valor\s*total(?:\s*a\s*pagar)?|subtotal|sub-total|sub\s+total|total\s*a\s*pagar|valor\s*a\s*pagar|valor\s*[àa]\s*pagar|total\s*pago|valor\s*pago|total\s*l[ií]quido|valor\s*l[ií]quido|total\s*bruto|valor\s*bruto|total\s*(?:dos\s*)?produtos|valor\s*(?:dos\s*)?produtos|valor\s*recebido|total\s*recebido|valor\s*troco|troco|desconto|descontos|acrescimo|acrescimos|forma\s*(?:de|ce)\s*pagamento|total\s*geral|valor\s*geral|qtd\.?\s*total(?:\s*de)?\s*itens)\b/i;
+    /^(?:total|vlr?\.?\s*total(?:\s*a\s*pagar)?|vl\s*total(?:\s*a\s*pagar)?|valor\s*total(?:\s*a\s*pagar)?|subtotal|sub-total|sub\s+total|total\s*a\s*pagar|valor\s*a\s*pagar|valor\s*[àa]\s*pagar|valor\s*pagar|total\s*pagar|total\s*pago|valor\s*pago|total\s*l[ií]quido|valor\s*l[ií]quido|total\s*bruto|valor\s*bruto|total\s*(?:dos\s*)?produtos|valor\s*(?:dos\s*)?produtos|valor\s*recebido|total\s*recebido|valor\s*troco|troco|desconto|descontos|acrescimo|acrescimos|forma\s*(?:de|ce)\s*pagamento|total\s*geral|valor\s*geral|qtd\.?\s*total(?:\s*de)?\s*itens)\b/i;
 
   if (summaryStartPattern.test(normalized)) return true;
 
   if (
-    /\b(?:valor|vlr?\.?|vl)\s*(?:total(?:\s*[àa]\s*pagar)?|geral|pago|[àa]\s*pagar|l[ií]quido|bruto|recebido|troco|da\s*nota|do\s*cupom|(?:dos\s*)?produtos)\b/i.test(
+    /\b(?:valor|vlr?\.?|vl)\s*(?:total(?:\s*[àa]\s*pagar)?|geral|pago|[àa]\s*pagar|pagar|l[ií]quido|bruto|recebido|troco|da\s*nota|do\s*cupom|(?:dos\s*)?produtos)\b/i.test(
       normalized,
     )
   ) {
@@ -602,9 +613,20 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
   }
 
   if (
-    /\b(?:total)\s*(?:geral|pago|[àa]\s*pagar|l[ií]quido|bruto|recebido|(?:dos\s*)?produtos|(?:de\s*)?itens|da\s*nota|do\s*cupom)\b/i.test(
+    /\b(?:total)\s*(?:geral|pago|[àa]\s*pagar|pagar|l[ií]quido|bruto|recebido|(?:dos\s*)?produtos|(?:de\s*)?itens|da\s*nota|do\s*cupom)\b/i.test(
       normalized,
     )
+  ) {
+    return true;
+  }
+
+  // Handle fuzzy OCR variations like "Velor É Pegar", "Valor a Pagar", "Total a Pagar"
+  if (
+    /\b(?:v[eaiou]l[o0e]r|vlr?|vl|total)\b.*?\b(?:[aàáeé]|para)?\s*p[eaiou][g6][a4e]r\b/i.test(
+      line,
+    ) ||
+    /\b(?:velor|valor)\s*(?:e|é|a|á)?\s*pegar\b/i.test(line) ||
+    /\bcart[aã]o\s*(?:d[eé]bito|cr[eé]dito|alimenta[çc][aã]o)\b/i.test(line)
   ) {
     return true;
   }
@@ -640,17 +662,33 @@ function isReceiptTotalOrSummaryLine(line: string): boolean {
 function isReceiptFooterBoundary(line: string): boolean {
   const normalized = normalizeSummaryOcrText(line.replace(/\s+/g, ' '));
   if (
-    /\b(?:qtd\.?|qtde\.?)\s*total\s*(?:de\s*)?itens\b/i.test(normalized) ||
-    /\bvalor\s*(?:total|[àa]\s*pagar|pago)\b/i.test(normalized) ||
+    /\b(?:qtd\.?|qtde\.?|quant)\s*total\s*(?:de\s*)?itens\b/i.test(normalized) ||
+    /\bvalor\s*(?:total|[àa]\s*pagar|pagar|pago)\b/i.test(normalized) ||
     /\btotal\s*[àa]\s*pagar\b/i.test(normalized) ||
+    /\btotal\s*pagar\b/i.test(normalized) ||
     /\bforma\s*(?:de|ce)\s*pagamento\b/i.test(normalized) ||
     /\bmeio\s*(?:de|ce)\s*pagamento\b/i.test(normalized) ||
+    /\bcartao\s*(?:debito|credito|alimentacao)\b/i.test(normalized) ||
     /\b(?:trib\.?\s*aprox|tributos|chave\s*de\s*acesso|consulte\s*pela)\b/i.test(
       normalized,
     )
   ) {
     return true;
   }
+
+  // Robust check for OCR typos in "Valor a Pagar", "Total a Pagar", "Cartão Débito"
+  if (
+    /\b(?:v[eaiou]l[o0e]r|vlr?|vl|total)\b.*?\b(?:[aàáeé]|para)?\s*p[eaiou][g6][a4e]r\b/i.test(
+      line,
+    ) ||
+    /\b(?:velor|valor)\s*(?:e|é|a|á)?\s*pegar\b/i.test(line) ||
+    /\b(?:qtde?|qtd|qte|quant)\.?\s*(?:total|tot|t[o0]t[a4]l)\b/i.test(line) ||
+    /\b(?:total|tot)\s*(?:de\s*)?(?:itens|item)\b/i.test(line) ||
+    /\bcart[aã]o\s*(?:d[eé]bito|cr[eé]dito|alimenta[çc][aã]o)\b/i.test(line)
+  ) {
+    return true;
+  }
+
   return false;
 }
 
@@ -731,7 +769,14 @@ export function isTotalProductName(name: string): boolean {
     lower.includes('valor pago') ||
     lower.includes('total pago') ||
     lower.includes('total a pagar') ||
-    lower.includes('valor a pagar')
+    lower.includes('valor a pagar') ||
+    lower.includes('valor pagar') ||
+    lower.includes('total pagar') ||
+    /\b(?:v[eaiou]l[o0e]r|total)\b.*?\b(?:[aàáeé]|para)?\s*p[eaiou][g6][a4e]r\b/i.test(
+      name,
+    ) ||
+    /\b(?:velor|valor)\s*(?:e|é|a|á)?\s*pegar\b/i.test(name) ||
+    /\bcart[aã]o\s*(?:d[eé]bito|cr[eé]dito|alimenta[çc][aã]o)\b/i.test(name)
   ) {
     return true;
   }
@@ -835,6 +880,11 @@ export function repairReceiptWord(word: string): string {
     w = `B${w.slice(1)}`;
   }
 
+  // 5. Repair hardware mm / piece OCR confusions (e.g. Gnmh -> 6mm, Bhn -> 8mm, 40nmh -> 40mm)
+  if (/^[Gg][nmh]{2,3}$/i.test(w)) return '6mm';
+  if (/^[Bb][nmh]{2,3}$/i.test(w)) return '8mm';
+  if (/^\d+[nmh]{2,3}$/i.test(w)) return `${w.replace(/[nmh]+$/i, '')}mm`;
+
   const upper = w.toUpperCase();
   if (upper in RECEIPT_WORD_FIXES) {
     return RECEIPT_WORD_FIXES[upper];
@@ -929,13 +979,27 @@ export function mergeSplitWords(rawTokens: string[]): string[] {
 
 function isLikelyOcrBarcode(token: string): boolean {
   const clean = token.replace(/^[([{"'`.,:;!|/-]+|[)\]}"'`.,:;!|/-]+$/g, '');
-  if (clean.length < 8 || clean.length > 16) return false;
+  if (clean.length < 7 || clean.length > 18) return false;
+
+  // Pure digit codes 7-18 chars (EAN-13, EAN-8, UPC, or store PLUs)
+  if (/^\d{7,18}$/.test(clean)) {
+    return !/\d+(?:g|gr|kg|ml|l|lt|mg|mm|cm|un)$/i.test(clean);
+  }
+
+  // Brazilian EAN-13 barcodes starting with 7 or T, often misread: e.g. "7bsbes3btib7t", "7bcscbogso222", "7bsbobos4c222"
+  if (/^[7T]\w{8,15}$/i.test(clean)) {
+    const digitCount = (clean.match(/\d/g) ?? []).length;
+    if (digitCount >= 2 && !/\d+(?:g|gr|kg|ml|l|lt|mg|mm|cm|un)$/i.test(clean)) {
+      return true;
+    }
+  }
+
   const digitCount = (clean.match(/\d/g) ?? []).length;
-  if (clean.length >= 10 && digitCount >= 6 && /^[0-9a-zA-Z&/\\-]+$/.test(clean)) {
+  if (clean.length >= 8 && digitCount >= 4 && /^[0-9a-zA-Z&/\\-]+$/.test(clean)) {
     return !/\d+(?:g|gr|kg|ml|l|lt|mg|mm|cm|un)$/i.test(clean);
   }
   if (!/^[0-9OoQqDdIl|!SsBbGgZzAaTtEeHhRr&/\\-]+$/.test(clean)) return false;
-  return digitCount >= 6 && digitCount / clean.length >= 0.45;
+  return digitCount >= 3 && digitCount / clean.length >= 0.35;
 }
 
 function isLikelyOcrItemIndexPrefix(token: string, followedByBarcode: boolean): boolean {
@@ -949,11 +1013,15 @@ function isLikelyOcrItemIndexPrefix(token: string, followedByBarcode: boolean): 
     return false;
   }
   if (/^\d{1,4}$/.test(clean)) return true;
-  if (/^[0OQ][0-9OQUoglht%]{2,3}$/i.test(clean)) return true;
+  // Catches 001, 002, 003, 008, 010 and their OCR confusions
+  // e.g. Cooi (001), Coo1 (001), Co3 (003), Dos (008), D08, C001, O01, Q01, ou7
+  if (/^(?:[oOqQcCdD0-9][0-9OQUCDoglt%su]{0,2}\d|\d{1,4}|cooi|coo1|co3|dos|d08)$/i.test(clean)) {
+    return true;
+  }
   if (followedByBarcode) {
     // When token[1] is a barcode, any short edge artifact or garbled index in token[0] is safe to drop
     if (clean.length <= 4 && !/^[a-zA-ZÀ-ÿ]{3,}$/.test(clean)) return true;
-    if (/^(?:ol&|gi6|luta|duos|ou\d|goi|qu)$/i.test(clean)) return true;
+    if (/^(?:ol&|gi6|luta|duos|ou\d|goi|qu|cooi|co\d|dos)$/i.test(clean)) return true;
   }
   return false;
 }
@@ -1090,6 +1158,23 @@ export function cleanReceiptProductName(raw: string): string {
   );
   s = s.replace(
     /(?:^|\s+)(?:\d{1,3}\s+(?:un|und|unid|pc|pct|cx|bdj|fd)|0\d{1,2}(?:un|und|unid))\s*$/i,
+    '',
+  );
+  s = s.replace(
+    /(?:^|\s+)(?:und?|unid|un)?\s*\d{1,3}(?:[,.]\d+)?\s*(?:un|und|unid|ium|lum|iun|lun)\s*$/i,
+    '',
+  );
+  s = s.replace(
+    /(?:^|\s+)(?:tp|tipo|tetra\s*pak)\s*\d*\s+(?:un|und|unid|ium|lum|iun|lun)\s*$/i,
+    '',
+  );
+  s = s.replace(/(?:^|\s+)(?:tp|tipo|tetra\s*pak)\s*$/i, '');
+  s = s.replace(
+    /(?:^|\s+)(?:k[goa0]|k3|kq|ha|bg|ng)\s+[oO0-9Qq][,.][0-9oOiilL!|]{2,4}(?:k[g6q9b]|g)?\s*$/i,
+    '',
+  );
+  s = s.replace(
+    /(?:^|\s+)[oO0-9Qq][,.][0-9oOiilL!|]{2,4}\s*(?:k[g6q9b]|g)\s*$/i,
     '',
   );
   s = s.replace(
@@ -1286,7 +1371,7 @@ export function cleanReceiptProductName(raw: string): string {
       /^\d+$/.test(last) ||
       [
         'de', 'da', 'do', 'das', 'dos', 'em', 'com', 'sem', 'para',
-        'un', 'und', 'unid', 'kg', 'lt', 'pc',
+        'un', 'und', 'unid', 'kg', 'lt', 'pc', 'tipo',
       ].includes(lastLower)
     ) {
       middleCleaned.pop();
@@ -1373,10 +1458,10 @@ export function accumulateScannedItems(
     const existing = map.get(key);
     if (existing) {
       const itemQty = item.quantity > 0 ? item.quantity : 1.0;
-      existing.quantity += itemQty;
-      existing.price += item.price;
+      existing.quantity = Number((existing.quantity + itemQty).toFixed(3));
+      existing.price = Number((existing.price + item.price).toFixed(2));
       if (existing.quantity > 0) {
-        existing.unitPrice = existing.price / existing.quantity;
+        existing.unitPrice = Number((existing.price / existing.quantity).toFixed(2));
       }
       if (!existing.unit || existing.unit === 'un') {
         if (item.unit && item.unit !== 'un') {
@@ -1403,7 +1488,7 @@ export function accumulateScannedItems(
   return result;
 }
 
-const DISCRETE_UNITS = new Set(['un', 'pc', 'pct', 'cx', 'dz']);
+const DISCRETE_UNITS = new Set(['un', 'und', 'unid', 'pc', 'pct', 'cx', 'dz', 'emb', 'fd', 'bdj']);
 
 function normalizeOcrUnit(rawUnit: string, rawQtyStr?: string): string {
   const lower = rawUnit.toLowerCase().trim();
@@ -1498,16 +1583,16 @@ function reconcileReceiptAmounts(params: {
 }): { qty: number; unitPrice: number; totalPrice: number } {
   let { qty, unit, unitPrice, totalPrice, priceCount } = params;
 
-  // 1. Clean up discrete-unit fractional OCR noise (e.g. "1.009 Un" or "1.600 Un x 8,49 8,49")
+  // 1. Clean up discrete-unit fractional OCR noise (e.g. "1.609 Un" or "1.009 Un" or "1.600 Un x 8,49 8,49")
   if (DISCRETE_UNITS.has(unit) && qty > 0 && Math.abs(qty - Math.round(qty)) > 0.001) {
     if (unitPrice != null && unitPrice > 0 && totalPrice > 0) {
       const ratio = totalPrice / unitPrice;
-      if (Math.abs(ratio - Math.round(ratio)) <= 0.08 && Math.round(ratio) >= 1) {
+      if (Math.abs(ratio - Math.round(ratio)) <= 0.15 && Math.round(ratio) >= 1) {
         qty = Math.round(ratio);
-      } else if (Math.abs(qty - Math.round(qty)) <= 0.08) {
+      } else {
         qty = Math.max(1, Math.round(qty));
       }
-    } else if (Math.abs(qty - Math.round(qty)) <= 0.08) {
+    } else {
       qty = Math.max(1, Math.round(qty));
     }
   }
@@ -1611,9 +1696,11 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   const sefazItemTotalLabelRegex =
     /^\s*v(?:l|lr)?\.?\s*total\s*:?\s*(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2})?\s*$/i;
   const trailingTabularQtyRegex =
-    /\s+(\d+(?:[,.]\d+)?)\s+(un|und|unid|pc|pct|cx|dz|bdj|fd)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
+    /\s+(?:(?:un|und|unid|pc|pct|cx)\s+)?(\d+(?:[,.]\d+)?)\s*(un|und|unid|ium|lum|iun|lun|pc|pct|cx|dz|bdj|fd)\b(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
   const trailingWeightQtyRegex =
     /\s+(\d+[,.]\d{2,4})\s*(kg|g|l|lt|ml)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
+  const trailingOcrWeightQtyRegex =
+    /\s+(?:(?:k[goa0]|k3|kq|ha|bg|ng)\s+)?([oO0-9Qq][,.][0-9oOiilL!|]{2,4})\s*(?:k[g6q9b]|g|l|ml)?(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
   const trailingAttachedUnitQtyRegex =
     /\s+(\d+[,.]\d{3,4}|0\d{1,2})\s*(un|und|unid|pc|pct|cx)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
 
@@ -1870,13 +1957,32 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
         }
       } else {
         // Tabular receipt line without 'x': "ARROZ CAMIL 5KG 2 UN 25,90 51,80" or "LEITE 1L 2,0000 UN 4,5000 9,00"
+        const ocrWeightMatch = trailingOcrWeightQtyRegex.exec(beforePrices);
         const tabMatch =
           trailingTabularQtyRegex.exec(beforePrices) ??
           trailingAttachedUnitQtyRegex.exec(beforePrices) ??
           (priceMatches.length >= 2 || /\d+[,.]\d{2,4}\s*$/.test(beforePrices)
             ? trailingWeightQtyRegex.exec(beforePrices)
             : null);
-        if (tabMatch) {
+        if (ocrWeightMatch && (!tabMatch || ocrWeightMatch.index <= tabMatch.index)) {
+          const numStr = ocrWeightMatch[1]
+            .replace(/^[oOQq]/, '0')
+            .replace(/[,.]/, '.')
+            .replace(/[oO]/g, '0')
+            .replace(/[iIlL!|]/g, '1');
+          const val = parseFloat(numStr);
+          if (val > 0 && val < 500) {
+            parsedQty = val;
+            parsedUnit = 'kg';
+            beforePrices = beforePrices.slice(0, ocrWeightMatch.index).trim();
+            if (ocrWeightMatch[2]) {
+              const up = AppFormatters.parsePrice(ocrWeightMatch[2]);
+              if (up != null && up > 0) parsedUnitPrice = up;
+            } else if (priceMatches.length >= 2) {
+              parsedUnitPrice = AppFormatters.parsePrice(firstMatch[1]);
+            }
+          }
+        } else if (tabMatch) {
           const u = normalizeOcrUnit(tabMatch[2], tabMatch[1]);
           const q = AppFormatters.parseQuantity(tabMatch[1], u);
           if (q != null && q > 0) {
