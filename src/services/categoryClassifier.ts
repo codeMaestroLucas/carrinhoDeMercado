@@ -1094,6 +1094,27 @@ export function extractQuantityAndName(
     }
   }
 
+  // Trailing bare quantity: e.g. "Laranjas 4", "Laranjas - 4"
+  const simpleDigitSuffixRegex = /(?:[-–—:]\s*|\s+)(\d{1,3})\s*$/;
+  match = simpleDigitSuffixRegex.exec(text);
+  if (match) {
+    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
+    const cleanedName = text.slice(0, match.index).trim();
+    if (
+      qty >= 1 &&
+      qty <= 99 &&
+      cleanedName &&
+      !/\b(?:tipo|n[°ºo]?|tam(?:anho)?)\s*$/i.test(cleanedName)
+    ) {
+      return {
+        name: cleanedName,
+        quantity: qty,
+        unit: 'un',
+        isPriceTotalByDefault: false,
+      };
+    }
+  }
+
   return { name: text, quantity: 1, unit: 'un', isPriceTotalByDefault: false };
 }
 

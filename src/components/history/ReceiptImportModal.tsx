@@ -3,15 +3,18 @@ import {
   Camera,
   Check,
   ChevronLeft,
+  Crop,
   ExternalLink,
   FileText,
   Hand,
+  Image as ImageIcon,
   Plus,
   QrCode,
   Sparkles,
   Trash2,
-  Upload,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import {
   PRODUCT_CATEGORIES,
@@ -25,6 +28,7 @@ import { NfceScannerService } from '../../services/nfceParserService';
 import { ReceiptScannerService } from '../../services/receiptParserService';
 import { AppFormatters } from '../../utils/formatters';
 import { CategoryIcon } from '../common/CategoryIcon';
+import { ReceiptImageEditor } from './ReceiptImageEditor';
 
 const DEFAULT_UNITS = ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'];
 
@@ -637,6 +641,17 @@ export function ReceiptImportModal({
   const [qrInput, setQrInput] = useState('');
   const [resolvedSefazUrl, setResolvedSefazUrl] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraZoom, setCameraZoom] = useState(2.2);
+  const [zoomCaps, setZoomCaps] = useState<{
+    min: number;
+    max: number;
+    step: number;
+    isHardware: boolean;
+  }>({ min: 1, max: 3.5, step: 0.25, isHardware: false });
+
+  const [pendingOcrFile, setPendingOcrFile] = useState<File | null>(null);
+  const [lastOriginalOcrFile, setLastOriginalOcrFile] = useState<File | null>(null);
+  const [editedPreviewUrl, setEditedPreviewUrl] = useState<string | null>(null);
 
   const [pasteText, setPasteText] = useState('');
   const [ocrProgress, setOcrProgress] = useState<number | null>(null);
@@ -670,10 +685,75 @@ export function ReceiptImportModal({
     };
   }, []);
 
-  const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
+  useEffect(() => {
+    return () => {
+      if (editedPreviewUrl) {
+        URL.revokeObjectURL(editedPreviewUrl);
+      }
+    };
+  }, [editedPreviewUrl]);
+
+  const scannerRef = useRef<{
+    stop: () => Promise<void>;
+    getRunningTrackCameraCapabilities?: () => {
+      zoomFeature: () => {
+        isSupported: () => boolean;
+        min: () => number;
+        max: () => number;
+        step: () => number;
+        apply: (value: number) => Promise<void>;
+        value: () => number | null;
+      };
+    };
+    applyVideoConstraints?: (constraints: MediaTrackConstraints) => Promise<void>;
+  } | null>(null);
   const qrRegionId = 'nfce-qr-reader-region';
 
+  const applyCameraZoom = async (
+    targetZoom: number,
+    capsOverride?: { min: number; max: number; step: number; isHardware: boolean },
+  ) => {
+    const caps = capsOverride ?? zoomCaps;
+    const clamped = Number(
+      Math.max(caps.min, Math.min(caps.max, targetZoom)).toFixed(2),
+    );
+    setCameraZoom(clamped);
+
+    const videoEl = document.querySelector<HTMLVideoElement>(
+      `#${qrRegionId} video`,
+    );
+
+    if (caps.isHardware && scannerRef.current?.getRunningTrackCameraCapabilities) {
+      try {
+        const zoomFeature = scannerRef.current
+          .getRunningTrackCameraCapabilities()
+          .zoomFeature();
+        if (zoomFeature.isSupported()) {
+          await zoomFeature.apply(clamped);
+          if (videoEl) {
+            videoEl.style.transform = '';
+          }
+          return;
+        }
+      } catch {
+        // Fallback to visual zoom below if hardware apply fails
+      }
+    }
+
+    if (videoEl) {
+      videoEl.style.transformOrigin = 'center center';
+      videoEl.style.transition = 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)';
+      videoEl.style.transform = `scale(${clamped})`;
+    }
+  };
+
   const stopCamera = async () => {
+    const videoEl = document.querySelector<HTMLVideoElement>(
+      `#${qrRegionId} video`,
+    );
+    if (videoEl) {
+      videoEl.style.transform = '';
+    }
     if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
@@ -700,7 +780,20 @@ export function ReceiptImportModal({
       scannerRef.current = qr;
       await qr.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
+        {
+          fps: 12,
+          aspectRatio: 1,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const size = Math.max(180, Math.floor(minEdge * 0.72));
+            return { width: size, height: size };
+          },
+          videoConstraints: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        },
         (decodedText) => {
           setQrInput(decodedText);
           void stopCamera();
@@ -710,6 +803,36 @@ export function ReceiptImportModal({
           // Ignore per-frame scan misses
         },
       );
+
+      // Apply stronger default zoom immediately so the user frames only the QR code
+      let detectedCaps = { min: 1, max: 3.5, step: 0.25, isHardware: false };
+      let defaultZoom = 2.2;
+
+      try {
+        const capabilities = qr.getRunningTrackCameraCapabilities();
+        const zoomFeature = capabilities.zoomFeature();
+        if (zoomFeature.isSupported()) {
+          const min = zoomFeature.min();
+          const max = zoomFeature.max();
+          const step = zoomFeature.step() || 0.1;
+          detectedCaps = { min, max, step, isHardware: true };
+          defaultZoom = Math.min(max, Math.max(min, 2.5));
+        }
+      } catch {
+        // Fallback to visual zoom
+      }
+
+      setZoomCaps(detectedCaps);
+      await applyCameraZoom(defaultZoom, detectedCaps);
+
+      // Attempt continuous autofocus when supported
+      try {
+        await qr.applyVideoConstraints({
+          advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+        });
+      } catch {
+        // Ignore if focusMode constraint is unsupported
+      }
     } catch (err) {
       setIsCameraActive(false);
       setStatusError(
@@ -757,9 +880,16 @@ export function ReceiptImportModal({
     }
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    setStatusError(null);
+    setLastOriginalOcrFile(file);
+    setPendingOcrFile(file);
+  };
+
+  const runOcrOnFile = async (file: File) => {
     setStatusError(null);
     setIsProcessing(true);
     setOcrProgress(0);
@@ -787,8 +917,16 @@ export function ReceiptImportModal({
     } finally {
       setIsProcessing(false);
       setOcrProgress(null);
-      e.target.value = '';
     }
+  };
+
+  const handleConfirmEditedPhoto = (editedFile: File, previewUrl: string) => {
+    setPendingOcrFile(null);
+    setEditedPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return previewUrl;
+    });
+    void runOcrOnFile(editedFile);
   };
 
   const handleParsePastedContent = () => {
@@ -1066,11 +1204,68 @@ export function ReceiptImportModal({
                 }`}
               >
                 <div
-                  id={qrRegionId}
-                  className={`overflow-hidden rounded-xl bg-black ${
-                    isCameraActive ? 'block min-h-[240px]' : 'hidden'
+                  className={`relative overflow-hidden rounded-xl bg-black ${
+                    isCameraActive ? 'block min-h-[260px]' : 'hidden'
                   }`}
-                />
+                >
+                  <div id={qrRegionId} className="w-full" />
+
+                  {/* Floating Apple-style Camera Zoom Controls */}
+                  {isCameraActive && (
+                    <div className="absolute inset-x-3 bottom-3 z-10 flex items-center justify-between gap-2 rounded-full bg-black/65 px-2.5 py-1.5 text-white backdrop-blur-md">
+                      <button
+                        type="button"
+                        aria-label="Diminuir zoom"
+                        onClick={() =>
+                          void applyCameraZoom(cameraZoom - Math.max(0.25, zoomCaps.step))
+                        }
+                        disabled={cameraZoom <= zoomCaps.min}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 disabled:opacity-35"
+                      >
+                        <ZoomOut size={14} strokeWidth={2} />
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3]
+                          .filter((preset) => preset >= zoomCaps.min && preset <= zoomCaps.max)
+                          .map((preset) => {
+                            const isSelected = Math.abs(cameraZoom - preset) < 0.2;
+                            return (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => void applyCameraZoom(preset)}
+                                className={`font-mono-tabular h-6 min-w-[34px] rounded-full px-2 text-[11px] font-semibold transition-all ${
+                                  isSelected
+                                    ? 'bg-[#30D158] text-[#052E16]'
+                                    : 'bg-white/10 text-white/85 hover:bg-white/20'
+                                }`}
+                              >
+                                {preset}x
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono-tabular min-w-[32px] text-right text-[11px] font-medium text-white/80">
+                          {cameraZoom.toFixed(1)}x
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Aumentar zoom"
+                          onClick={() =>
+                            void applyCameraZoom(cameraZoom + Math.max(0.25, zoomCaps.step))
+                          }
+                          disabled={cameraZoom >= zoomCaps.max}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 disabled:opacity-35"
+                        >
+                          <ZoomIn size={14} strokeWidth={2} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {!isCameraActive ? (
                   <button
                     type="button"
@@ -1136,22 +1331,70 @@ export function ReceiptImportModal({
                     : 'animate-slide-backward'
                 }`}
               >
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-8 transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]">
-                  <Upload size={22} strokeWidth={1.5} className="text-[var(--accent-fg)]" />
-                  <span className="text-xs font-medium text-[var(--text-primary)]">
-                    Fotografar ou escolher imagem do cupom
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    Reconhecimento direto no navegador
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => void handlePhotoUpload(e)}
-                    className="hidden"
-                  />
-                </label>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
+                    <Camera size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Tirar foto do cupom
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      Cortar, girar e ajustar antes do OCR
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoSelected}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
+                    <ImageIcon size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      Escolher da galeria
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      Editar foto salva no aparelho
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoSelected}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {editedPreviewUrl && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-2.5 text-left">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <img
+                        src={editedPreviewUrl}
+                        alt="Prévia do cupom editado"
+                        className="h-12 w-12 shrink-0 rounded-lg border border-[var(--border-hairline)] object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-[var(--text-primary)]">
+                          Foto preparada para OCR
+                        </p>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Recortada e ajustada
+                        </p>
+                      </div>
+                    </div>
+                    {lastOriginalOcrFile && !isProcessing && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingOcrFile(lastOriginalOcrFile)}
+                        className="btn-tinted flex h-8 shrink-0 items-center gap-1.5 px-3 text-xs"
+                      >
+                        <Crop size={13} strokeWidth={2} />
+                        Reeditar
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {ocrProgress != null && (
                   <div className="space-y-1.5">
@@ -1329,6 +1572,14 @@ export function ReceiptImportModal({
             setEditingItem(null);
             setIsAddingNew(false);
           }}
+        />
+      )}
+
+      {pendingOcrFile && (
+        <ReceiptImageEditor
+          file={pendingOcrFile}
+          onCancel={() => setPendingOcrFile(null)}
+          onConfirm={handleConfirmEditedPhoto}
         />
       )}
     </>

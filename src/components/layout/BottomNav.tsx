@@ -103,8 +103,7 @@ export function BottomNav({
           {/* Apple Segmented Navigation Pill with GPU-only transform sliding indicator */}
           <nav
             aria-label="Navegação principal desktop"
-            className="segmented-track grid grid-cols-4"
-            style={{ width: '408px' }}
+            className="segmented-track grid w-[420px] grid-cols-4"
           >
             <span
               aria-hidden="true"
@@ -121,7 +120,7 @@ export function BottomNav({
                   type="button"
                   aria-current={active ? 'page' : undefined}
                   onClick={() => onChangeTab(tab.id)}
-                  className={`segmented-item flex h-9 items-center justify-center gap-1.5 px-3 text-[13px] ${
+                  className={`segmented-item flex h-9 w-full items-center justify-center gap-1.5 px-2 text-[13px] ${
                     active ? 'font-semibold text-[var(--accent-fg)]' : ''
                   }`}
                 >

@@ -18,9 +18,14 @@ import {
 } from '../services/productHistoryService';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryIcon } from '../components/common/CategoryIcon';
+import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { ReceiptImportModal } from '../components/history/ReceiptImportModal';
-import { ProductAnalyticsModal } from '../components/history/ProductAnalyticsModal';
+import {
+  ProductAnalyticsModal,
+  captureSpatialOrigin,
+  type SpatialOrigin,
+} from '../components/history/ProductAnalyticsModal';
 import { ProductComparisonModal } from '../components/history/ProductComparisonModal';
 
 interface HistoryPageProps {
@@ -39,10 +44,14 @@ export function HistoryPage({
   const addSingleItem = useShoppingStore((s) => s.addSingleItem);
 
   const [marketFilter, setMarketFilter] = useState<string>('');
+  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [selectedAggregate, setSelectedAggregate] =
-    useState<ProductHistoryAggregate | null>(null);
+  const [analyticsState, setAnalyticsState] = useState<{
+    aggregate: ProductHistoryAggregate;
+    origin: SpatialOrigin | null;
+    originKey: string;
+  } | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -63,6 +72,15 @@ export function HistoryPage({
     history.forEach((r) => names.add(r.marketName));
     return Array.from(names).sort();
   }, [history]);
+
+  const handleSelectMarketFilter = (nextName: string) => {
+    if (nextName === marketFilter) return;
+    const allOptions = ['', ...marketNames];
+    const curIdx = allOptions.indexOf(marketFilter);
+    const nextIdx = allOptions.indexOf(nextName);
+    setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
+    setMarketFilter(nextName);
+  };
 
   const filteredRecords = useMemo(() => {
     if (!marketFilter) return history;
@@ -112,27 +130,19 @@ export function HistoryPage({
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] pb-28 pt-safe md:pb-16">
-      {/* Page Header Band */}
+      {/* Page Header Band — crisp single-line mobile & desktop layout */}
       <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-              Histórico &amp; Notas
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              <span className="font-mono-tabular">{history.length}</span>{' '}
-              {history.length === 1
-                ? 'compra registrada'
-                : 'compras registradas'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2.5 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+          <h1 className="font-display truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+            Histórico
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">
             {allAggregates.length >= 2 && (
               <button
                 type="button"
                 onClick={() => setShowCompare(true)}
                 aria-label="Comparar produtos"
-                className="btn-secondary h-10 w-10 p-0 sm:w-auto sm:px-4 text-xs sm:text-sm"
+                className="btn-secondary h-10 w-10 p-0 text-xs sm:w-auto sm:px-4 sm:text-sm"
               >
                 <GitCompareArrows size={16} strokeWidth={1.8} />
                 <span className="hidden sm:inline">Comparar</span>
@@ -141,9 +151,9 @@ export function HistoryPage({
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="btn-primary h-10 px-4 text-xs sm:px-5 sm:text-sm"
+              className="btn-primary h-10 shrink-0 px-3.5 text-xs sm:px-5 sm:text-sm"
             >
-              <QrCode size={16} strokeWidth={1.9} />
+              <QrCode size={16} strokeWidth={1.9} className="shrink-0" />
               <span>Ler cupom</span>
             </button>
             <div className="md:hidden">
@@ -153,61 +163,57 @@ export function HistoryPage({
         </div>
       </section>
 
-      <div className="mx-auto max-w-5xl space-y-5 px-4 pt-6 animate-enter sm:px-6 lg:px-8">
-        {/* Market Filter Rail */}
+      <div className="mx-auto max-w-5xl space-y-5 px-4 pt-5 animate-enter sm:px-6 lg:px-8">
+        {/* Gooey Liquid Morph Market Filter Rail */}
         {marketNames.length > 1 && (
-          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => setMarketFilter('')}
-              className={`h-9 shrink-0 rounded-full border px-4 text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-150 ease-ui ${
-                !marketFilter
-                  ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
-                  : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Todos
-            </button>
-            {marketNames.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setMarketFilter(name)}
-                className={`h-9 shrink-0 rounded-full border px-4 text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-150 ease-ui ${
-                  marketFilter === name
-                    ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
-                    : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
+          <GooeyMarketSelector
+            options={[
+              { id: '', label: 'Todos', showIcon: false },
+              ...marketNames.map((name) => ({ id: name, label: name })),
+            ]}
+            selectedId={marketFilter}
+            onSelect={handleSelectMarketFilter}
+          />
         )}
 
-        {/* Summary KPI Strip */}
-        {filteredRecords.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
-            <div className="surface-card p-4 sm:p-5">
-              <p className="text-xs text-[var(--text-muted)]">Total acumulado</p>
-              <p className="font-mono-tabular mt-1 text-lg font-semibold text-[var(--text-primary)] sm:text-2xl">
-                {AppFormatters.formatCurrency(summaryStats.totalSpent)}
-              </p>
+        {/* Animated Market-Dependent Content (KPI Bento + Receipt Ledger) */}
+        <div
+          key={marketFilter || 'all-markets'}
+          className={`space-y-5 ${
+            marketDirection === 'forward'
+              ? 'animate-slide-forward'
+              : 'animate-slide-backward'
+          }`}
+        >
+          {/* Responsive Apple Bento KPI Grid — never breaks currency across lines */}
+          {filteredRecords.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="surface-card col-span-2 flex items-center justify-between gap-3 px-5 py-4 sm:col-span-1 sm:block sm:p-5">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Total acumulado
+                </p>
+                <p className="font-mono-tabular whitespace-nowrap text-xl font-semibold text-[var(--text-primary)] sm:mt-1 sm:text-2xl">
+                  {AppFormatters.formatCurrency(summaryStats.totalSpent)}
+                </p>
+              </div>
+              <div className="surface-card p-4 sm:p-5">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Ticket médio
+                </p>
+                <p className="font-mono-tabular mt-1 whitespace-nowrap text-lg font-semibold text-[var(--text-primary)] sm:text-2xl">
+                  {AppFormatters.formatCurrency(summaryStats.avgTicket)}
+                </p>
+              </div>
+              <div className="surface-card p-4 sm:p-5">
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Notas salvas
+                </p>
+                <p className="font-mono-tabular mt-1 whitespace-nowrap text-lg font-semibold text-[var(--accent-fg)] sm:text-2xl">
+                  {summaryStats.count}
+                </p>
+              </div>
             </div>
-            <div className="surface-card p-4 sm:p-5">
-              <p className="text-xs text-[var(--text-muted)]">Ticket médio</p>
-              <p className="font-mono-tabular mt-1 text-lg font-semibold text-[var(--text-primary)] sm:text-2xl">
-                {AppFormatters.formatCurrency(summaryStats.avgTicket)}
-              </p>
-            </div>
-            <div className="surface-card p-4 sm:p-5">
-              <p className="text-xs text-[var(--text-muted)]">Notas salvas</p>
-              <p className="font-mono-tabular mt-1 text-lg font-semibold text-[var(--accent-fg)] sm:text-2xl">
-                {summaryStats.count}
-              </p>
-            </div>
-          </div>
-        )}
+          )}
 
         {/* Receipt Ledger List */}
         {filteredRecords.length === 0 ? (
@@ -289,16 +295,24 @@ export function HistoryPage({
                                 (occ) => occ.productName === item.name,
                               ),
                             );
+                            const rowKey = `${record.id}_${item.name}_${idx}`;
+                            const isExpanded = analyticsState?.originKey === rowKey;
                             return (
                               <button
-                                key={`${item.name}_${idx}`}
+                                key={rowKey}
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
                                   if (matchingAgg) {
-                                    setSelectedAggregate(matchingAgg);
+                                    setAnalyticsState({
+                                      aggregate: matchingAgg,
+                                      origin: captureSpatialOrigin(e.currentTarget),
+                                      originKey: rowKey,
+                                    });
                                   }
                                 }}
-                                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors duration-150 ease-ui first:rounded-t-2xl last:rounded-b-2xl hover:bg-[var(--bg-app)]"
+                                className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-[background-color,opacity,transform] duration-150 ease-ui first:rounded-t-2xl last:rounded-b-2xl hover:bg-[var(--bg-app)] ${
+                                  isExpanded ? 'scale-[0.98] opacity-30' : ''
+                                }`}
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   <CategoryIcon category={item.category} size={16} />
@@ -351,6 +365,7 @@ export function HistoryPage({
             })}
           </div>
         )}
+        </div>
       </div>
 
       {toastMsg && (
@@ -368,11 +383,12 @@ export function HistoryPage({
         />
       )}
 
-      {selectedAggregate && (
+      {analyticsState && (
         <ProductAnalyticsModal
-          aggregate={selectedAggregate}
+          aggregate={analyticsState.aggregate}
           allAggregates={allAggregates}
-          onClose={() => setSelectedAggregate(null)}
+          origin={analyticsState.origin}
+          onClose={() => setAnalyticsState(null)}
         />
       )}
 

@@ -237,4 +237,54 @@ describe('ReceiptImportModal item editing and gestures', () => {
 
     vi.useRealTimers();
   });
+
+  it('opens the image editor (crop, rotate, adjust) before sending a photo to OCR', () => {
+    const origCreateObjectURL = URL.createObjectURL;
+    const origRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => 'blob:mock-receipt');
+    URL.revokeObjectURL = vi.fn();
+
+    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+
+    // Switch to Foto OCR tab
+    fireEvent.click(screen.getByText('Foto OCR'));
+    expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
+    expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
+
+    // Select an image file from gallery
+    const galleryInput = screen
+      .getByText('Escolher da galeria')
+      .closest('label')!
+      .querySelector('input[type="file"]') as HTMLInputElement;
+
+    const fakeFile = new File(['fake-image-bytes'], 'cupom.jpg', {
+      type: 'image/jpeg',
+    });
+    fireEvent.change(galleryInput, { target: { files: [fakeFile] } });
+
+    // Image editor dialog should open before OCR runs
+    expect(
+      screen.getByRole('dialog', { name: 'Editar foto do cupom' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cortar e Girar')).toBeInTheDocument();
+    expect(screen.getByText('Ajustes OCR')).toBeInTheDocument();
+    expect(screen.getByText('-90°')).toBeInTheDocument();
+    expect(screen.getByText('+90°')).toBeInTheDocument();
+
+    // Rotate and switch to Adjustments tab
+    fireEvent.click(screen.getByText('+90°'));
+    fireEvent.click(screen.getByText('Ajustes OCR'));
+    expect(screen.getByText('Realçar texto (Preto e Branco)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Brilho')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraste')).toBeInTheDocument();
+
+    // Cancel closes the editor
+    fireEvent.click(screen.getByText('Cancelar'));
+    expect(
+      screen.queryByRole('dialog', { name: 'Editar foto do cupom' }),
+    ).not.toBeInTheDocument();
+
+    URL.createObjectURL = origCreateObjectURL;
+    URL.revokeObjectURL = origRevokeObjectURL;
+  });
 });

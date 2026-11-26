@@ -40,6 +40,7 @@ import {
 } from '../types/shopping';
 import { useShoppingStore } from '../store/useShoppingStore';
 import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
+import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 
 function SortableCategoryRow({
@@ -156,6 +157,7 @@ export function MarketConfigPage() {
   const [showAllKeywords, setShowAllKeywords] = useState(false);
   const [newKeywordInput, setNewKeywordInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
   const [isFullscreen, setIsFullscreen] = useState(
     typeof document !== 'undefined' && Boolean(document.fullscreenElement),
   );
@@ -181,6 +183,15 @@ export function MarketConfigPage() {
 
   const selectedMarket =
     markets.find((m) => m.id === selectedMarketId) ?? markets[0];
+
+  const handleSelectMarket = (nextId: string) => {
+    if (nextId === selectedMarket.id) return;
+    const curIdx = markets.findIndex((m) => m.id === selectedMarket.id);
+    const nextIdx = markets.findIndex((m) => m.id === nextId);
+    setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
+    selectMarket(nextId);
+    setEditingMarketName(null);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -228,15 +239,10 @@ export function MarketConfigPage() {
     <div className="min-h-screen bg-[var(--bg-app)] pb-28 pt-safe md:pb-16">
       {/* Page Header Band */}
       <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-              Mercados &amp; Ajustes
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Rota de corredores, sincronização familiar e dicionário inteligente
-            </p>
-          </div>
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+            Mercados &amp; Ajustes
+          </h1>
           <div className="md:hidden">
             <ThemeToggleButton />
           </div>
@@ -265,7 +271,7 @@ export function MarketConfigPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddMarket((v) => !v)}
-                  className="btn-secondary h-9 shrink-0 px-3.5 text-xs"
+                  className="btn-secondary hidden h-9 shrink-0 px-3.5 text-xs md:inline-flex"
                 >
                   <Plus size={14} strokeWidth={2} />
                   Novo
@@ -300,26 +306,32 @@ export function MarketConfigPage() {
                 </form>
               )}
 
-              <div className="no-scrollbar mb-4 flex items-center gap-2 overflow-x-auto pb-1">
-                {markets.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      selectMarket(m.id);
-                      setEditingMarketName(null);
-                    }}
-                    className={`h-9 shrink-0 rounded-full border px-4 text-xs font-semibold transition-[background-color,color,border-color,box-shadow] duration-150 ease-ui ${
-                      m.id === selectedMarket.id
-                        ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
-                        : 'border-[var(--border-hairline)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {m.name}
-                  </button>
-                ))}
+              <div className="mb-4">
+                <GooeyMarketSelector
+                  options={markets.map((m) => ({ id: m.id, label: m.name }))}
+                  selectedId={selectedMarket.id}
+                  onSelect={handleSelectMarket}
+                  trailing={
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMarket((v) => !v)}
+                      className="btn-secondary inline-flex h-10 shrink-0 px-4 text-xs md:hidden"
+                    >
+                      <Plus size={14} strokeWidth={2} />
+                      Novo
+                    </button>
+                  }
+                />
               </div>
 
+              <div
+                key={`market-panel-${selectedMarket.id}`}
+                className={
+                  marketDirection === 'forward'
+                    ? 'animate-slide-forward'
+                    : 'animate-slide-backward'
+                }
+              >
               <div className="mb-4 flex items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-4 py-2.5">
                 {editingMarketName !== null ? (
                   <form
@@ -404,6 +416,7 @@ export function MarketConfigPage() {
                   </div>
                 </SortableContext>
               </DndContext>
+              </div>
             </section>
           </div>
 

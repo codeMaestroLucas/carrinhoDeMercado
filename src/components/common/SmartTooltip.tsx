@@ -64,16 +64,16 @@ export function SmartTooltip({
       onBlur={handleLeave}
     >
       {children}
-      {open && (
-        <span
-          role="tooltip"
-          className={`animate-popover-in pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-primary)] shadow-[var(--shadow-pill)] ${
-            side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}
-        >
-          {label}
-        </span>
-      )}
+      <span
+        role="tooltip"
+        aria-hidden={!open}
+        data-open={open}
+        className={`origin-menu pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-primary)] shadow-[var(--shadow-pill)] ${
+          side === 'top' ? 'origin-bottom bottom-full mb-2' : 'origin-top top-full mt-2'
+        }`}
+      >
+        {label}
+      </span>
     </span>
   );
 }

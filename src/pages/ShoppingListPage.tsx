@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Check,
   ChevronRight,
   ClipboardPaste,
   Cloud,
@@ -13,7 +12,6 @@ import {
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
-  Store,
   Tag,
   Trash2,
 } from 'lucide-react';
@@ -31,6 +29,7 @@ import { CategoryClassifier } from '../services/categoryClassifier';
 import { buildAllProductAggregates } from '../services/productHistoryService';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryDot } from '../components/common/CategoryIcon';
+import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
 import { SmartTooltip } from '../components/common/SmartTooltip';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { PwaInstallBanner } from '../components/layout/PwaInstallBanner';
@@ -83,6 +82,18 @@ export function ShoppingListPage({
   const [showListMenu, setShowListMenu] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [inputShake, setInputShake] = useState(false);
+  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
+
+  const handleSelectMarket = useCallback(
+    (nextMarketId: string) => {
+      if (nextMarketId === selectedMarketId) return;
+      const curIdx = markets.findIndex((m) => m.id === selectedMarketId);
+      const nextIdx = markets.findIndex((m) => m.id === nextMarketId);
+      setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
+      selectMarket(nextMarketId);
+    },
+    [markets, selectedMarketId, selectMarket],
+  );
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,44 +172,6 @@ export function ShoppingListPage({
         return a.name.localeCompare(b.name);
       });
   }, [items, showCheckedItems, categoryFilter, categoryOrderMap]);
-
-  // Group unchecked items by aisle category in selectedMarket.categoryOrder
-  const { pendingGroups, checkedItemsList } = useMemo(() => {
-    const groupsMap = new Map<ProductCategoryId, ShoppingItem[]>();
-    const checked: ShoppingItem[] = [];
-
-    for (const item of filteredAndSortedItems) {
-      if (item.isChecked) {
-        checked.push(item);
-        continue;
-      }
-      const list = groupsMap.get(item.category);
-      if (list) {
-        list.push(item);
-      } else {
-        groupsMap.set(item.category, [item]);
-      }
-    }
-
-    const orderedGroups: Array<{
-      category: ProductCategoryId;
-      aisleIndex: number;
-      items: ShoppingItem[];
-    }> = [];
-
-    for (const [category, groupItems] of groupsMap.entries()) {
-      const idx = categoryOrderMap.get(category) ?? 99;
-      orderedGroups.push({
-        category,
-        aisleIndex: idx + 1,
-        items: groupItems,
-      });
-    }
-
-    orderedGroups.sort((a, b) => a.aisleIndex - b.aisleIndex);
-
-    return { pendingGroups: orderedGroups, checkedItemsList: checked };
-  }, [filteredAndSortedItems, categoryOrderMap]);
 
   const recommendationsByProduct = useMemo(() => {
     const byId = new Map<string, MarketProfile>();
@@ -335,9 +308,6 @@ export function ShoppingListPage({
     };
   }, [items]);
 
-  const progressPct =
-    items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0;
-
   const triggerInputShake = () => {
     setInputShake(false);
     requestAnimationFrame(() => {
@@ -383,17 +353,28 @@ export function ShoppingListPage({
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] pb-44 pt-safe md:pb-28">
-      {/* Editorial Top Hero Band */}
-      <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
-        <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+      {/* Editorial Top Hero Band with ListTop.jpg on BOTH Mobile & Desktop */}
+      <section className="relative overflow-hidden border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
+        {/* Mobile atmospheric top-right photograph layer (restored per user request) */}
+        <div className="pointer-events-none absolute inset-0 md:hidden">
+          <img
+            src="/assets/ListTop.jpg"
+            alt=""
+            className="animate-photo-settle h-full w-full object-cover object-right opacity-80 dark:opacity-28"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-surface)]/86 to-[var(--bg-surface)]/15" />
+          <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[var(--bg-surface)] to-transparent" />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           {/* Mobile Quiet Utility Row */}
           <div className="mb-4 flex items-center justify-between gap-2 md:hidden">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display inline-flex items-center gap-1.5 text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              <span className="font-display inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-surface)]/85 px-2.5 py-1 text-base font-semibold tracking-tight text-[var(--text-primary)] backdrop-blur-sm">
                 <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
                 Carrinho
               </span>
-              <div className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 text-xs font-medium text-[var(--text-secondary)]">
+              <div className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-surface)]/90 px-2.5 text-xs font-medium text-[var(--text-secondary)] backdrop-blur-sm">
                 <ShoppingCart size={13} strokeWidth={1.8} className="text-[var(--accent-fg)]" />
                 <span className="font-mono-tabular">
                   {items.length} {items.length === 1 ? 'item' : 'itens'}
@@ -409,7 +390,7 @@ export function ShoppingListPage({
                         ? 'Sincronizando com a família'
                         : `Sincronizado (${sharedSpaceCode})`
                   }
-                  className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-app)] px-2.5 text-xs font-medium text-[var(--text-secondary)]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[var(--border-hairline)] bg-[var(--bg-surface)]/90 px-2.5 text-xs font-medium text-[var(--text-secondary)] backdrop-blur-sm"
                 >
                   {hasPendingCloudPush ? (
                     <CloudOff size={13} strokeWidth={1.8} className="text-[var(--amber)]" />
@@ -421,11 +402,11 @@ export function ShoppingListPage({
               )}
             </div>
 
-            <ThemeToggleButton />
+            <ThemeToggleButton variant="glass" />
           </div>
 
           <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-12 lg:gap-8">
-            {/* Left Column: Title, Context & Quick-Add Command Bar */}
+            {/* Left Column: Title & Quick-Add Command Bar */}
             <div className="md:col-span-7">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -442,22 +423,29 @@ export function ShoppingListPage({
                       </span>
                     </div>
                   )}
-                  <h1 className="font-display truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl lg:text-4xl">
+                  <h1
+                    key={selectedMarket.id}
+                    className={`font-display truncate text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl lg:text-4xl ${
+                      marketDirection === 'forward'
+                        ? 'animate-slide-forward'
+                        : 'animate-slide-backward'
+                    }`}
+                  >
                     Lista • {selectedMarket.name}
                   </h1>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  <p className="sr-only">
                     Itens organizados na ordem de setores de {selectedMarket.name}
                   </p>
                 </div>
               </div>
 
               {/* Apple Spotlight-style Quick-Add Bar */}
-              <form onSubmit={handleAddSubmit} className="relative mt-5">
+              <form onSubmit={handleAddSubmit} className="relative mt-4 sm:mt-5">
                 <div
-                  className={`flex items-center gap-2 rounded-2xl border bg-[var(--bg-subtle)] p-1.5 pl-4 transition-[border-color,background-color,box-shadow] duration-150 ease-ui focus-within:border-[var(--accent)]/40 focus-within:bg-[var(--bg-surface)] focus-within:ring-4 focus-within:ring-[var(--accent-ring)] ${
+                  className={`flex items-center gap-2 rounded-2xl border bg-[var(--bg-surface)]/92 p-1.5 pl-4 shadow-[var(--shadow-card)] backdrop-blur-md transition-[border-color,background-color,box-shadow] duration-150 ease-ui focus-within:border-[var(--accent)]/40 focus-within:bg-[var(--bg-surface)] focus-within:ring-4 focus-within:ring-[var(--accent-ring)] md:bg-[var(--bg-subtle)] md:shadow-none ${
                     inputShake
                       ? 'animate-shake border-[var(--negative)]/60 ring-2 ring-[var(--negative-soft)]'
-                      : 'border-transparent'
+                      : 'border-[var(--border-hairline)] md:border-transparent'
                   }`}
                 >
                   <textarea
@@ -499,9 +487,9 @@ export function ShoppingListPage({
                   </button>
                 </div>
 
-                {/* Autocomplete Suggestions Dropdown */}
+                {/* Autocomplete Suggestions Dropdown (Origin-anchored below input) */}
                 {historicalSuggestions.length > 0 && (
-                  <div className="animate-popover-in absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-float)]">
+                  <div className="animate-popover-in origin-top absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-float)]">
                     <div className="flex items-center gap-2 border-b border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-2 text-xs font-medium text-[var(--text-muted)]">
                       <History size={14} strokeWidth={1.75} />
                       <span>Do seu histórico de compras</span>
@@ -552,47 +540,31 @@ export function ShoppingListPage({
       <PwaInstallBanner />
 
       <div className="mx-auto max-w-5xl space-y-5 px-4 pt-5 animate-enter sm:px-6 lg:px-8">
-        {/* Market Aisle Rail + Filters & Menu */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="no-scrollbar flex flex-1 items-center gap-2 overflow-x-auto py-0.5">
-            {markets.map((m) => {
-              const active = selectedMarket.id === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => selectMarket(m.id)}
-                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-ui active:scale-[0.98] ${
-                    active
-                      ? 'border-transparent bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_10px_rgba(25,128,66,0.22)]'
-                      : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {active ? (
-                    <Check size={14} strokeWidth={2.4} />
-                  ) : (
-                    <Store size={14} strokeWidth={1.7} />
-                  )}
-                  <span>{m.name}</span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Gooey Liquid Morph Market Aisle Rail + Actions */}
+        <div className="flex items-center justify-between gap-2.5">
+          <GooeyMarketSelector
+            options={markets.map((m) => ({ id: m.id, label: m.name }))}
+            selectedId={selectedMarket.id}
+            onSelect={handleSelectMarket}
+          />
 
           <div className="flex shrink-0 items-center gap-1.5">
-            <SmartTooltip label="Filtros da lista">
-              <button
-                type="button"
-                onClick={() => setShowFilters(true)}
-                aria-label="Filtros"
-                className="btn-secondary relative h-11 w-11 p-0"
-              >
-                <SlidersHorizontal size={17} strokeWidth={1.75} />
-                {(categoryFilter || !showCheckedItems) && (
-                  <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--accent)]" />
-                )}
-              </button>
-            </SmartTooltip>
+            {/* Desktop filter button; on mobile, Filters is consolidated into the 3-dots menu */}
+            <div className="hidden md:inline-flex">
+              <SmartTooltip label="Filtros da lista">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(true)}
+                  aria-label="Filtros"
+                  className="btn-secondary relative h-11 w-11 p-0"
+                >
+                  <SlidersHorizontal size={17} strokeWidth={1.75} />
+                  {(categoryFilter || !showCheckedItems) && (
+                    <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--accent)]" />
+                  )}
+                </button>
+              </SmartTooltip>
+            </div>
 
             <div className="relative">
               <SmartTooltip label="Mais opções">
@@ -600,113 +572,109 @@ export function ShoppingListPage({
                   type="button"
                   onClick={() => setShowListMenu(!showListMenu)}
                   aria-label="Mais opções"
-                  className="btn-secondary h-11 w-11 p-0"
+                  aria-expanded={showListMenu}
+                  className="btn-secondary relative h-11 w-11 p-0"
                 >
                   <MoreVertical size={17} strokeWidth={1.75} />
+                  {(categoryFilter || !showCheckedItems) && (
+                    <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--accent)] md:hidden" />
+                  )}
                 </button>
               </SmartTooltip>
 
               {showListMenu && (
-                <div className="animate-popover-in absolute right-0 top-12 z-40 w-56 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-[var(--shadow-float)]">
-                  {checkedCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearCheckedItems();
-                        setShowListMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
-                    >
-                      <Trash2 size={15} strokeWidth={1.75} />
-                      <span>Limpar marcados ({checkedCount})</span>
-                    </button>
+                <div
+                  className="fixed inset-0 z-30"
+                  aria-hidden="true"
+                  onClick={() => setShowListMenu(false)}
+                />
+              )}
+
+              {/* Origin-anchored reversible menu expanding from/collapsing into trigger */}
+              <div
+                data-open={showListMenu}
+                aria-hidden={!showListMenu}
+                className="origin-menu origin-top-right absolute right-0 top-12 z-40 w-56 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1.5 shadow-[var(--shadow-float)]"
+              >
+                <button
+                  type="button"
+                  tabIndex={showListMenu ? 0 : -1}
+                  onClick={() => {
+                    setShowListMenu(false);
+                    setShowFilters(true);
+                  }}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)] md:hidden"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <SlidersHorizontal size={15} strokeWidth={1.75} />
+                    <span>Filtros da lista</span>
+                  </span>
+                  {(categoryFilter || !showCheckedItems) && (
+                    <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
                   )}
+                </button>
+                <div className="my-1 h-px bg-[var(--border-hairline)] md:hidden" />
+                {checkedCount > 0 && (
                   <button
                     type="button"
+                    tabIndex={showListMenu ? 0 : -1}
                     onClick={() => {
-                      uncheckAllItems();
+                      clearCheckedItems();
                       setShowListMenu(false);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
-                  >
-                    <RotateCcw size={15} strokeWidth={1.75} />
-                    <span>Desmarcar todos</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          'Tem certeza que deseja apagar todos os itens da lista?',
-                        )
-                      ) {
-                        clearAllItems();
-                        setShowListMenu(false);
-                      }
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
                   >
                     <Trash2 size={15} strokeWidth={1.75} />
-                    <span>Limpar toda a lista</span>
+                    <span>Limpar marcados ({checkedCount})</span>
                   </button>
-                  <div className="my-1 h-px bg-[var(--border-hairline)]" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFinish(true);
+                )}
+                <button
+                  type="button"
+                  tabIndex={showListMenu ? 0 : -1}
+                  onClick={() => {
+                    uncheckAllItems();
+                    setShowListMenu(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors duration-150 ease-ui hover:bg-[var(--bg-subtle)]"
+                >
+                  <RotateCcw size={15} strokeWidth={1.75} />
+                  <span>Desmarcar todos</span>
+                </button>
+                <button
+                  type="button"
+                  tabIndex={showListMenu ? 0 : -1}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Tem certeza que deseja apagar todos os itens da lista?',
+                      )
+                    ) {
+                      clearAllItems();
                       setShowListMenu(false);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
-                  >
-                    <ShoppingBag size={15} strokeWidth={1.8} />
-                    <span>Finalizar compra</span>
-                  </button>
-                </div>
-              )}
+                    }
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium text-[var(--negative)] transition-colors duration-150 ease-ui hover:bg-[var(--negative-soft)]"
+                >
+                  <Trash2 size={15} strokeWidth={1.75} />
+                  <span>Limpar toda a lista</span>
+                </button>
+                <div className="my-1 h-px bg-[var(--border-hairline)]" />
+                <button
+                  type="button"
+                  tabIndex={showListMenu ? 0 : -1}
+                  onClick={() => {
+                    setShowFinish(true);
+                    setShowListMenu(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-[var(--accent-fg)] transition-colors duration-150 ease-ui hover:bg-[var(--accent-soft)]"
+                >
+                  <ShoppingBag size={15} strokeWidth={1.8} />
+                  <span>Finalizar compra</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Live Cart Ledger Summary Strip (Goal-Gradient + Zeigarnik Effect) */}
-        {items.length > 0 && (
-          <div className="surface-card grid grid-cols-1 gap-4 p-4 sm:grid-cols-12 sm:items-center sm:px-5">
-            <div className="sm:col-span-5">
-              <div className="flex items-center justify-between text-xs font-medium text-[var(--text-secondary)]">
-                <span>
-                  {checkedCount === items.length
-                    ? 'Tudo no carrinho!'
-                    : items.length - checkedCount === 1
-                      ? 'Falta 1 item'
-                      : `Faltam ${items.length - checkedCount} itens`}
-                </span>
-                <span className="font-mono-tabular font-semibold text-[var(--accent-fg)]">
-                  {checkedCount}/{items.length} ({progressPct}%)
-                </span>
-              </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
-                <div
-                  className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 border-t border-[var(--border-hairline)] pt-3 sm:col-span-7 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5">
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">No carrinho</p>
-                <p className="font-mono-tabular mt-0.5 text-lg font-semibold text-[var(--positive)]">
-                  {AppFormatters.formatCurrency(checkedTotal)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">Estimado total</p>
-                <p className="font-mono-tabular mt-0.5 text-lg font-semibold text-[var(--text-primary)]">
-                  {AppFormatters.formatCurrency(totalEstimated)}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Market Bargain Banner */}
         {bargainGroups.length > 0 && (
@@ -787,86 +755,33 @@ export function ShoppingListPage({
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {pendingGroups.map((group) => {
-              const catInfo = PRODUCT_CATEGORY_MAP[group.category];
+          <div
+            key={`list-${selectedMarket.id}`}
+            className={`space-y-2 ${
+              marketDirection === 'forward'
+                ? 'animate-slide-forward'
+                : 'animate-slide-backward'
+            }`}
+          >
+            {filteredAndSortedItems.map((item) => {
+              const bestRec = !item.isChecked
+                ? recommendationsByProduct.get(
+                    CategoryClassifier.normalize(item.name),
+                  )?.[0] ?? null
+                : null;
+
               return (
-                <section key={group.category} className="space-y-2.5">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono-tabular text-xs font-medium text-[var(--text-muted)]">
-                        {String(group.aisleIndex).padStart(2, '0')}
-                      </span>
-                      <CategoryDot category={group.category} />
-                      <h2 className="font-display text-base font-semibold text-[var(--text-primary)]">
-                        {catInfo.label}
-                      </h2>
-                    </div>
-                    <span className="font-mono-tabular rounded-full bg-[var(--bg-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                      {group.items.length}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {group.items.map((item) => {
-                      const bestRec =
-                        recommendationsByProduct.get(
-                          CategoryClassifier.normalize(item.name),
-                        )?.[0] ?? null;
-
-                      return (
-                        <SwipeableShoppingItemRow
-                          key={item.id}
-                          item={item}
-                          cheapestMarketName={bestRec ? bestRec.market.name : null}
-                          onToggleChecked={toggleItemChecked}
-                          onOpenEdit={handleOpenEdit}
-                          onRemove={handleRemoveItem}
-                          onUpdateQuantity={updateItemQuantity}
-                        />
-                      );
-                    })}
-                  </div>
-                </section>
+                <SwipeableShoppingItemRow
+                  key={item.id}
+                  item={item}
+                  cheapestMarketName={bestRec ? bestRec.market.name : null}
+                  onToggleChecked={toggleItemChecked}
+                  onOpenEdit={handleOpenEdit}
+                  onRemove={handleRemoveItem}
+                  onUpdateQuantity={updateItemQuantity}
+                />
               );
             })}
-
-            {checkedItemsList.length > 0 && (
-              <section className="space-y-2.5 pt-2">
-                <div className="flex items-center justify-between border-t border-[var(--border-hairline)] px-1 pt-5">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--positive-soft)] text-[var(--positive)]">
-                      <Check size={12} strokeWidth={2.5} />
-                    </span>
-                    <h2 className="font-display text-base font-semibold text-[var(--text-secondary)]">
-                      No carrinho ({checkedItemsList.length})
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={clearCheckedItems}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--negative-soft)] hover:text-[var(--negative)]"
-                  >
-                    <Trash2 size={13} strokeWidth={1.8} />
-                    <span>Limpar marcados</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {checkedItemsList.map((item) => (
-                    <SwipeableShoppingItemRow
-                      key={item.id}
-                      item={item}
-                      cheapestMarketName={null}
-                      onToggleChecked={toggleItemChecked}
-                      onOpenEdit={handleOpenEdit}
-                      onRemove={handleRemoveItem}
-                      onUpdateQuantity={updateItemQuantity}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
           </div>
         )}
       </div>
@@ -923,7 +838,7 @@ export function ShoppingListPage({
       {showSavings && (
         <MarketSavingsModal
           groups={bargainGroups}
-          onSelectMarket={(id) => selectMarket(id)}
+          onSelectMarket={(id) => handleSelectMarket(id)}
           onClose={() => setShowSavings(false)}
         />
       )}

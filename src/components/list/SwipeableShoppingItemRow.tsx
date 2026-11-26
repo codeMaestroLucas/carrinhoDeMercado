@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import { Check, Minus, Plus, Store, Tag, Trash2 } from 'lucide-react';
+import { Minus, Plus, Store, Tag, Trash2 } from 'lucide-react';
 import {
   getEffectiveTotalAmount,
   type ShoppingItem,
@@ -15,6 +15,13 @@ interface SwipeableShoppingItemRowProps {
   onRemove: (id: string) => void;
   onUpdateQuantity: (id: string, qty: number) => void;
 }
+
+/**
+ * Shared across all list rows so that when tapping Item A moves it to the
+ * checked section and Item B shifts upward under the user's finger, the
+ * browser's delayed compatibility mouse events cannot ghost-click Item B.
+ */
+let lastGlobalPointerEventAt = 0;
 
 export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
   item,
@@ -36,9 +43,16 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
   const isLongPressTriggeredRef = useRef(false);
   const isPressActiveRef = useRef(false);
-  const lastPointerEventAtRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevCheckedRef = useRef(item.isChecked);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!prevCheckedRef.current && item.isChecked) {
@@ -63,7 +77,7 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
   const isMouseDuplicateAfterPointer = (e: React.SyntheticEvent): boolean => {
     return (
       e.type.startsWith('mouse') &&
-      Date.now() - lastPointerEventAtRef.current < 1000
+      Date.now() - lastGlobalPointerEventAt < 1000
     );
   };
 
@@ -82,7 +96,7 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
     if (e.type.startsWith('pointer')) {
       const pe = e as React.PointerEvent;
       if (pe.pointerType === 'mouse' && pe.button !== 0) return;
-      lastPointerEventAtRef.current = Date.now();
+      lastGlobalPointerEventAt = Date.now();
     } else if (isMouseDuplicateAfterPointer(e)) {
       return;
     }
@@ -153,7 +167,7 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
 
   const handlePressEnd = (e: React.SyntheticEvent) => {
     if (e.type.startsWith('pointer')) {
-      lastPointerEventAtRef.current = Date.now();
+      lastGlobalPointerEventAt = Date.now();
     } else if (isMouseDuplicateAfterPointer(e)) {
       return;
     }
@@ -194,11 +208,15 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
       return;
     }
 
+    // Prevent any lingering synthetic click from landing on a row that shifts up
+    if (e.type.startsWith('pointer')) {
+      e.preventDefault();
+    }
     onToggleChecked(item.id);
   };
 
   const handlePressCancel = () => {
-    lastPointerEventAtRef.current = Date.now();
+    lastGlobalPointerEventAt = Date.now();
     isPressActiveRef.current = false;
     isLongPressTriggeredRef.current = false;
     clearLongPressTimer();
@@ -245,31 +263,22 @@ export const SwipeableShoppingItemRow = memo(function SwipeableShoppingItemRow({
           item.isChecked ? 'opacity-65' : ''
         }`}
       >
-        {/* Apple Reminders Circular Check Control with Squash & Stretch + Secondary Halo */}
-        <div className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+        {/* Bright Apple Pastel Category Icon Tile (clean, no checkbox) */}
+        <div className="relative shrink-0">
           {justChecked && (
             <span
               aria-hidden="true"
-              className="animate-check-halo pointer-events-none absolute inset-0 rounded-full bg-[var(--accent)]"
+              className="animate-check-halo pointer-events-none absolute inset-0 rounded-xl bg-[var(--accent)]"
             />
           )}
-          <div
-            className={`relative flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors duration-150 ease-ui ${
-              item.isChecked
-                ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]'
-                : 'border-[var(--border-strong)] bg-[var(--bg-surface)]'
-            } ${justChecked ? 'animate-check-pop' : ''}`}
-          >
-            {item.isChecked && <Check size={14} strokeWidth={2.75} />}
-          </div>
+          <CategoryBadge
+            category={item.category}
+            size={18}
+            className={`h-10 w-10 rounded-xl transition-transform duration-150 ${
+              justChecked ? 'animate-check-pop' : ''
+            }`}
+          />
         </div>
-
-        {/* Bright Apple Pastel Category Icon Tile */}
-        <CategoryBadge
-          category={item.category}
-          size={16}
-          className="h-9 w-9 shrink-0 rounded-xl"
-        />
 
         {/* Product Info */}
         <div className="min-w-0 flex-1">

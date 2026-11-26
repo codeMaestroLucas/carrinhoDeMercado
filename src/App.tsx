@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, WifiOff } from 'lucide-react';
 import { useShoppingStore } from './store/useShoppingStore';
 import { BottomNav, type AppTab } from './components/layout/BottomNav';
+import { PullToRefresh } from './components/layout/PullToRefresh';
 import { SplashScreen } from './components/layout/SplashScreen';
 import { ShoppingListPage } from './pages/ShoppingListPage';
 import { HomePage } from './pages/HomePage';
@@ -112,6 +113,15 @@ export function App() {
 
   const pendingCount = items.filter((i) => !i.isChecked).length;
 
+  const handlePullRefresh = async () => {
+    if (needRefresh) {
+      await updateServiceWorker(true);
+      return;
+    }
+    await flushPendingSync();
+    await refreshCloudSync();
+  };
+
   return (
     <>
       {showSplash && (
@@ -140,21 +150,23 @@ export function App() {
       )}
 
       <main className="min-h-screen md:pt-[64px]">
-        {activeTab === 'home' && <HomePage />}
-        {activeTab === 'list' && (
-          <ShoppingListPage
-            autoFocusQuickAdd={autoFocusQuickAdd}
-            onQuickAddConsumed={() => setAutoFocusQuickAdd(false)}
-          />
-        )}
-        {activeTab === 'history' && (
-          <HistoryPage
-            autoOpenScanner={autoOpenScanner}
-            onScannerOpened={() => setAutoOpenScanner(false)}
-            onNavigateToList={() => setActiveTab('list')}
-          />
-        )}
-        {activeTab === 'config' && <MarketConfigPage />}
+        <PullToRefresh onRefresh={handlePullRefresh}>
+          {activeTab === 'home' && <HomePage />}
+          {activeTab === 'list' && (
+            <ShoppingListPage
+              autoFocusQuickAdd={autoFocusQuickAdd}
+              onQuickAddConsumed={() => setAutoFocusQuickAdd(false)}
+            />
+          )}
+          {activeTab === 'history' && (
+            <HistoryPage
+              autoOpenScanner={autoOpenScanner}
+              onScannerOpened={() => setAutoOpenScanner(false)}
+              onNavigateToList={() => setActiveTab('list')}
+            />
+          )}
+          {activeTab === 'config' && <MarketConfigPage />}
+        </PullToRefresh>
       </main>
 
       <BottomNav

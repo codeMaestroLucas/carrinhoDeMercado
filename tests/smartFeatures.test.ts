@@ -124,6 +124,22 @@ SUPERMERCADO MODELO
       '- 2kg Arroz\n- Feijão\n- arroz 2kg',
     );
     expect(pasted).toEqual(['2kg Arroz', 'Feijão']);
+
+    const pLeading = CategoryClassifier.extractQuantityAndName('4 laranjas');
+    expect(pLeading).toEqual({
+      name: 'laranjas',
+      quantity: 4,
+      unit: 'un',
+      isPriceTotalByDefault: false,
+    });
+
+    const pTrailing = CategoryClassifier.extractQuantityAndName('Laranjas 4');
+    expect(pTrailing).toEqual({
+      name: 'Laranjas',
+      quantity: 4,
+      unit: 'un',
+      isPriceTotalByDefault: false,
+    });
   });
 
   it('formats currency and quantities in pt-BR', () => {

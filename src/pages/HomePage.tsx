@@ -29,7 +29,11 @@ import { CategoryClassifier } from '../services/categoryClassifier';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryBadge, CategoryDot } from '../components/common/CategoryIcon';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
-import { ProductAnalyticsModal } from '../components/history/ProductAnalyticsModal';
+import {
+  ProductAnalyticsModal,
+  captureSpatialOrigin,
+  type SpatialOrigin,
+} from '../components/history/ProductAnalyticsModal';
 import { ProductComparisonModal } from '../components/history/ProductComparisonModal';
 
 export function HomePage() {
@@ -41,8 +45,11 @@ export function HomePage() {
   const [priceIndexDays, setPriceIndexDays] = useState(60);
   const [variationTab, setVariationTab] = useState<'up' | 'down'>('down');
 
-  const [selectedAggregate, setSelectedAggregate] =
-    useState<ProductHistoryAggregate | null>(null);
+  const [analyticsState, setAnalyticsState] = useState<{
+    aggregate: ProductHistoryAggregate;
+    origin: SpatialOrigin | null;
+    originKey: string;
+  } | null>(null);
   const [compareState, setCompareState] = useState<{
     open: boolean;
     itemA?: ProductHistoryAggregate | null;
@@ -154,18 +161,24 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] pb-28 pt-safe md:pb-16">
-      {/* Page Header Band */}
-      <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
-              Início &amp; Análises
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Gastos mensais, inflação pessoal e comparativo real por mercado
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      {/* Page Header Band — with gocery.jpg atmospheric backdrop on mobile */}
+      <section className="relative overflow-hidden border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
+        {/* Mobile atmospheric photograph layer matching ShoppingListPage */}
+        <div className="pointer-events-none absolute inset-0 md:hidden">
+          <img
+            src="/assets/gocery.jpg"
+            alt=""
+            className="animate-photo-settle h-full w-full object-cover object-right opacity-55 dark:opacity-28"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-surface)]/86 to-[var(--bg-surface)]/25" />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[var(--bg-surface)] to-transparent" />
+        </div>
+
+        <div className="relative z-10 mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-5 sm:px-6 lg:px-8">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+            Início &amp; Análises
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">
             {allAggregates.length >= 2 && (
               <button
                 type="button"
@@ -176,7 +189,7 @@ export function HomePage() {
                     itemB: allAggregates[1],
                   })
                 }
-                className="btn-secondary h-10 px-4 text-xs sm:text-sm"
+                className="btn-secondary h-10 px-3.5 text-xs sm:px-4 sm:text-sm"
               >
                 <GitCompareArrows
                   size={16}
@@ -187,7 +200,7 @@ export function HomePage() {
               </button>
             )}
             <div className="md:hidden">
-              <ThemeToggleButton />
+              <ThemeToggleButton variant="glass" />
             </div>
           </div>
         </div>
@@ -399,17 +412,26 @@ export function HomePage() {
                             ) ??
                             null;
 
+                          const cardKey = `var_${v.productName}_${v.marketName}`;
+                          const isExpanded = analyticsState?.originKey === cardKey;
+
                           return (
                             <button
-                              key={`${v.productName}_${v.marketName}`}
+                              key={cardKey}
                               type="button"
                               disabled={!targetAgg}
-                              onClick={() => {
+                              onClick={(e) => {
                                 if (targetAgg) {
-                                  setSelectedAggregate(targetAgg);
+                                  setAnalyticsState({
+                                    aggregate: targetAgg,
+                                    origin: captureSpatialOrigin(e.currentTarget),
+                                    originKey: cardKey,
+                                  });
                                 }
                               }}
-                              className="card-interactive w-48 shrink-0 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3.5 text-left disabled:cursor-default disabled:opacity-80"
+                              className={`card-interactive w-48 shrink-0 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3.5 text-left transition-[opacity,transform] duration-200 disabled:cursor-default disabled:opacity-80 ${
+                                isExpanded ? 'scale-[0.97] opacity-30' : ''
+                              }`}
                             >
                               <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                                 {v.productName}
@@ -524,63 +546,79 @@ export function HomePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                {filteredAggregates.slice(0, 30).map((agg) => (
-                  <button
-                    key={agg.normalizedKey}
-                    type="button"
-                    onClick={() => setSelectedAggregate(agg)}
-                    className="card-interactive flex w-full items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3 text-left"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CategoryBadge
-                        category={agg.category}
-                        size={17}
-                        className="h-9 w-9 shrink-0 rounded-xl"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                          {agg.displayName}
+              <div
+                key={marketFilter || 'all-markets'}
+                className="animate-slide-forward grid grid-cols-1 gap-2.5 md:grid-cols-2"
+              >
+                {filteredAggregates.slice(0, 30).map((agg) => {
+                  const cardKey = `exp_${agg.normalizedKey}`;
+                  const isExpanded = analyticsState?.originKey === cardKey;
+                  return (
+                    <button
+                      key={agg.normalizedKey}
+                      type="button"
+                      onClick={(e) =>
+                        setAnalyticsState({
+                          aggregate: agg,
+                          origin: captureSpatialOrigin(e.currentTarget),
+                          originKey: cardKey,
+                        })
+                      }
+                      className={`card-interactive flex w-full items-center justify-between rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-3 text-left transition-[opacity,transform] duration-200 ${
+                        isExpanded ? 'scale-[0.98] opacity-30' : ''
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <CategoryBadge
+                          category={agg.category}
+                          size={17}
+                          className="h-9 w-9 shrink-0 rounded-xl"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                            {agg.displayName}
+                          </p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            Menor:{' '}
+                            <span className="font-mono-tabular">
+                              {agg.minPriceOccurrence
+                                ? `${AppFormatters.formatCurrency(agg.minPriceOccurrence.price)} (${agg.minPriceOccurrence.marketName})`
+                                : '--'}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="ml-3 shrink-0 text-right">
+                        <p className="font-mono-tabular text-sm font-semibold text-[var(--positive)]">
+                          {AppFormatters.formatCurrency(agg.lastPrice)}
                         </p>
-                        <p className="truncate text-xs text-[var(--text-muted)]">
-                          Menor:{' '}
-                          <span className="font-mono-tabular">
-                            {agg.minPriceOccurrence
-                              ? `${AppFormatters.formatCurrency(agg.minPriceOccurrence.price)} (${agg.minPriceOccurrence.marketName})`
-                              : '--'}
-                          </span>
+                        <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
+                          Média {AppFormatters.formatCurrency(agg.averagePrice)}
                         </p>
                       </div>
-                    </div>
-                    <div className="ml-3 shrink-0 text-right">
-                      <p className="font-mono-tabular text-sm font-semibold text-[var(--positive)]">
-                        {AppFormatters.formatCurrency(agg.lastPrice)}
-                      </p>
-                      <p className="font-mono-tabular text-xs text-[var(--text-muted)]">
-                        Média {AppFormatters.formatCurrency(agg.averagePrice)}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           </>
         )}
       </div>
 
-      {selectedAggregate && (
+      {analyticsState && (
         <ProductAnalyticsModal
-          aggregate={selectedAggregate}
+          aggregate={analyticsState.aggregate}
           allAggregates={fullAggregates}
+          origin={analyticsState.origin}
           onCompareWith={(other) => {
             setCompareState({
               open: true,
-              itemA: selectedAggregate,
+              itemA: analyticsState.aggregate,
               itemB: other,
             });
-            setSelectedAggregate(null);
+            setAnalyticsState(null);
           }}
-          onClose={() => setSelectedAggregate(null)}
+          onClose={() => setAnalyticsState(null)}
         />
       )}
 

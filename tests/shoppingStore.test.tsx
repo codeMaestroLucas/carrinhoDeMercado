@@ -270,4 +270,74 @@ describe('useShoppingStore & ShoppingListPage', () => {
     fireEvent.pointerCancel(card);
     expect(toggleChecked).toHaveBeenCalledTimes(1);
   });
+
+  it('prevents ghost-clicking the next row when tapping an item shifts the list upward', () => {
+    const toggleChecked = vi.fn();
+    const itemA = {
+      id: 'item-a',
+      name: 'Feijão Carioca',
+      quantity: 1,
+      unit: 'kg',
+      category: 'alimentos' as const,
+      isChecked: false,
+      marketId: null,
+      price: null,
+      isPriceTotal: false,
+      createdAt: new Date().toISOString(),
+    };
+    const itemB = {
+      id: 'item-b',
+      name: 'Macarrão Penne',
+      quantity: 1,
+      unit: 'un',
+      category: 'alimentos' as const,
+      isChecked: false,
+      marketId: null,
+      price: null,
+      isPriceTotal: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    render(
+      <>
+        <SwipeableShoppingItemRow
+          item={itemA}
+          onToggleChecked={toggleChecked}
+          onOpenEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onUpdateQuantity={vi.fn()}
+        />
+        <SwipeableShoppingItemRow
+          item={itemB}
+          onToggleChecked={toggleChecked}
+          onOpenEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onUpdateQuantity={vi.fn()}
+        />
+      </>,
+    );
+
+    // User taps Item A via touch/pointer; Item A toggles and moves out of place.
+    fireEvent.pointerDown(screen.getByText('Feijão Carioca'), {
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerUp(screen.getByText('Feijão Carioca'), {
+      clientX: 100,
+      clientY: 100,
+    });
+
+    // Browser then fires delayed compatibility mouse events on Item B, which shifted into (100, 100).
+    fireEvent.mouseDown(screen.getByText('Macarrão Penne'), {
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.mouseUp(screen.getByText('Macarrão Penne'), {
+      clientX: 100,
+      clientY: 100,
+    });
+
+    expect(toggleChecked).toHaveBeenCalledTimes(1);
+    expect(toggleChecked).toHaveBeenCalledWith('item-a');
+  });
 });

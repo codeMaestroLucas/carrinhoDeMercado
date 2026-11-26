@@ -172,199 +172,205 @@
 
 /* ----------------------------------------------------------------
    Apple Frosted Materials & Tactile Button Primitives
-   (Squash & stretch at 0.97 on :active, < 100ms snappy response)
+   Wrapped in @layer components so Tailwind utilities (grid, flex, etc.) win cleanly
    ---------------------------------------------------------------- */
 
-.apple-glass {
-  background-color: var(--bg-glass);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-}
-
-.apple-glass-strong {
-  background-color: var(--bg-glass-strong);
-  backdrop-filter: saturate(180%) blur(28px);
-  -webkit-backdrop-filter: saturate(180%) blur(28px);
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  background-color: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(25, 128, 66, 0.18), 0 4px 12px rgba(25, 128, 66, 0.14);
-  transition:
-    background-color var(--m-out) var(--ease-ui),
-    box-shadow var(--m-out) var(--ease-ui),
-    transform var(--m-press) var(--ease-ui),
-    opacity var(--m-out) var(--ease-ui);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--accent-hover);
-  box-shadow: 0 2px 6px rgba(25, 128, 66, 0.24), 0 6px 16px rgba(25, 128, 66, 0.18);
-  transition-duration: var(--m-in), var(--m-in), var(--m-press), var(--m-in);
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-hairline);
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition:
-    background-color var(--m-out) var(--ease-ui),
-    border-color var(--m-out) var(--ease-ui),
-    transform var(--m-press) var(--ease-ui);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--bg-elevated);
-  border-color: var(--border-subtle);
-  transition-duration: var(--m-in), var(--m-in), var(--m-press);
-}
-
-.btn-tinted {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border-radius: 999px;
-  background-color: var(--accent-soft);
-  color: var(--accent-fg);
-  font-weight: 600;
-  transition:
-    background-color var(--m-out) var(--ease-ui),
-    transform var(--m-press) var(--ease-ui);
-}
-
-.btn-tinted:hover:not(:disabled) {
-  filter: brightness(0.97);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover:not(:disabled),
-  .btn-secondary:hover:not(:disabled),
-  .btn-tinted:hover:not(:disabled) {
-    transform: translateY(-1px);
+@layer components {
+  .apple-glass {
+    background-color: var(--bg-glass);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
   }
-}
 
-/* Tactile squash & stretch press (scale from 0.97) */
-.btn-primary:active:not(:disabled),
-.btn-secondary:active:not(:disabled),
-.btn-tinted:active:not(:disabled) {
-  transform: translateY(0.5px) scale(0.97);
-}
+  .apple-glass-strong {
+    background-color: var(--bg-glass-strong);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+  }
 
-/* Apple Segmented Control */
-.segmented-track {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background-color: var(--bg-subtle);
-  padding: 3px;
-}
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    background-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(25, 128, 66, 0.18), 0 4px 12px rgba(25, 128, 66, 0.14);
+    transition:
+      background-color var(--m-out) var(--ease-ui),
+      box-shadow var(--m-out) var(--ease-ui),
+      transform var(--m-press) var(--ease-ui),
+      opacity var(--m-out) var(--ease-ui);
+  }
 
-.segmented-item {
-  position: relative;
-  z-index: 1;
-  border-radius: 999px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition:
-    background-color 180ms var(--ease-ui),
-    color 150ms var(--ease-ui),
-    box-shadow 180ms var(--ease-ui),
-    transform var(--m-press) var(--ease-ui);
-}
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+    box-shadow: 0 2px 6px rgba(25, 128, 66, 0.24), 0 6px 16px rgba(25, 128, 66, 0.18);
+    transition-duration: var(--m-in), var(--m-in), var(--m-press), var(--m-in);
+  }
 
-.segmented-item:hover {
-  color: var(--text-primary);
-}
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-hairline);
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition:
+      background-color var(--m-out) var(--ease-ui),
+      border-color var(--m-out) var(--ease-ui),
+      transform var(--m-press) var(--ease-ui);
+  }
 
-.segmented-item:active {
-  transform: scale(0.97);
-}
-
-.segmented-item-active {
-  background-color: var(--bg-surface);
-  color: var(--text-primary);
-  font-weight: 600;
-  box-shadow: var(--shadow-pill);
-}
-
-/* Crisp Apple luminous card */
-.surface-card {
-  border-radius: var(--r-lg);
-  border: 1px solid var(--border-hairline);
-  background-color: var(--bg-surface);
-  box-shadow: var(--shadow-card);
-}
-
-.dark .surface-card {
-  box-shadow: var(--shadow-card), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-}
-
-/* Interactive linked card: subtle 2px lift on hover */
-.card-interactive {
-  transition:
-    transform 180ms var(--ease-ui),
-    border-color 150ms var(--ease-ui),
-    background-color 150ms var(--ease-ui),
-    box-shadow 180ms var(--ease-ui);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .card-interactive:hover {
-    transform: translateY(-2px);
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--bg-elevated);
     border-color: var(--border-subtle);
-    box-shadow: var(--shadow-card-hover);
+    transition-duration: var(--m-in), var(--m-in), var(--m-press);
   }
-}
 
-/* Photo frame smooth zoom (1.03 inside frame) */
-.photo-frame {
-  overflow: hidden;
-}
-
-.photo-frame img {
-  transition: transform 550ms var(--ease-enter);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .photo-frame:hover img {
-    transform: scale(1.03);
+  .btn-tinted {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    background-color: var(--accent-soft);
+    color: var(--accent-fg);
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      background-color var(--m-out) var(--ease-ui),
+      transform var(--m-press) var(--ease-ui);
   }
-}
 
-/* Smooth accordion expansion (CSS Grid + interpolate-size support, no abrupt jumps) */
-.accordion-grid {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 240ms var(--ease-enter),
-    opacity 200ms var(--ease-ui);
-}
+  .btn-tinted:hover:not(:disabled) {
+    filter: brightness(0.97);
+  }
 
-.accordion-grid[data-open="true"] {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
+  @media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover:not(:disabled),
+    .btn-secondary:hover:not(:disabled),
+    .btn-tinted:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+  }
 
-.accordion-inner {
-  overflow: hidden;
+  /* Tactile squash & stretch press (scale from 0.97) */
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-tinted:active:not(:disabled) {
+    transform: translateY(0.5px) scale(0.97);
+  }
+
+  /* Apple Segmented Control */
+  .segmented-track {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background-color: var(--bg-subtle);
+    padding: 3px;
+  }
+
+  .segmented-item {
+    position: relative;
+    z-index: 1;
+    border-radius: 999px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    transition:
+      background-color 180ms var(--ease-ui),
+      color 150ms var(--ease-ui),
+      box-shadow 180ms var(--ease-ui),
+      transform var(--m-press) var(--ease-ui);
+  }
+
+  .segmented-item:hover {
+    color: var(--text-primary);
+  }
+
+  .segmented-item:active {
+    transform: scale(0.97);
+  }
+
+  .segmented-item-active {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-pill);
+  }
+
+  /* Crisp Apple luminous card */
+  .surface-card {
+    border-radius: var(--r-lg);
+    border: 1px solid var(--border-hairline);
+    background-color: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .surface-card {
+    box-shadow: var(--shadow-card), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* Interactive linked card: subtle 2px lift on hover */
+  .card-interactive {
+    transition:
+      transform 180ms var(--ease-ui),
+      border-color 150ms var(--ease-ui),
+      background-color 150ms var(--ease-ui),
+      box-shadow 180ms var(--ease-ui);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .card-interactive:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-subtle);
+      box-shadow: var(--shadow-card-hover);
+    }
+  }
+
+  /* Photo frame smooth zoom (1.03 inside frame) */
+  .photo-frame {
+    overflow: hidden;
+  }
+
+  .photo-frame img {
+    transition: transform 550ms var(--ease-enter);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .photo-frame:hover img {
+      transform: scale(1.03);
+    }
+  }
+
+  /* Smooth accordion expansion (CSS Grid + interpolate-size support, no abrupt jumps) */
+  .accordion-grid {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 240ms var(--ease-enter),
+      opacity 200ms var(--ease-ui);
+  }
+
+  .accordion-grid[data-open="true"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  .accordion-inner {
+    overflow: hidden;
+  }
 }
 
 /* ----------------------------------------------------------------
@@ -564,6 +570,44 @@
   animation: goal-ready-ring 2.2s var(--ease-ui) infinite;
 }
 
+/* Spatial detail secondary content stagger (GPU transform & opacity only) */
+.spatial-stagger-item {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  transition:
+    opacity 240ms var(--ease-enter) var(--stagger-delay, 0ms),
+    transform 280ms var(--ease-enter) var(--stagger-delay, 0ms);
+}
+
+[data-spatial-phase="open"] .spatial-stagger-item {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+[data-spatial-phase="closing"] .spatial-stagger-item {
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 130ms var(--ease-ui) 0ms,
+    transform 150ms var(--ease-ui) 0ms;
+}
+
+/* Origin-anchored reversible menu & popover transitions */
+.origin-menu {
+  opacity: 0;
+  transform: translate3d(0, -6px, 0) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity 140ms var(--ease-ui),
+    transform 160ms var(--ease-enter);
+}
+
+.origin-menu[data-open="true"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  pointer-events: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-enter,
   .animate-photo-settle,
@@ -577,6 +621,12 @@
   .animate-slide-backward,
   .animate-goal-ready {
     animation: none !important;
+  }
+
+  .spatial-stagger-item,
+  .origin-menu {
+    transform: none !important;
+    transition: opacity 120ms ease !important;
   }
 
   .card-interactive:hover,

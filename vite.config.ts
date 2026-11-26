@@ -10,8 +10,13 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       includeAssets: [
+        'favicon.ico',
+        'favicon.svg',
         'favicon.png',
+        'favicon-16x16.png',
+        'favicon-32x32.png',
         'apple-touch-icon.png',
+        'safari-pinned-tab.svg',
         'icons/*.png',
         'assets/*.jpg',
         'assets/*.png',
@@ -21,8 +26,8 @@ export default defineConfig({
         short_name: 'Carrinho',
         description:
           'Aplicativo inteligente de lista e carrinho de compras com leitura de cupom fiscal, comparação de preços e sincronização em família.',
-        theme_color: '#F7F4EE',
-        background_color: '#F7F4EE',
+        theme_color: '#F5F5F7',
+        background_color: '#F5F5F7',
         display: 'fullscreen',
         display_override: ['fullscreen', 'standalone'],
         orientation: 'portrait',
