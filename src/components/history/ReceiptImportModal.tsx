@@ -138,12 +138,16 @@ function EditScannedItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-xs sm:items-center sm:p-4"
+      data-disable-pull-to-refresh="true"
+      className="fixed inset-0 z-[60] flex items-end justify-center overscroll-none bg-black/60 backdrop-blur-xs sm:items-center sm:p-4"
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="animate-modal-in max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
+        className="animate-modal-in max-h-[92vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
@@ -686,6 +690,23 @@ export function ReceiptImportModal({
   }, []);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehaviorY;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehaviorY = 'none';
+    document.documentElement.style.overscrollBehaviorY = 'none';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehaviorY = prevBodyOverscroll;
+      document.documentElement.style.overscrollBehaviorY = prevHtmlOverscroll;
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (editedPreviewUrl) {
         URL.revokeObjectURL(editedPreviewUrl);
@@ -929,6 +950,15 @@ export function ReceiptImportModal({
     void runOcrOnFile(editedFile);
   };
 
+  const handleRemoveOcrPhoto = () => {
+    setEditedPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setLastOriginalOcrFile(null);
+    setPendingOcrFile(null);
+  };
+
   const handleParsePastedContent = () => {
     const raw = pasteText.trim();
     if (!raw) return;
@@ -1089,7 +1119,14 @@ export function ReceiptImportModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Importar cupom fiscal"
+        data-disable-pull-to-refresh="true"
+        className="fixed inset-0 z-50 flex items-end justify-center overscroll-none bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
         onClick={() => {
           void stopCamera();
           onClose();
@@ -1097,7 +1134,7 @@ export function ReceiptImportModal({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="animate-modal-in max-h-[93vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
+          className="animate-modal-in max-h-[93vh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
         >
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
@@ -1331,67 +1368,83 @@ export function ReceiptImportModal({
                     : 'animate-slide-backward'
                 }`}
               >
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
-                    <Camera size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
-                    <span className="text-xs font-semibold text-[var(--text-primary)]">
-                      Tirar foto do cupom
-                    </span>
-                    <span className="text-[11px] text-[var(--text-muted)]">
-                      Cortar, girar e ajustar antes do OCR
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoSelected}
-                      className="hidden"
-                    />
-                  </label>
+                {!editedPreviewUrl ? (
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
+                      <Camera size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">
+                        Tirar foto do cupom
+                      </span>
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        Cortar, girar e ajustar antes do OCR
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoSelected}
+                        className="hidden"
+                      />
+                    </label>
 
-                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
-                    <ImageIcon size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
-                    <span className="text-xs font-semibold text-[var(--text-primary)]">
-                      Escolher da galeria
-                    </span>
-                    <span className="text-[11px] text-[var(--text-muted)]">
-                      Editar foto salva no aparelho
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoSelected}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {editedPreviewUrl && (
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-2.5 text-left">
-                    <div className="flex min-w-0 items-center gap-2.5">
+                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--bg-app)] px-4 py-6 transition-colors duration-150 ease-ui hover:border-[var(--accent)]/40 hover:bg-[var(--bg-subtle)]">
+                      <ImageIcon size={22} strokeWidth={1.6} className="text-[var(--accent-fg)]" />
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">
+                        Escolher da galeria
+                      </span>
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        Editar foto salva no aparelho
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoSelected}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-3 text-left sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
                       <img
                         src={editedPreviewUrl}
                         alt="Prévia do cupom editado"
-                        className="h-12 w-12 shrink-0 rounded-lg border border-[var(--border-hairline)] object-cover"
+                        className="h-14 w-14 shrink-0 rounded-lg border border-[var(--border-hairline)] object-cover"
                       />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-[var(--text-primary)]">
-                          Foto preparada para OCR
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
+                          Foto do cupom pronta
                         </p>
                         <p className="text-[11px] text-[var(--text-muted)]">
-                          Recortada e ajustada
+                          {isProcessing
+                            ? 'Extraindo itens pelo OCR...'
+                            : 'Recortada e ajustada'}
                         </p>
                       </div>
                     </div>
-                    {lastOriginalOcrFile && !isProcessing && (
-                      <button
-                        type="button"
-                        onClick={() => setPendingOcrFile(lastOriginalOcrFile)}
-                        className="btn-tinted flex h-8 shrink-0 items-center gap-1.5 px-3 text-xs"
-                      >
-                        <Crop size={13} strokeWidth={2} />
-                        Reeditar
-                      </button>
+
+                    {!isProcessing && (
+                      <div className="flex items-center gap-2">
+                        {lastOriginalOcrFile && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingOcrFile(lastOriginalOcrFile)}
+                            className="btn-tinted flex h-8 flex-1 items-center justify-center gap-1.5 px-3 text-xs sm:flex-initial"
+                          >
+                            <Crop size={13} strokeWidth={2} />
+                            Reeditar
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleRemoveOcrPhoto}
+                          aria-label="Remover foto"
+                          className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--negative)]/20 bg-[var(--negative-soft)] px-3 text-xs font-semibold text-[var(--negative)] transition-colors hover:brightness-95 active:scale-[0.98] sm:flex-initial"
+                        >
+                          <Trash2 size={13} strokeWidth={1.8} />
+                          Remover foto
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -1518,7 +1571,7 @@ export function ReceiptImportModal({
                   </button>
                 </div>
 
-                <div className="max-h-80 space-y-2 overflow-y-auto pr-1 sm:max-h-96">
+                <div className="max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1 sm:max-h-96">
                   {scannedItems.map((item, idx) => (
                     <SwipeableScannedReceiptItemRow
                       key={item.id}
