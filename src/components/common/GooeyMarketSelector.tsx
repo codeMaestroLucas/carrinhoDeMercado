@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Store } from 'lucide-react';
 
-export interface GooeyOption {
+interface GooeyOption {
   id: string;
   label: string;
   showIcon?: boolean;
@@ -105,7 +105,6 @@ export function GooeyMarketSelector({
     <div
       className={`no-scrollbar relative flex flex-1 items-center overflow-x-auto py-1 ${className}`}
     >
-      {/* SVG Gooey Filter Definition */}
       <svg
         className="pointer-events-none absolute h-0 w-0 overflow-hidden"
         aria-hidden="true"
@@ -129,7 +128,6 @@ export function GooeyMarketSelector({
       </svg>
 
       <div ref={trackRef} className="relative flex items-center gap-2">
-        {/* Layer 0: Crisp white background pills for unselected options */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-0"
@@ -150,7 +148,6 @@ export function GooeyMarketSelector({
           })}
         </div>
 
-        {/* Layer 1: Gooey / Liquid Morphing Green Mercury Blobs */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-[1]"
@@ -184,7 +181,6 @@ export function GooeyMarketSelector({
           )}
         </div>
 
-        {/* Layer 2: Interactive Foreground Buttons */}
         {options.map((opt) => {
           const active = opt.id === selectedId;
           const showIcon = opt.showIcon ?? true;

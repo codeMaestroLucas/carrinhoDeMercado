@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useShoppingStore } from '../src/store/useShoppingStore';
 import { ShoppingListPage } from '../src/pages/ShoppingListPage';
 import { SwipeableShoppingItemRow } from '../src/components/list/SwipeableShoppingItemRow';
@@ -214,7 +214,9 @@ describe('useShoppingStore & ShoppingListPage', () => {
 
     // 2. Long press (500ms): opens edit modal
     fireEvent.mouseDown(card, { clientX: 100, clientY: 100 });
-    vi.advanceTimersByTime(550);
+    act(() => {
+      vi.advanceTimersByTime(550);
+    });
     expect(openEdit).toHaveBeenCalledWith(mockItem);
     fireEvent.mouseUp(card, { clientX: 100, clientY: 100 });
     // mouseUp after long press should not toggle checked again
@@ -225,7 +227,9 @@ describe('useShoppingStore & ShoppingListPage', () => {
     fireEvent.mouseDown(cardContainer, { clientX: 200, clientY: 100 });
     fireEvent.mouseMove(cardContainer, { clientX: 100, clientY: 100 });
     fireEvent.mouseUp(cardContainer, { clientX: 100, clientY: 100 });
-    vi.runAllTimers();
+    act(() => {
+      vi.runAllTimers();
+    });
     expect(remove).toHaveBeenCalledWith('item-1');
 
     vi.useRealTimers();

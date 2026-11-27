@@ -17,6 +17,8 @@ import {
 } from 'firebase/firestore';
 import type { SharedSpaceStatePayload } from '../types/shopping';
 
+export type CloudUnsubscribe = Unsubscribe;
+
 const firebaseConfig = {
   apiKey:
     import.meta.env.VITE_FIREBASE_API_KEY ||
@@ -191,7 +193,6 @@ export const CloudSyncService = {
           if (code !== 'not-found') {
             throw updateErr;
           }
-          // Document does not exist yet: fall through to full setDoc
         }
       }
 
@@ -228,6 +229,12 @@ export const CloudSyncService = {
         params.onError?.(new Error(this.formatFirestoreError(error)));
       },
     );
+  },
+
+  isPermissionDeniedError(err: unknown): boolean {
+    const e = err as { code?: string; message?: string };
+    const msg = e?.message ?? String(err);
+    return e?.code === 'permission-denied' || msg.includes('Permissão negada');
   },
 
   formatFirestoreError(err: unknown): string {

@@ -1,12 +1,17 @@
 import {
   PRODUCT_CATEGORIES,
   type CategorySpendingSummary,
+  type MarketBargainGroup,
+  type MarketBargainItem,
+  type MarketPriceRecommendation,
   type MarketProductStats,
+  type MarketProfile,
   type PriceIndexSummary,
   type ProductCategoryId,
   type ProductHistoryOccurrence,
   type ProductVariationItem,
   type PurchaseRecord,
+  type ShoppingItem,
 } from '../types/shopping';
 import { CategoryClassifier } from './categoryClassifier';
 
@@ -35,7 +40,7 @@ function hasReceiptCode(name: string): boolean {
   );
 }
 
-export function createProductHistoryAggregate(
+function createProductHistoryAggregate(
   normalizedKey: string,
   displayName: string,
   category: ProductCategoryId,
@@ -202,7 +207,6 @@ function groupHistoryOccurrences(
     }
   }
 
-  // Sort most specific buckets first (those with explicit measurements, then most tokens)
   const hasMeasRegex = /\b\d+(?:\.\d+)?(?:ml|l|g|kg)\b/;
   const sortedBuckets = Array.from(exactMap.values()).sort((a, b) => {
     const aHasMeas = hasMeasRegex.test(a.key) ? 1 : 0;
@@ -430,4 +434,165 @@ export function calculateCategorySpending(
 
   result.sort((a, b) => b.totalSpent - a.totalSpent);
   return result;
+}
+
+export function findAggregateForProductName(
+  aggregates: ProductHistoryAggregate[],
+  productName: string,
+): ProductHistoryAggregate | undefined {
+  const exact = aggregates.find((agg) =>
+    agg.occurrences.some((occ) => occ.productName === productName),
+  );
+  if (exact) return exact;
+  const normTarget = CategoryClassifier.normalizeForComparison(productName);
+  if (!normTarget) return undefined;
+  return aggregates.find((agg) => agg.normalizedKey === normTarget);
+}
+
+export function findLastHistoricalPrice(
+  history: PurchaseRecord[],
+  itemName: string,
+  marketId?: string | null,
+): number | null {
+  const normalized = CategoryClassifier.normalize(itemName);
+  if (!normalized) return null;
+
+  if (marketId) {
+    for (const record of history) {
+      if (record.marketId !== marketId) continue;
+      for (const item of record.items) {
+        if (
+          CategoryClassifier.normalize(item.name) === normalized &&
+          item.price > 0
+        ) {
+          return item.price;
+        }
+      }
+    }
+  }
+
+  for (const record of history) {
+    for (const item of record.items) {
+      if (
+        CategoryClassifier.normalize(item.name) === normalized &&
+        item.price > 0
+      ) {
+        return item.price;
+      }
+    }
+  }
+  return null;
+}
+
+export function buildMarketRecommendationsByProduct(
+  history: PurchaseRecord[],
+  markets: MarketProfile[],
+): Map<string, MarketPriceRecommendation[]> {
+  const byId = new Map<string, MarketProfile>();
+  const byNormName = new Map<string, MarketProfile>();
+  for (const m of markets) {
+    byId.set(m.id, m);
+    byNormName.set(CategoryClassifier.normalize(m.name), m);
+  }
+
+  const pricesByProduct = new Map<string, Map<string, number[]>>();
+  const fallbackMarketNames = new Map<string, string>();
+  const allCategoryIds = PRODUCT_CATEGORIES.map((c) => c.id);
+
+  for (const record of history) {
+    const matchedMarket =
+      byId.get(record.marketId) ??
+      byNormName.get(CategoryClassifier.normalize(record.marketName));
+    const marketKey = matchedMarket?.id ?? record.marketId;
+    if (!fallbackMarketNames.has(marketKey)) {
+      fallbackMarketNames.set(
+        marketKey,
+        matchedMarket?.name ?? record.marketName,
+      );
+    }
+
+    for (const histItem of record.items) {
+      if (histItem.price <= 0) continue;
+      const prodKey = CategoryClassifier.normalize(histItem.name);
+      if (!prodKey) continue;
+
+      let marketPrices = pricesByProduct.get(prodKey);
+      if (!marketPrices) {
+        marketPrices = new Map<string, number[]>();
+        pricesByProduct.set(prodKey, marketPrices);
+      }
+      const arr = marketPrices.get(marketKey);
+      if (arr) {
+        arr.push(histItem.price);
+      } else {
+        marketPrices.set(marketKey, [histItem.price]);
+      }
+    }
+  }
+
+  const result = new Map<string, MarketPriceRecommendation[]>();
+  for (const [prodKey, marketPrices] of pricesByProduct.entries()) {
+    const recs: MarketPriceRecommendation[] = [];
+    for (const [marketId, prices] of marketPrices.entries()) {
+      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+      const market =
+        byId.get(marketId) ??
+        ({
+          id: marketId,
+          name: fallbackMarketNames.get(marketId) ?? 'Mercado',
+          categoryOrder: allCategoryIds,
+        } satisfies MarketProfile);
+      recs.push({ market, averagePrice: avg, lastPrice: prices[0] });
+    }
+    recs.sort((a, b) => a.averagePrice - b.averagePrice);
+    result.set(prodKey, recs);
+  }
+  return result;
+}
+
+export function getMarketRecommendationsForProduct(
+  history: PurchaseRecord[],
+  markets: MarketProfile[],
+  itemName: string,
+): MarketPriceRecommendation[] {
+  const normalized = CategoryClassifier.normalize(itemName);
+  if (!normalized) return [];
+  return buildMarketRecommendationsByProduct(history, markets).get(normalized) ?? [];
+}
+
+export function computeMarketBargains(
+  items: ShoppingItem[],
+  recommendationsByProduct: Map<string, MarketPriceRecommendation[]>,
+): MarketBargainGroup[] {
+  const groupsMap = new Map<string, MarketBargainGroup>();
+  for (const item of items) {
+    const recs = recommendationsByProduct.get(
+      CategoryClassifier.normalize(item.name),
+    );
+    if (!recs || recs.length < 2) continue;
+    const cheapest = recs[0];
+    const highest = recs[recs.length - 1];
+    if (highest.averagePrice <= cheapest.averagePrice) continue;
+    const savingsPercent =
+      ((highest.averagePrice - cheapest.averagePrice) / highest.averagePrice) *
+      100;
+    const bargain: MarketBargainItem = {
+      item,
+      cheapestPrice: cheapest.averagePrice,
+      highestPrice: highest.averagePrice,
+      savingsPercent,
+    };
+    const existing = groupsMap.get(cheapest.market.id);
+    if (existing) {
+      existing.bargains.push(bargain);
+    } else {
+      groupsMap.set(cheapest.market.id, {
+        market: cheapest.market,
+        bargains: [bargain],
+      });
+    }
+  }
+  return Array.from(groupsMap.values()).sort(
+    (a, b) => b.bargains.length - a.bargains.length,
+  );
 }

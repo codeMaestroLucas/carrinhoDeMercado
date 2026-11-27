@@ -16,32 +16,33 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
-  PRODUCT_CATEGORIES,
   PRODUCT_CATEGORY_MAP,
   getEffectiveTotalAmount,
-  type MarketPriceRecommendation,
-  type MarketProfile,
+  type MarketBargainGroup,
   type ProductCategoryId,
   type ShoppingItem,
 } from '../types/shopping';
 import { useShoppingStore } from '../store/useShoppingStore';
 import { CategoryClassifier } from '../services/categoryClassifier';
-import { buildAllProductAggregates } from '../services/productHistoryService';
+import {
+  buildAllProductAggregates,
+  buildMarketRecommendationsByProduct,
+  computeMarketBargains,
+} from '../services/productHistoryService';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryDot } from '../components/common/CategoryIcon';
 import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
 import { SmartTooltip } from '../components/common/SmartTooltip';
+import { ToastHud } from '../components/common/ToastHud';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import { PwaInstallBanner } from '../components/layout/PwaInstallBanner';
 import { EditItemModal } from '../components/list/EditItemModal';
 import { FiltersModal } from '../components/list/FiltersModal';
 import { SwipeableShoppingItemRow } from '../components/list/SwipeableShoppingItemRow';
-import {
-  MarketSavingsModal,
-  type MarketBargainGroup,
-  type MarketBargainItem,
-} from '../components/list/MarketSavingsModal';
+import { MarketSavingsModal } from '../components/list/MarketSavingsModal';
 import { FinishPurchaseModal } from '../components/list/FinishPurchaseModal';
+import { useMarketSelectionDirection } from '../hooks/useMarketSelectionDirection';
+import { useToast } from '../hooks/useToast';
 
 interface ShoppingListPageProps {
   autoFocusQuickAdd?: boolean;
@@ -73,6 +74,7 @@ export function ShoppingListPage({
   const uncheckAllItems = useShoppingStore((s) => s.uncheckAllItems);
   const clearAllItems = useShoppingStore((s) => s.clearAllItems);
   const selectMarket = useShoppingStore((s) => s.selectMarket);
+  const setCategoryFilter = useShoppingStore((s) => s.setCategoryFilter);
 
   const [inputText, setInputText] = useState('');
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
@@ -80,23 +82,22 @@ export function ShoppingListPage({
   const [showSavings, setShowSavings] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [inputShake, setInputShake] = useState(false);
-  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
+  const { message: toastMsg, showToast } = useToast(2800);
+
+  const marketDirection = useMarketSelectionDirection(
+    markets.findIndex((m) => m.id === selectedMarketId),
+  );
 
   const handleSelectMarket = useCallback(
     (nextMarketId: string) => {
       if (nextMarketId === selectedMarketId) return;
-      const curIdx = markets.findIndex((m) => m.id === selectedMarketId);
-      const nextIdx = markets.findIndex((m) => m.id === nextMarketId);
-      setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
       selectMarket(nextMarketId);
     },
-    [markets, selectedMarketId, selectMarket],
+    [selectedMarketId, selectMarket],
   );
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (autoFocusQuickAdd) {
@@ -104,25 +105,6 @@ export function ShoppingListPage({
       onQuickAddConsumed?.();
     }
   }, [autoFocusQuickAdd, onQuickAddConsumed]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current !== null) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  const showToast = useCallback((msg: string) => {
-    setToastMsg(msg);
-    if (toastTimerRef.current !== null) {
-      clearTimeout(toastTimerRef.current);
-    }
-    toastTimerRef.current = setTimeout(() => {
-      setToastMsg(null);
-      toastTimerRef.current = null;
-    }, 2800);
-  }, []);
 
   const selectedMarket = useMemo(
     () => markets.find((m) => m.id === selectedMarketId) ?? markets[0],
@@ -173,103 +155,15 @@ export function ShoppingListPage({
       });
   }, [items, showCheckedItems, categoryFilter, categoryOrderMap]);
 
-  const recommendationsByProduct = useMemo(() => {
-    const byId = new Map<string, MarketProfile>();
-    const byNormName = new Map<string, MarketProfile>();
-    for (const m of markets) {
-      byId.set(m.id, m);
-      byNormName.set(CategoryClassifier.normalize(m.name), m);
-    }
+  const recommendationsByProduct = useMemo(
+    () => buildMarketRecommendationsByProduct(history, markets),
+    [history, markets],
+  );
 
-    const pricesByProduct = new Map<string, Map<string, number[]>>();
-    const fallbackMarketNames = new Map<string, string>();
-    const allCategoryIds = PRODUCT_CATEGORIES.map((c) => c.id);
-
-    for (const record of history) {
-      const matchedMarket =
-        byId.get(record.marketId) ??
-        byNormName.get(CategoryClassifier.normalize(record.marketName));
-      const marketKey = matchedMarket?.id ?? record.marketId;
-      if (!fallbackMarketNames.has(marketKey)) {
-        fallbackMarketNames.set(
-          marketKey,
-          matchedMarket?.name ?? record.marketName,
-        );
-      }
-
-      for (const histItem of record.items) {
-        if (histItem.price <= 0) continue;
-        const prodKey = CategoryClassifier.normalize(histItem.name);
-        if (!prodKey) continue;
-
-        let marketPrices = pricesByProduct.get(prodKey);
-        if (!marketPrices) {
-          marketPrices = new Map<string, number[]>();
-          pricesByProduct.set(prodKey, marketPrices);
-        }
-        const arr = marketPrices.get(marketKey);
-        if (arr) {
-          arr.push(histItem.price);
-        } else {
-          marketPrices.set(marketKey, [histItem.price]);
-        }
-      }
-    }
-
-    const result = new Map<string, MarketPriceRecommendation[]>();
-    for (const [prodKey, marketPrices] of pricesByProduct.entries()) {
-      const recs: MarketPriceRecommendation[] = [];
-      for (const [marketId, prices] of marketPrices.entries()) {
-        const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-        const market =
-          byId.get(marketId) ??
-          ({
-            id: marketId,
-            name: fallbackMarketNames.get(marketId) ?? 'Mercado',
-            categoryOrder: allCategoryIds,
-          } satisfies MarketProfile);
-        recs.push({ market, averagePrice: avg, lastPrice: prices[0] });
-      }
-      recs.sort((a, b) => a.averagePrice - b.averagePrice);
-      result.set(prodKey, recs);
-    }
-    return result;
-  }, [history, markets]);
-
-  const bargainGroups = useMemo<MarketBargainGroup[]>(() => {
-    const groupsMap = new Map<string, MarketBargainGroup>();
-    for (const item of items) {
-      const recs = recommendationsByProduct.get(
-        CategoryClassifier.normalize(item.name),
-      );
-      if (!recs || recs.length < 2) continue;
-      const cheapest = recs[0];
-      const highest = recs[recs.length - 1];
-      if (highest.averagePrice <= cheapest.averagePrice) continue;
-      const savingsPercent =
-        ((highest.averagePrice - cheapest.averagePrice) /
-          highest.averagePrice) *
-        100;
-      const bargain: MarketBargainItem = {
-        item,
-        cheapestPrice: cheapest.averagePrice,
-        highestPrice: highest.averagePrice,
-        savingsPercent,
-      };
-      const existing = groupsMap.get(cheapest.market.id);
-      if (existing) {
-        existing.bargains.push(bargain);
-      } else {
-        groupsMap.set(cheapest.market.id, {
-          market: cheapest.market,
-          bargains: [bargain],
-        });
-      }
-    }
-    return Array.from(groupsMap.values()).sort(
-      (a, b) => b.bargains.length - a.bargains.length,
-    );
-  }, [items, recommendationsByProduct]);
+  const bargainGroups = useMemo<MarketBargainGroup[]>(
+    () => computeMarketBargains(items, recommendationsByProduct),
+    [items, recommendationsByProduct],
+  );
 
   const activeMarketBargainGroup = useMemo(() => {
     return (
@@ -676,7 +570,6 @@ export function ShoppingListPage({
           </div>
         </div>
 
-        {/* Market Bargain Banner */}
         {bargainGroups.length > 0 && (
           <button
             type="button"
@@ -721,7 +614,6 @@ export function ShoppingListPage({
           </button>
         )}
 
-        {/* Active Category Filter Strip */}
         {categoryFilter && (
           <div className="surface-card flex items-center justify-between px-4 py-3 text-sm">
             <span className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
@@ -730,7 +622,7 @@ export function ShoppingListPage({
             </span>
             <button
               type="button"
-              onClick={() => useShoppingStore.getState().setCategoryFilter(null)}
+              onClick={() => setCategoryFilter(null)}
               className="text-xs font-semibold text-[var(--accent-fg)] hover:underline"
             >
               Limpar filtro
@@ -738,7 +630,6 @@ export function ShoppingListPage({
           </div>
         )}
 
-        {/* Shopping Items Grouped by Market Aisle */}
         {filteredAndSortedItems.length === 0 ? (
           <div className="surface-card flex flex-col items-center justify-center border-dashed px-6 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
@@ -786,7 +677,6 @@ export function ShoppingListPage({
         )}
       </div>
 
-      {/* Apple Frosted-Glass Floating Checkout Bar */}
       {items.length > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[74px] z-20 px-4 md:bottom-6">
           <div className="apple-glass-strong pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-4 rounded-full border border-[var(--border-subtle)] py-2 pr-2 pl-5 text-[var(--text-primary)] shadow-[var(--shadow-float)]">
@@ -821,12 +711,10 @@ export function ShoppingListPage({
         </div>
       )}
 
-      {/* Apple Frosted HUD Toast Feedback */}
-      {toastMsg && (
-        <div className="apple-glass-strong fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-24">
-          {toastMsg}
-        </div>
-      )}
+      <ToastHud
+        message={toastMsg}
+        className="apple-glass-strong fixed bottom-36 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-24"
+      />
 
       {editingItem && (
         <EditItemModal

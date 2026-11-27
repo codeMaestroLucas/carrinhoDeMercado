@@ -94,7 +94,6 @@ export function App() {
     } else {
       root.classList.remove('dark');
     }
-    // Force style recalculation while transitions are paused
     void root.offsetHeight;
     const raf = requestAnimationFrame(() => {
       root.classList.remove('theme-switching');
@@ -177,5 +176,3 @@ export function App() {
     </>
   );
 }
-
-export default App;

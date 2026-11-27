@@ -108,7 +108,6 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
       }}
       className="relative"
     >
-      {/* Apple-style Floating Pull-to-Refresh Spinner Pill */}
       <div
         aria-live="polite"
         aria-label={isRefreshing ? 'Recarregando página' : undefined}
@@ -143,7 +142,6 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
         </div>
       </div>
 
-      {/* Content gently shifts down while pulling */}
       <div
         style={{
           transform:

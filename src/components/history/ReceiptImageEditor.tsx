@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 
-export interface CropRect {
+interface CropRect {
   /** Normalized 0..1 */
   x: number;
   y: number;
@@ -386,7 +386,6 @@ export function ReceiptImageEditor({
       onTouchMove={(e) => e.stopPropagation()}
       onTouchEnd={(e) => e.stopPropagation()}
     >
-      {/* Top Bar */}
       <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
         <button
           type="button"
@@ -412,7 +411,6 @@ export function ReceiptImageEditor({
         </button>
       </div>
 
-      {/* Main Interactive Crop & Preview Stage */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-5 sm:p-8">
         {loadError ? (
           <div className="rounded-2xl border border-white/15 bg-white/5 px-5 py-4 text-center text-xs text-white/80">
@@ -431,26 +429,21 @@ export function ReceiptImageEditor({
             }}
             className="relative max-h-full max-w-full select-none touch-none overflow-visible shadow-2xl"
           >
-            {/* Preview Canvas */}
             <canvas
               ref={previewCanvasRef}
               style={{ filter: previewCssFilter }}
               className="block h-full w-full rounded-sm object-contain"
             />
 
-            {/* Darkened mask outside crop area */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              {/* Top shade */}
               <div
                 className="absolute inset-x-0 top-0 bg-black/60"
                 style={{ height: `${crop.y * 100}%` }}
               />
-              {/* Bottom shade */}
               <div
                 className="absolute inset-x-0 bottom-0 bg-black/60"
                 style={{ height: `${(1 - crop.y - crop.height) * 100}%` }}
               />
-              {/* Left shade */}
               <div
                 className="absolute left-0 bg-black/60"
                 style={{
@@ -459,7 +452,6 @@ export function ReceiptImageEditor({
                   width: `${crop.x * 100}%`,
                 }}
               />
-              {/* Right shade */}
               <div
                 className="absolute right-0 bg-black/60"
                 style={{
@@ -470,7 +462,6 @@ export function ReceiptImageEditor({
               />
             </div>
 
-            {/* Interactive Crop Frame */}
             <div
               onPointerDown={startDrag('move')}
               style={{
@@ -481,7 +472,6 @@ export function ReceiptImageEditor({
               }}
               className="absolute cursor-move border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
             >
-              {/* Rule of thirds grid */}
               <div
                 className={`pointer-events-none absolute inset-0 transition-opacity duration-150 ${
                   isDragging ? 'opacity-90' : 'opacity-40'
@@ -527,7 +517,6 @@ export function ReceiptImageEditor({
                 <span className="block h-5 w-5 rounded-br-sm border-b-[3px] border-r-[3px] border-[#30D158] drop-shadow" />
               </button>
 
-              {/* Edge Handles */}
               <button
                 type="button"
                 aria-label="Ajustar borda superior"
@@ -565,9 +554,7 @@ export function ReceiptImageEditor({
         )}
       </div>
 
-      {/* Bottom Editing Controls Dock */}
       <div className="shrink-0 space-y-3 border-t border-white/10 bg-[#141417]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
-        {/* Editor Mode Switcher */}
         <div className="mx-auto grid max-w-sm grid-cols-2 rounded-full bg-white/10 p-1">
           <button
             type="button"
@@ -595,11 +582,9 @@ export function ReceiptImageEditor({
           </button>
         </div>
 
-        {/* Tab Controls */}
         <div className="mx-auto max-w-md">
           {activeTab === 'crop' ? (
             <div className="space-y-3">
-              {/* Rotation & Full Crop Quick Actions */}
               <div className="flex items-center justify-center gap-2">
                 <button
                   type="button"
@@ -627,7 +612,6 @@ export function ReceiptImageEditor({
                 </button>
               </div>
 
-              {/* Fine Straighten Slider */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] text-white/70">
                   <span>Endireitar inclinação</span>
@@ -653,7 +637,6 @@ export function ReceiptImageEditor({
             </div>
           ) : (
             <div className="space-y-3">
-              {/* One-tap Enhance Text (B&W High Contrast) */}
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                 <div>
                   <p className="text-xs font-medium text-white">
@@ -680,7 +663,6 @@ export function ReceiptImageEditor({
                 </button>
               </div>
 
-              {/* Brightness & Contrast Sliders */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[11px] text-white/70">
@@ -728,7 +710,6 @@ export function ReceiptImageEditor({
           )}
         </div>
 
-        {/* Confirm Action */}
         <div className="mx-auto flex max-w-md items-center gap-2 pt-1">
           <button
             type="button"

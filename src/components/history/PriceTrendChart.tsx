@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import {
   Area,
   AreaChart,
@@ -9,62 +10,68 @@ import {
 } from 'recharts';
 import type { ProductHistoryOccurrence } from '../../types/shopping';
 import { AppFormatters } from '../../utils/formatters';
+import {
+  CHART_AXIS_TICK_STYLE,
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_CLASS,
+} from './chartTheme';
 
 interface PriceTrendChartProps {
   occurrences: ProductHistoryOccurrence[];
 }
 
 export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
+  const gradientId = useId();
   if (occurrences.length === 0) return null;
 
   const data = occurrences.map((occ) => ({
-    dateLabel: AppFormatters.formatShortDate(occ.date),
-    price: Number(occ.price.toFixed(2)),
-    marketName: occ.marketName,
+    label: AppFormatters.formatShortDate(occ.date),
+    price: occ.price,
+    market: occ.marketName,
+    fullDate: AppFormatters.formatDate(occ.date),
   }));
 
   return (
-    <div className="h-52 w-full">
+    <div className="w-full h-48">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
           <defs>
-            <linearGradient id="priceTrendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.22} />
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.28} />
               <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.0} />
             </linearGradient>
           </defs>
-          <CartesianGrid
-            vertical={false}
-            strokeDasharray="3 3"
-            stroke="#86868B"
-            strokeOpacity={0.18}
-          />
+          <CartesianGrid {...CHART_GRID_PROPS} />
           <XAxis
-            dataKey="dateLabel"
-            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
-            tickLine={false}
+            dataKey="label"
+            tick={CHART_AXIS_TICK_STYLE}
             axisLine={false}
+            tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
-            tickLine={false}
+            tick={CHART_AXIS_TICK_STYLE}
             axisLine={false}
-            tickFormatter={(v: number) => `R$${v.toFixed(0)}`}
+            tickLine={false}
+            tickFormatter={(v) => `R$${Number(v).toFixed(0)}`}
           />
           <Tooltip
             content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const point = payload[0].payload as (typeof data)[number];
+              if (!active || !payload || payload.length === 0) return null;
+              const p = payload[0].payload as {
+                price: number;
+                market: string;
+                fullDate: string;
+              };
               return (
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs shadow-lg">
-                  <p className="font-mono-tabular font-semibold text-[var(--accent-fg)]">
-                    {AppFormatters.formatCurrency(point.price)}
+                <div className={CHART_TOOLTIP_CLASS}>
+                  <p className="font-bold text-[var(--accent-fg)]">
+                    {AppFormatters.formatCurrency(p.price)}
                   </p>
-                  <p className="mt-0.5 font-medium text-[var(--text-primary)]">
-                    {point.marketName}
+                  <p className="text-[var(--text-primary)] font-medium mt-0.5">
+                    {p.market}
                   </p>
-                  <p className="font-mono-tabular text-[11px] text-[var(--text-muted)]">
-                    {point.dateLabel}
+                  <p className="text-[var(--text-muted)] text-[10px]">
+                    {p.fullDate}
                   </p>
                 </div>
               );
@@ -74,10 +81,10 @@ export function PriceTrendChart({ occurrences }: PriceTrendChartProps) {
             type="monotone"
             dataKey="price"
             stroke="var(--accent)"
-            strokeWidth={2.2}
-            fill="url(#priceTrendFill)"
-            dot={{ r: 3.5, fill: 'var(--accent)', strokeWidth: 0 }}
-            activeDot={{ r: 5.5, fill: 'var(--accent)' }}
+            strokeWidth={2.5}
+            fillOpacity={1}
+            fill={`url(#${gradientId})`}
+            activeDot={{ r: 5, fill: 'var(--accent)', stroke: '#fff', strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>

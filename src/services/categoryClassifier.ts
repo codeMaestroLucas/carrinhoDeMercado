@@ -838,7 +838,38 @@ export function cloneDefaultDictionary(): Record<ProductCategoryId, string[]> {
   return result;
 }
 
-export function classifyProduct(
+function scoreTokensAgainstKeyword(words: string[], keyword: string): number {
+  let score = 0;
+  for (const word of words) {
+    if (word === keyword) {
+      let wScore = keyword.length * 4;
+      if (words[0] === word) {
+        wScore += 14;
+      }
+      score = Math.max(score, wScore);
+    } else if (
+      word.length >= 3 &&
+      keyword.length >= 4 &&
+      keyword.startsWith(word)
+    ) {
+      score = Math.max(score, word.length * 3);
+    } else if (
+      keyword.length >= 4 &&
+      word.length >= 4 &&
+      word.startsWith(keyword)
+    ) {
+      score = Math.max(score, keyword.length * 3);
+    } else if (word.length >= 4 && keyword.length >= 4) {
+      const sim = stringSimilarity(word, keyword);
+      if (sim >= 0.78) {
+        score = Math.max(score, Math.round(keyword.length * sim * 2.5));
+      }
+    }
+  }
+  return score;
+}
+
+function classifyProduct(
   itemName: string,
   options?: {
     customMemory?: Record<string, ProductCategoryId>;
@@ -899,54 +930,9 @@ export function classifyProduct(
           score = keyword.length * 6;
         }
       } else {
-        for (const word of expandedWords) {
-          if (word === keyword) {
-            let wScore = keyword.length * 4;
-            if (expandedWords[0] === word) {
-              wScore += 14;
-            }
-            score = Math.max(score, wScore);
-          } else if (
-            word.length >= 3 &&
-            keyword.length >= 4 &&
-            keyword.startsWith(word)
-          ) {
-            score = Math.max(score, word.length * 3);
-          } else if (
-            keyword.length >= 4 &&
-            word.length >= 4 &&
-            word.startsWith(keyword)
-          ) {
-            score = Math.max(score, keyword.length * 3);
-          } else if (word.length >= 4 && keyword.length >= 4) {
-            const sim = stringSimilarity(word, keyword);
-            if (sim >= 0.78) {
-              score = Math.max(score, Math.round(keyword.length * sim * 2.5));
-            }
-          }
-        }
-
+        score = scoreTokensAgainstKeyword(expandedWords, keyword);
         if (score === 0 && expanded !== normalized) {
-          for (const word of itemWords) {
-            if (word === keyword) {
-              let wScore = keyword.length * 4;
-              if (itemWords[0] === word) {
-                wScore += 14;
-              }
-              score = Math.max(score, wScore);
-            } else if (
-              word.length >= 3 &&
-              keyword.length >= 4 &&
-              keyword.startsWith(word)
-            ) {
-              score = Math.max(score, word.length * 3);
-            } else if (word.length >= 4 && keyword.length >= 4) {
-              const sim = stringSimilarity(word, keyword);
-              if (sim >= 0.78) {
-                score = Math.max(score, Math.round(keyword.length * sim * 2.5));
-              }
-            }
-          }
+          score = scoreTokensAgainstKeyword(itemWords, keyword);
         }
       }
 
@@ -982,6 +968,75 @@ function normalizeExtractedUnit(rawUnit: string): string {
   return 'un';
 }
 
+function buildExtractedQuantityResult(
+  name: string,
+  qty: number,
+  rawUnit?: string,
+): ExtractedQuantityAndName {
+  const unit =
+    !rawUnit || rawUnit.toLowerCase() === 'x'
+      ? 'un'
+      : normalizeExtractedUnit(rawUnit);
+  const isWeightOrDoz = unit === 'kg' || unit === 'g' || unit === 'dz';
+  return {
+    name,
+    quantity: qty > 0 ? qty : 1,
+    unit,
+    isPriceTotalByDefault: isWeightOrDoz,
+  };
+}
+
+interface QuantityPatternSpec {
+  regex: RegExp;
+  position: 'prefix' | 'suffix';
+  hasUnit: boolean;
+  validate?: (name: string, qty: number) => boolean;
+}
+
+const QUANTITY_PATTERNS: QuantityPatternSpec[] = [
+  {
+    regex: /[(\[]\s*(\d{1,4})\s*([a-zA-ZÀ-ÿ]{1,10})\s*[)\]]\s*$/i,
+    position: 'suffix',
+    hasUnit: true,
+  },
+  {
+    regex:
+      /(?:[-–—:]\s*)?(\d{1,4})\s*(kg|kilos?|quilos?|g|gr|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|l|litros?|un|und|unid|unidades?|[xX])\s*$/i,
+    position: 'suffix',
+    hasUnit: true,
+  },
+  {
+    regex:
+      /^(\d{1,4})\s*(kg|kilos?|quilos?|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|litros?|un|und|unid|unidades?|[xX])\s*(?:de\s+)?(?:[-–—:]\s*)?/i,
+    position: 'prefix',
+    hasUnit: true,
+  },
+  {
+    regex: /^(\d{1,4})\s*([lLgG])\s+(?:de\s+)?(?:[-–—:]\s*)?/i,
+    position: 'prefix',
+    hasUnit: true,
+  },
+  {
+    regex: /[(\[]\s*(\d{1,4})\s*[)\]]\s*$/,
+    position: 'suffix',
+    hasUnit: false,
+  },
+  {
+    regex: /^(\d{1,4})\s+(?=[a-zA-ZÀ-ÿ])/,
+    position: 'prefix',
+    hasUnit: false,
+  },
+  {
+    regex: /(?:[-–—:]\s*|\s+)(\d{1,3})\s*$/,
+    position: 'suffix',
+    hasUnit: false,
+    validate: (name, qty) =>
+      qty >= 1 &&
+      qty <= 99 &&
+      !/\b(?:tipo|n[°ºo]?|tam(?:anho)?)\s*$/i.test(name),
+  },
+];
+
 export function extractQuantityAndName(
   rawText: string,
 ): ExtractedQuantityAndName {
@@ -990,129 +1045,21 @@ export function extractQuantityAndName(
     return { name: '', quantity: 1, unit: 'un', isPriceTotalByDefault: false };
   }
 
-  let match = /[(\[]\s*(\d{1,4})\s*([a-zA-ZÀ-ÿ]{1,10})\s*[)\]]\s*$/i.exec(text);
-  if (match) {
+  for (const spec of QUANTITY_PATTERNS) {
+    const match = spec.regex.exec(text);
+    if (!match) continue;
     const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const unit = normalizeExtractedUnit(match[2] ?? 'un');
-    const cleanedName = text.slice(0, match.index).trim();
-    if (cleanedName) {
-      const isWeightOrDoz = unit === 'kg' || unit === 'g' || unit === 'dz';
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit,
-        isPriceTotalByDefault: isWeightOrDoz,
-      };
-    }
-  }
-
-  const suffixUnitRegex =
-    /(?:[-–—:]\s*)?(\d{1,4})\s*(kg|kilos?|quilos?|g|gr|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|l|litros?|un|und|unid|unidades?|[xX])\s*$/i;
-  match = suffixUnitRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const rawU = match[2] ?? 'un';
-    const unit =
-      rawU.toLowerCase() === 'x' ? 'un' : normalizeExtractedUnit(rawU);
-    const cleanedName = text.slice(0, match.index).trim();
-    if (cleanedName) {
-      const isWeightOrDoz = unit === 'kg' || unit === 'g' || unit === 'dz';
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit,
-        isPriceTotalByDefault: isWeightOrDoz,
-      };
-    }
-  }
-
-  const prefixMultiUnitRegex =
-    /^(\d{1,4})\s*(kg|kilos?|quilos?|gramas?|dz|d[uú]zias?|cx|caixas?|pct|pacotes?|litros?|un|und|unid|unidades?|[xX])\s*(?:de\s+)?(?:[-–—:]\s*)?/i;
-  match = prefixMultiUnitRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const rawU = match[2] ?? 'un';
-    const unit =
-      rawU.toLowerCase() === 'x' ? 'un' : normalizeExtractedUnit(rawU);
-    const cleanedName = text.slice(match[0].length).trim();
-    if (cleanedName) {
-      const isWeightOrDoz = unit === 'kg' || unit === 'g' || unit === 'dz';
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit,
-        isPriceTotalByDefault: isWeightOrDoz,
-      };
-    }
-  }
-
-  const prefixSingleLetterUnitRegex =
-    /^(\d{1,4})\s*([lLgG])\s+(?:de\s+)?(?:[-–—:]\s*)?/i;
-  match = prefixSingleLetterUnitRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const unit = normalizeExtractedUnit(match[2] ?? 'un');
-    const cleanedName = text.slice(match[0].length).trim();
-    if (cleanedName) {
-      const isWeightOrDoz = unit === 'kg' || unit === 'g' || unit === 'dz';
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit,
-        isPriceTotalByDefault: isWeightOrDoz,
-      };
-    }
-  }
-
-  const parenSuffixRegex = /[(\[]\s*(\d{1,4})\s*[)\]]\s*$/;
-  match = parenSuffixRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const cleanedName = text.slice(0, match.index).trim();
-    if (cleanedName) {
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit: 'un',
-        isPriceTotalByDefault: false,
-      };
-    }
-  }
-
-  const simpleDigitPrefixRegex = /^(\d{1,4})\s+(?=[a-zA-ZÀ-ÿ])/;
-  match = simpleDigitPrefixRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const cleanedName = text.slice(match[0].length).trim();
-    if (cleanedName) {
-      return {
-        name: cleanedName,
-        quantity: qty > 0 ? qty : 1,
-        unit: 'un',
-        isPriceTotalByDefault: false,
-      };
-    }
-  }
-
-  // Trailing bare quantity: e.g. "Laranjas 4", "Laranjas - 4"
-  const simpleDigitSuffixRegex = /(?:[-–—:]\s*|\s+)(\d{1,3})\s*$/;
-  match = simpleDigitSuffixRegex.exec(text);
-  if (match) {
-    const qty = Number.parseInt(match[1] ?? '1', 10) || 1;
-    const cleanedName = text.slice(0, match.index).trim();
-    if (
-      qty >= 1 &&
-      qty <= 99 &&
-      cleanedName &&
-      !/\b(?:tipo|n[°ºo]?|tam(?:anho)?)\s*$/i.test(cleanedName)
-    ) {
-      return {
-        name: cleanedName,
-        quantity: qty,
-        unit: 'un',
-        isPriceTotalByDefault: false,
-      };
-    }
+    const cleanedName =
+      spec.position === 'suffix'
+        ? text.slice(0, match.index).trim()
+        : text.slice(match[0].length).trim();
+    if (!cleanedName) continue;
+    if (spec.validate && !spec.validate(cleanedName, qty)) continue;
+    return buildExtractedQuantityResult(
+      cleanedName,
+      qty,
+      spec.hasUnit ? match[2] : undefined,
+    );
   }
 
   return { name: text, quantity: 1, unit: 'un', isPriceTotalByDefault: false };

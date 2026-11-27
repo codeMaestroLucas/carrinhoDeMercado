@@ -8,37 +8,37 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import {
-  PRODUCT_CATEGORY_MAP,
-  getPurchaseRecordTotal,
-} from '../types/shopping';
+import { PRODUCT_CATEGORY_MAP } from '../types/shopping';
 import { useShoppingStore } from '../store/useShoppingStore';
 import {
   buildAllProductAggregates,
   calculateCategorySpending,
   calculatePriceIndex,
+  findAggregateForProductName,
   matchesAggregateSearchQuery,
   type ProductHistoryAggregate,
 } from '../services/productHistoryService';
 import {
   buildHomeSnapshot,
+  collectAvailableMarketNames,
+  computeMonthlyStats,
   loadHomeSnapshotSync,
   saveHomeSnapshot,
 } from '../services/homeSnapshotService';
-import { CategoryClassifier } from '../services/categoryClassifier';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryBadge, CategoryDot } from '../components/common/CategoryIcon';
-import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
 import {
-  ProductAnalyticsModal,
   captureSpatialOrigin,
   type SpatialOrigin,
-} from '../components/history/ProductAnalyticsModal';
+} from '../components/common/spatialTransition';
+import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
+import { ProductAnalyticsModal } from '../components/history/ProductAnalyticsModal';
 import { ProductComparisonModal } from '../components/history/ProductComparisonModal';
 
 export function HomePage() {
   const history = useShoppingStore((s) => s.history);
   const markets = useShoppingStore((s) => s.markets);
+  const items = useShoppingStore((s) => s.items);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [marketFilter, setMarketFilter] = useState<string>('');
@@ -82,39 +82,7 @@ export function HomePage() {
     if (history.length === 0 && cachedSnapshot?.monthlyStats) {
       return cachedSnapshot.monthlyStats;
     }
-    const now = new Date();
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth();
-    const prevDate = new Date(curYear, curMonth - 1, 1);
-    const prevYear = prevDate.getFullYear();
-    const prevMonth = prevDate.getMonth();
-
-    let currentMonthTotal = 0;
-    let currentMonthCount = 0;
-    let previousMonthTotal = 0;
-
-    for (const rec of history) {
-      const d = new Date(rec.date);
-      const total = getPurchaseRecordTotal(rec);
-      if (d.getFullYear() === curYear && d.getMonth() === curMonth) {
-        currentMonthTotal += total;
-        currentMonthCount++;
-      } else if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) {
-        previousMonthTotal += total;
-      }
-    }
-
-    const diffPercent =
-      previousMonthTotal > 0
-        ? ((currentMonthTotal - previousMonthTotal) / previousMonthTotal) * 100
-        : null;
-
-    return {
-      currentMonthTotal,
-      currentMonthCount,
-      previousMonthTotal,
-      diffPercent,
-    };
+    return computeMonthlyStats(history);
   }, [history, cachedSnapshot]);
 
   const priceIndex = useMemo(() => {
@@ -135,21 +103,24 @@ export function HomePage() {
     if (history.length === 0 && cachedSnapshot?.availableMarketNames) {
       return cachedSnapshot.availableMarketNames;
     }
-    const set = new Set<string>();
-    markets.forEach((m) => set.add(m.name));
-    history.forEach((r) => set.add(r.marketName));
-    return Array.from(set).sort();
+    return collectAvailableMarketNames(history, markets);
   }, [markets, history, cachedSnapshot]);
 
   useEffect(() => {
     if (history.length > 0) {
+      const pendingCount = items.filter((i) => !i.isChecked).length;
       const timer = setTimeout(() => {
-        const snap = buildHomeSnapshot(history, markets, 0, priceIndexDays);
+        const snap = buildHomeSnapshot(
+          history,
+          markets,
+          pendingCount,
+          priceIndexDays,
+        );
         saveHomeSnapshot(snap);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [history, markets, priceIndexDays]);
+  }, [history, markets, items, priceIndexDays]);
 
   const highlightedVariations =
     variationTab === 'up' ? priceIndex.topIncreases : priceIndex.topDecreases;
@@ -207,9 +178,7 @@ export function HomePage() {
       </section>
 
       <div className="mx-auto max-w-5xl space-y-6 px-4 pt-6 animate-enter sm:px-6 lg:px-8">
-        {/* Hero Financial Split */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-12 md:gap-5">
-          {/* Monthly Spending Card */}
           <div className="surface-card flex flex-col justify-between p-6 sm:p-7 md:col-span-7">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-[var(--text-secondary)]">
@@ -288,9 +257,7 @@ export function HomePage() {
           </section>
         ) : (
           <>
-            {/* Bento Analytics Row: Inflation Index + Category Spending */}
             <div className="grid grid-cols-1 gap-5 md:grid-cols-12">
-              {/* Personal Price Index */}
               <section className="surface-card flex flex-col justify-between p-5 sm:p-6 md:col-span-7">
                 <div>
                   <div className="mb-4 flex items-center justify-between gap-2">
@@ -398,19 +365,10 @@ export function HomePage() {
                       >
                         {highlightedVariations.map((v) => {
                           const targetAgg =
-                            fullAggregates.find((agg) =>
-                              agg.occurrences.some(
-                                (occ) => occ.productName === v.productName,
-                              ),
-                            ) ??
-                            fullAggregates.find(
-                              (agg) =>
-                                agg.normalizedKey ===
-                                CategoryClassifier.normalizeForComparison(
-                                  v.productName,
-                                ),
-                            ) ??
-                            null;
+                            findAggregateForProductName(
+                              fullAggregates,
+                              v.productName,
+                            ) ?? null;
 
                           const cardKey = `var_${v.productName}_${v.marketName}`;
                           const isExpanded = analyticsState?.originKey === cardKey;
@@ -463,7 +421,6 @@ export function HomePage() {
                 )}
               </section>
 
-              {/* Category Spending Ledger */}
               {categorySpending.length > 0 && (
                 <section className="surface-card p-5 sm:p-6 md:col-span-5">
                   <h2 className="font-display mb-4 text-lg font-semibold text-[var(--text-primary)]">
@@ -503,7 +460,6 @@ export function HomePage() {
               )}
             </div>
 
-            {/* Product Price Explorer */}
             <section className="surface-card p-5 sm:p-6">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>

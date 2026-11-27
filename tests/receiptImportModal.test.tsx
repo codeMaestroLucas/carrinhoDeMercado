@@ -245,48 +245,45 @@ describe('ReceiptImportModal item editing and gestures', () => {
     URL.createObjectURL = vi.fn(() => 'blob:mock-receipt');
     URL.revokeObjectURL = vi.fn();
 
-    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+    try {
+      render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
-    // Switch to Foto OCR tab
-    fireEvent.click(screen.getByText('Foto OCR'));
-    expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
-    expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Foto OCR'));
+      expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
+      expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
 
-    // Select an image file from gallery
-    const galleryInput = screen
-      .getByText('Escolher da galeria')
-      .closest('label')!
-      .querySelector('input[type="file"]') as HTMLInputElement;
+      const galleryInput = screen
+        .getByText('Escolher da galeria')
+        .closest('label')!
+        .querySelector('input[type="file"]') as HTMLInputElement;
 
-    const fakeFile = new File(['fake-image-bytes'], 'cupom.jpg', {
-      type: 'image/jpeg',
-    });
-    fireEvent.change(galleryInput, { target: { files: [fakeFile] } });
+      const fakeFile = new File(['fake-image-bytes'], 'cupom.jpg', {
+        type: 'image/jpeg',
+      });
+      fireEvent.change(galleryInput, { target: { files: [fakeFile] } });
 
-    // Image editor dialog should open before OCR runs
-    expect(
-      screen.getByRole('dialog', { name: 'Editar foto do cupom' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Cortar e Girar')).toBeInTheDocument();
-    expect(screen.getByText('Ajustes OCR')).toBeInTheDocument();
-    expect(screen.getByText('-90°')).toBeInTheDocument();
-    expect(screen.getByText('+90°')).toBeInTheDocument();
+      expect(
+        screen.getByRole('dialog', { name: 'Editar foto do cupom' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Cortar e Girar')).toBeInTheDocument();
+      expect(screen.getByText('Ajustes OCR')).toBeInTheDocument();
+      expect(screen.getByText('-90°')).toBeInTheDocument();
+      expect(screen.getByText('+90°')).toBeInTheDocument();
 
-    // Rotate and switch to Adjustments tab
-    fireEvent.click(screen.getByText('+90°'));
-    fireEvent.click(screen.getByText('Ajustes OCR'));
-    expect(screen.getByText('Realçar texto (Preto e Branco)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Brilho')).toBeInTheDocument();
-    expect(screen.getByLabelText('Contraste')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('+90°'));
+      fireEvent.click(screen.getByText('Ajustes OCR'));
+      expect(screen.getByText('Realçar texto (Preto e Branco)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Brilho')).toBeInTheDocument();
+      expect(screen.getByLabelText('Contraste')).toBeInTheDocument();
 
-    // Cancel closes the editor
-    fireEvent.click(screen.getByText('Cancelar'));
-    expect(
-      screen.queryByRole('dialog', { name: 'Editar foto do cupom' }),
-    ).not.toBeInTheDocument();
-
-    URL.createObjectURL = origCreateObjectURL;
-    URL.revokeObjectURL = origRevokeObjectURL;
+      fireEvent.click(screen.getByText('Cancelar'));
+      expect(
+        screen.queryByRole('dialog', { name: 'Editar foto do cupom' }),
+      ).not.toBeInTheDocument();
+    } finally {
+      URL.createObjectURL = origCreateObjectURL;
+      URL.revokeObjectURL = origRevokeObjectURL;
+    }
   });
 
   it('blocks pull-to-refresh while ReceiptImportModal is open and restores overscroll on unmount', () => {
@@ -328,48 +325,47 @@ describe('ReceiptImportModal item editing and gestures', () => {
     }
     globalThis.Image = MockImage as unknown as typeof Image;
 
-    vi.spyOn(
-      ReceiptScannerService,
-      'recognizeTextFromImageFile',
-    ).mockResolvedValue('001 LEITE INTEGRAL 1L 5,49');
+    try {
+      vi.spyOn(
+        ReceiptScannerService,
+        'recognizeTextFromImageFile',
+      ).mockResolvedValue('001 LEITE INTEGRAL 1L 5,49');
 
-    render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
+      render(<ReceiptImportModal onClose={onClose} onImported={onImported} />);
 
-    fireEvent.click(screen.getByText('Foto OCR'));
-    expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
-    expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Foto OCR'));
+      expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
+      expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
 
-    const galleryInput = screen
-      .getByText('Escolher da galeria')
-      .closest('label')!
-      .querySelector('input[type="file"]') as HTMLInputElement;
+      const galleryInput = screen
+        .getByText('Escolher da galeria')
+        .closest('label')!
+        .querySelector('input[type="file"]') as HTMLInputElement;
 
-    const fakeFile = new File(['fake-image-bytes'], 'cupom.jpg', {
-      type: 'image/jpeg',
-    });
-    fireEvent.change(galleryInput, { target: { files: [fakeFile] } });
+      const fakeFile = new File(['fake-image-bytes'], 'cupom.jpg', {
+        type: 'image/jpeg',
+      });
+      fireEvent.change(galleryInput, { target: { files: [fakeFile] } });
 
-    // Wait for MockImage onload so "Usar foto e ler OCR" becomes enabled
-    const confirmBtn = await screen.findByText('Usar foto e ler OCR');
-    await waitFor(() => expect(confirmBtn).not.toBeDisabled());
-    fireEvent.click(confirmBtn);
+      const confirmBtn = await screen.findByText('Usar foto e ler OCR');
+      await waitFor(() => expect(confirmBtn).not.toBeDisabled());
+      fireEvent.click(confirmBtn);
 
-    // Once confirmed, "Tirar foto do cupom" and "Escolher da galeria" are hidden
-    await waitFor(() => {
-      expect(screen.getByText('Foto do cupom pronta')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Tirar foto do cupom')).not.toBeInTheDocument();
-    expect(screen.queryByText('Escolher da galeria')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Remover foto')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Foto do cupom pronta')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Tirar foto do cupom')).not.toBeInTheDocument();
+      expect(screen.queryByText('Escolher da galeria')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Remover foto')).toBeInTheDocument();
 
-    // Clicking "Remover foto" restores the camera and gallery options
-    fireEvent.click(screen.getByLabelText('Remover foto'));
-    expect(screen.queryByText('Foto do cupom pronta')).not.toBeInTheDocument();
-    expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
-    expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
-
-    globalThis.Image = OrigImage;
-    URL.createObjectURL = origCreateObjectURL;
-    URL.revokeObjectURL = origRevokeObjectURL;
+      fireEvent.click(screen.getByLabelText('Remover foto'));
+      expect(screen.queryByText('Foto do cupom pronta')).not.toBeInTheDocument();
+      expect(screen.getByText('Tirar foto do cupom')).toBeInTheDocument();
+      expect(screen.getByText('Escolher da galeria')).toBeInTheDocument();
+    } finally {
+      globalThis.Image = OrigImage;
+      URL.createObjectURL = origCreateObjectURL;
+      URL.revokeObjectURL = origRevokeObjectURL;
+    }
   });
 });

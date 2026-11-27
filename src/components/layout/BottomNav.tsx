@@ -55,28 +55,24 @@ export function BottomNav({
   const tabs: Array<{
     id: AppTab;
     label: string;
-    shortLabel: string;
     icon: typeof Home;
     badge?: number;
   }> = [
-    { id: 'home', label: 'Início', shortLabel: 'Início', icon: Home },
+    { id: 'home', label: 'Início', icon: Home },
     {
       id: 'list',
       label: 'Lista',
-      shortLabel: 'Lista',
       icon: ListTodo,
       badge: pendingCount,
     },
     {
       id: 'history',
       label: 'Histórico',
-      shortLabel: 'Histórico',
       icon: ReceiptText,
     },
     {
       id: 'config',
       label: 'Ajustes',
-      shortLabel: 'Ajustes',
       icon: SlidersHorizontal,
     },
   ];
@@ -88,7 +84,6 @@ export function BottomNav({
 
   return (
     <>
-      {/* Desktop Frosted Apple Top Navigation Bar (md+) */}
       <header className="apple-glass fixed inset-x-0 top-0 z-30 hidden h-[64px] border-b border-[var(--border-hairline)] md:block">
         <div className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-6 lg:px-8">
           <button
@@ -100,7 +95,6 @@ export function BottomNav({
             <BrandMark />
           </button>
 
-          {/* Apple Segmented Navigation Pill with GPU-only transform sliding indicator */}
           <nav
             aria-label="Navegação principal desktop"
             className="segmented-track grid w-[420px] grid-cols-4"
@@ -147,7 +141,6 @@ export function BottomNav({
         </div>
       </header>
 
-      {/* Mobile Frosted Apple Bottom Tab Bar (< md) */}
       <nav
         aria-label="Navegação principal"
         className="apple-glass-strong fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-hairline)] pb-safe md:hidden"
@@ -187,7 +180,7 @@ export function BottomNav({
                       : 'font-medium text-[var(--text-muted)]'
                   }`}
                 >
-                  {tab.shortLabel}
+                  {tab.label}
                 </span>
               </button>
             );

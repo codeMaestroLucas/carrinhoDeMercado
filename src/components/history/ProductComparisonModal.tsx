@@ -5,6 +5,7 @@ import {
   type ProductHistoryAggregate,
 } from '../../services/productHistoryService';
 import { AppFormatters } from '../../utils/formatters';
+import { ModalShell } from '../common/ModalShell';
 import { DualPriceComparisonChart } from './DualPriceComparisonChart';
 
 interface ProductComparisonModalProps {
@@ -57,15 +58,13 @@ export function ProductComparisonModal({
   }, [itemA, itemB]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
-      onClick={onClose}
+    <ModalShell
+      onClose={onClose}
+      ariaLabel="Comparar produtos"
+      maxWidthClass="max-w-xl"
+      panelClassName="max-h-[92vh] overflow-y-auto bg-[var(--bg-app)] p-6 pb-8"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="animate-modal-in max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-app)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -206,7 +205,6 @@ export function ProductComparisonModal({
             </>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

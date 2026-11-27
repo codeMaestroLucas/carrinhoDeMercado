@@ -14,19 +14,23 @@ import {
 import { useShoppingStore } from '../store/useShoppingStore';
 import {
   buildAllProductAggregates,
+  findAggregateForProductName,
   type ProductHistoryAggregate,
 } from '../services/productHistoryService';
 import { AppFormatters } from '../utils/formatters';
 import { CategoryIcon } from '../components/common/CategoryIcon';
 import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
-import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
-import { ReceiptImportModal } from '../components/history/ReceiptImportModal';
 import {
-  ProductAnalyticsModal,
   captureSpatialOrigin,
   type SpatialOrigin,
-} from '../components/history/ProductAnalyticsModal';
+} from '../components/common/spatialTransition';
+import { ToastHud } from '../components/common/ToastHud';
+import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
+import { ReceiptImportModal } from '../components/history/ReceiptImportModal';
+import { ProductAnalyticsModal } from '../components/history/ProductAnalyticsModal';
 import { ProductComparisonModal } from '../components/history/ProductComparisonModal';
+import { useMarketSelectionDirection } from '../hooks/useMarketSelectionDirection';
+import { useToast } from '../hooks/useToast';
 
 interface HistoryPageProps {
   autoOpenScanner?: boolean;
@@ -44,7 +48,6 @@ export function HistoryPage({
   const addSingleItem = useShoppingStore((s) => s.addSingleItem);
 
   const [marketFilter, setMarketFilter] = useState<string>('');
-  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [analyticsState, setAnalyticsState] = useState<{
@@ -53,7 +56,7 @@ export function HistoryPage({
     originKey: string;
   } | null>(null);
   const [showCompare, setShowCompare] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const { message: toastMsg, showToast } = useToast();
 
   useEffect(() => {
     if (autoOpenScanner) {
@@ -62,25 +65,15 @@ export function HistoryPage({
     }
   }, [autoOpenScanner, onScannerOpened]);
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
-
   const marketNames = useMemo(() => {
     const names = new Set<string>();
     history.forEach((r) => names.add(r.marketName));
     return Array.from(names).sort();
   }, [history]);
 
-  const handleSelectMarketFilter = (nextName: string) => {
-    if (nextName === marketFilter) return;
-    const allOptions = ['', ...marketNames];
-    const curIdx = allOptions.indexOf(marketFilter);
-    const nextIdx = allOptions.indexOf(nextName);
-    setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
-    setMarketFilter(nextName);
-  };
+  const marketDirection = useMarketSelectionDirection(
+    ['', ...marketNames].indexOf(marketFilter),
+  );
 
   const filteredRecords = useMemo(() => {
     if (!marketFilter) return history;
@@ -172,7 +165,7 @@ export function HistoryPage({
               ...marketNames.map((name) => ({ id: name, label: name })),
             ]}
             selectedId={marketFilter}
-            onSelect={handleSelectMarketFilter}
+            onSelect={setMarketFilter}
           />
         )}
 
@@ -215,7 +208,6 @@ export function HistoryPage({
             </div>
           )}
 
-        {/* Receipt Ledger List */}
         {filteredRecords.length === 0 ? (
           <div className="surface-card flex flex-col items-center justify-center border-dashed px-6 py-16 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
@@ -290,10 +282,9 @@ export function HistoryPage({
                       <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-app)] px-5 py-4">
                         <div className="divide-y divide-[var(--border-hairline)] rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-surface)]">
                           {record.items.map((item, idx) => {
-                            const matchingAgg = allAggregates.find((agg) =>
-                              agg.occurrences.some(
-                                (occ) => occ.productName === item.name,
-                              ),
+                            const matchingAgg = findAggregateForProductName(
+                              allAggregates,
+                              item.name,
                             );
                             const rowKey = `${record.id}_${item.name}_${idx}`;
                             const isExpanded = analyticsState?.originKey === rowKey;
@@ -368,11 +359,10 @@ export function HistoryPage({
         </div>
       </div>
 
-      {toastMsg && (
-        <div className="apple-glass-strong fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-8">
-          {toastMsg}
-        </div>
-      )}
+      <ToastHud
+        message={toastMsg}
+        className="apple-glass-strong fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-8"
+      />
 
       {showImportModal && (
         <ReceiptImportModal

@@ -18,38 +18,14 @@ import {
   type ProductHistoryAggregate,
 } from '../../services/productHistoryService';
 import { AppFormatters } from '../../utils/formatters';
+import { prefersReducedMotion } from '../../utils/browser';
 import { CategoryBadge } from '../common/CategoryIcon';
+import {
+  computeFlipTransform,
+  getLiveOriginRect,
+  type SpatialOrigin,
+} from '../common/spatialTransition';
 import { PriceTrendChart } from './PriceTrendChart';
-
-export interface SpatialOriginRect {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  borderRadius?: number;
-}
-
-export interface SpatialOrigin {
-  rect: SpatialOriginRect;
-  element?: HTMLElement | null;
-}
-
-export function captureSpatialOrigin(el: HTMLElement | null): SpatialOrigin | null {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  const computed = typeof window !== 'undefined' ? window.getComputedStyle(el) : null;
-  const parsedRadius = computed ? parseFloat(computed.borderRadius) : 16;
-  return {
-    rect: {
-      top: r.top,
-      left: r.left,
-      width: r.width,
-      height: r.height,
-      borderRadius: Number.isFinite(parsedRadius) ? parsedRadius : 16,
-    },
-    element: el,
-  };
-}
 
 interface ProductAnalyticsModalProps {
   aggregate: ProductHistoryAggregate;
@@ -61,55 +37,6 @@ interface ProductAnalyticsModalProps {
 
 type SpatialPhase = 'entering' | 'open' | 'closing';
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function getLiveOriginRect(origin?: SpatialOrigin | null): SpatialOriginRect | null {
-  if (!origin) return null;
-  if (origin.element && origin.element.isConnected) {
-    const r = origin.element.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) {
-      return {
-        top: r.top,
-        left: r.left,
-        width: r.width,
-        height: r.height,
-        borderRadius: origin.rect.borderRadius ?? 16,
-      };
-    }
-  }
-  return origin.rect;
-}
-
-function computeFlipTransform(
-  from: SpatialOriginRect,
-  to: DOMRect,
-): { transform: string; borderRadius: string } {
-  const fromCenterX = from.left + from.width / 2;
-  const fromCenterY = from.top + from.height / 2;
-  const toCenterX = to.left + to.width / 2;
-  const toCenterY = to.top + to.height / 2;
-
-  const dx = fromCenterX - toCenterX;
-  const dy = fromCenterY - toCenterY;
-  const sx = Math.max(0.24, Math.min(1, from.width / Math.max(1, to.width)));
-  const sy = Math.max(0.14, Math.min(1, from.height / Math.max(1, to.height)));
-
-  // Compensate border-radius during scale so corners stay visually crisp
-  const avgScale = (sx + sy) / 2;
-  const compensatedRadius = Math.min(
-    64,
-    Math.round((from.borderRadius ?? 16) / Math.max(0.35, avgScale)),
-  );
-
-  return {
-    transform: `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`,
-    borderRadius: `${compensatedRadius}px`,
-  };
-}
-
 export function ProductAnalyticsModal({
   aggregate,
   allAggregates,
@@ -117,7 +44,9 @@ export function ProductAnalyticsModal({
   onCompareWith,
   onClose,
 }: ProductAnalyticsModalProps) {
-  const similar = findSimilarProducts(aggregate, allAggregates, { limit: 4 });
+  const similar = onCompareWith
+    ? findSimilarProducts(aggregate, allAggregates, { limit: 4 })
+    : [];
   const variation = aggregate.variationPercentFromLastTime;
 
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -240,7 +169,6 @@ export function ProductAnalyticsModal({
     [origin, onClose],
   );
 
-  // Close with Escape key (reversible)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -257,6 +185,10 @@ export function ProductAnalyticsModal({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={aggregate.displayName}
+      data-disable-pull-to-refresh="true"
       data-spatial-phase={phase}
       className={`fixed inset-0 z-50 flex items-end justify-center p-0 transition-[background-color,backdrop-filter] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:items-center sm:p-4 ${
         phase === 'open'
@@ -273,7 +205,6 @@ export function ProductAnalyticsModal({
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
-        {/* Shared Header Element (continuously visible throughout expansion & collapse) */}
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <CategoryBadge
@@ -305,9 +236,7 @@ export function ProductAnalyticsModal({
           </button>
         </div>
 
-        {/* Staggered Secondary Detail Content */}
         <div className="space-y-4">
-          {/* Metrics grid */}
           <div
             className="spatial-stagger-item grid grid-cols-3 gap-2.5"
             style={staggerStyle(60)}
@@ -373,7 +302,6 @@ export function ProductAnalyticsModal({
             </div>
           )}
 
-          {/* Price Trend Chart */}
           {aggregate.chronologicalPricedOccurrences.length >= 2 && (
             <div
               className="spatial-stagger-item surface-card p-4"
@@ -388,7 +316,6 @@ export function ProductAnalyticsModal({
             </div>
           )}
 
-          {/* Market Ranking */}
           {aggregate.marketRanking.length > 0 && (
             <div
               className="spatial-stagger-item surface-card p-4"
@@ -430,7 +357,6 @@ export function ProductAnalyticsModal({
             </div>
           )}
 
-          {/* Similar products */}
           {similar.length > 0 && onCompareWith && (
             <div
               className="spatial-stagger-item surface-card p-4"
@@ -464,7 +390,6 @@ export function ProductAnalyticsModal({
             </div>
           )}
 
-          {/* All occurrences */}
           <div
             className="spatial-stagger-item surface-card p-4"
             style={staggerStyle(235)}

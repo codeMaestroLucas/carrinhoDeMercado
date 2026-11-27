@@ -1,6 +1,7 @@
 import { get, set } from 'idb-keyval';
 
 const STORAGE_KEY = 'carrinhocompras_pwa_state_v1';
+const PWA_INSTALL_BANNER_DISMISSED_KEY = 'pwa_install_banner_dismissed';
 
 export interface PersistedAppState {
   clientId?: string;
@@ -67,7 +68,6 @@ export async function loadPersistedState(): Promise<PersistedAppState | null> {
  * 2. Asynchronously writes the full, unrestricted payload to IndexedDB.
  */
 export async function savePersistedState(state: PersistedAppState): Promise<void> {
-  // 1. Immediate lightweight mirror update for t=0 next boot
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const mirror: PersistedAppState =
@@ -91,7 +91,6 @@ export async function savePersistedState(state: PersistedAppState): Promise<void
     }
   }
 
-  // 2. Persist full state into IndexedDB
   try {
     await set(STORAGE_KEY, state);
   } catch {
@@ -147,5 +146,26 @@ export function clearPersistedSessionSync(): void {
     }
   } catch {
     // Ignore
+  }
+}
+
+export function isPwaInstallBannerDismissed(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      Boolean(window.localStorage.getItem(PWA_INSTALL_BANNER_DISMISSED_KEY))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function dismissPwaInstallBanner(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PWA_INSTALL_BANNER_DISMISSED_KEY, '1');
+    }
+  } catch {
+    // Ignore storage access restrictions
   }
 }

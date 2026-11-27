@@ -10,9 +10,9 @@ import {
 } from './productHistoryService';
 import { getPurchaseRecordTotal } from '../types/shopping';
 
-export const HOME_SNAPSHOT_STORAGE_KEY = 'carrinhocompras_home_snapshot_v1';
+const HOME_SNAPSHOT_STORAGE_KEY = 'carrinhocompras_home_snapshot_v1';
 
-export interface HomeSnapshot {
+interface HomeSnapshot {
   monthlyStats: {
     currentMonthTotal: number;
     currentMonthCount: number;
@@ -21,13 +21,6 @@ export interface HomeSnapshot {
   };
   priceIndex: PriceIndexSummary;
   categorySpending: CategorySpendingSummary[];
-  recentPurchases: Array<{
-    id: string;
-    marketName: string;
-    date: string;
-    total: number;
-    itemCount: number;
-  }>;
   availableMarketNames: string[];
   pendingItemsCount: number;
   updatedAtMs: number;
@@ -62,16 +55,12 @@ export function saveHomeSnapshot(snapshot: HomeSnapshot): void {
       JSON.stringify(snapshot),
     );
   } catch {
-    // Ignore quota issues
   }
 }
 
-export function buildHomeSnapshot(
+export function computeMonthlyStats(
   history: PurchaseRecord[],
-  markets: MarketProfile[],
-  pendingItemsCount: number = 0,
-  priceIndexDays: number = 60,
-): HomeSnapshot {
+): HomeSnapshot['monthlyStats'] {
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
@@ -99,35 +88,40 @@ export function buildHomeSnapshot(
       ? ((currentMonthTotal - previousMonthTotal) / previousMonthTotal) * 100
       : null;
 
-  const priceIndexResult = calculatePriceIndex(history, priceIndexDays);
-  const spendingResult = calculateCategorySpending(history);
+  return {
+    currentMonthTotal,
+    currentMonthCount,
+    previousMonthTotal,
+    diffPercent,
+  };
+}
 
+export function collectAvailableMarketNames(
+  history: PurchaseRecord[],
+  markets: MarketProfile[],
+): string[] {
   const marketSet = new Set<string>();
   markets.forEach((m) => marketSet.add(m.name));
   history.forEach((r) => marketSet.add(r.marketName));
+  return Array.from(marketSet).sort();
+}
 
-  const sortedRecent = [...history]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5)
-    .map((r) => ({
-      id: r.id,
-      marketName: r.marketName,
-      date: r.date,
-      total: getPurchaseRecordTotal(r),
-      itemCount: r.items.length,
-    }));
+export function buildHomeSnapshot(
+  history: PurchaseRecord[],
+  markets: MarketProfile[],
+  pendingItemsCount: number = 0,
+  priceIndexDays: number = 60,
+): HomeSnapshot {
+  const monthlyStats = computeMonthlyStats(history);
+  const priceIndexResult = calculatePriceIndex(history, priceIndexDays);
+  const spendingResult = calculateCategorySpending(history);
+  const availableMarketNames = collectAvailableMarketNames(history, markets);
 
   return {
-    monthlyStats: {
-      currentMonthTotal,
-      currentMonthCount,
-      previousMonthTotal,
-      diffPercent,
-    },
+    monthlyStats,
     priceIndex: priceIndexResult,
     categorySpending: spendingResult,
-    recentPurchases: sortedRecent,
-    availableMarketNames: Array.from(marketSet).sort(),
+    availableMarketNames,
     pendingItemsCount,
     updatedAtMs: Date.now(),
   };

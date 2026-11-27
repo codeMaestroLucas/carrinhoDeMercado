@@ -10,40 +10,50 @@ import {
 } from 'recharts';
 import type { ProductHistoryAggregate } from '../../services/productHistoryService';
 import { AppFormatters } from '../../utils/formatters';
+import {
+  CHART_AXIS_TICK_STYLE,
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_CLASS,
+} from './chartTheme';
 
 interface DualPriceComparisonChartProps {
   itemA: ProductHistoryAggregate;
   itemB: ProductHistoryAggregate;
 }
 
+interface DualChartPoint {
+  dateKey: string;
+  label: string;
+  timestamp: number;
+  priceA?: number;
+  priceB?: number;
+}
+
+function appendSeries(
+  byDate: Map<string, DualChartPoint>,
+  occurrences: ProductHistoryAggregate['chronologicalPricedOccurrences'],
+  field: 'priceA' | 'priceB',
+) {
+  for (const occ of occurrences) {
+    const parsedTime = Date.parse(occ.date);
+    const dateKey = Number.isNaN(parsedTime) ? occ.date : occ.date.slice(0, 10);
+    const existing = byDate.get(dateKey) ?? {
+      dateKey,
+      label: AppFormatters.formatShortDate(occ.date),
+      timestamp: Number.isNaN(parsedTime) ? 0 : parsedTime,
+    };
+    existing[field] = occ.price;
+    byDate.set(dateKey, existing);
+  }
+}
+
 export function DualPriceComparisonChart({
   itemA,
   itemB,
 }: DualPriceComparisonChartProps) {
-  const byDate = new Map<
-    string,
-    { timestamp: number; dateLabel: string; priceA?: number; priceB?: number }
-  >();
-
-  for (const occ of itemA.chronologicalPricedOccurrences) {
-    const label = AppFormatters.formatShortDate(occ.date);
-    const existing = byDate.get(label) ?? {
-      timestamp: Date.parse(occ.date),
-      dateLabel: label,
-    };
-    existing.priceA = Number(occ.price.toFixed(2));
-    byDate.set(label, existing);
-  }
-
-  for (const occ of itemB.chronologicalPricedOccurrences) {
-    const label = AppFormatters.formatShortDate(occ.date);
-    const existing = byDate.get(label) ?? {
-      timestamp: Date.parse(occ.date),
-      dateLabel: label,
-    };
-    existing.priceB = Number(occ.price.toFixed(2));
-    byDate.set(label, existing);
-  }
+  const byDate = new Map<string, DualChartPoint>();
+  appendSeries(byDate, itemA.chronologicalPricedOccurrences, 'priceA');
+  appendSeries(byDate, itemB.chronologicalPricedOccurrences, 'priceB');
 
   const data = Array.from(byDate.values()).sort(
     (a, b) => a.timestamp - b.timestamp,
@@ -52,68 +62,64 @@ export function DualPriceComparisonChart({
   if (data.length === 0) return null;
 
   return (
-    <div className="h-56 w-full">
+    <div className="w-full h-56">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-          <CartesianGrid
-            vertical={false}
-            strokeDasharray="3 3"
-            stroke="#86868B"
-            strokeOpacity={0.18}
-          />
+        <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+          <CartesianGrid {...CHART_GRID_PROPS} />
           <XAxis
-            dataKey="dateLabel"
-            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
-            tickLine={false}
+            dataKey="label"
+            tick={CHART_AXIS_TICK_STYLE}
             axisLine={false}
+            tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#86868B', fontFamily: 'ui-monospace, SF Mono, Geist Mono, monospace' }}
-            tickLine={false}
+            tick={CHART_AXIS_TICK_STYLE}
             axisLine={false}
-            tickFormatter={(v: number) => `R$${v.toFixed(0)}`}
+            tickLine={false}
+            tickFormatter={(v) => `R$${Number(v).toFixed(0)}`}
           />
           <Tooltip
-            content={({ active, payload, label }) => {
-              if (!active || !payload?.length) return null;
+            content={({ active, payload }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              const point = payload[0].payload as { label: string };
               return (
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-xs shadow-lg">
-                  <p className="font-mono-tabular mb-1 text-[11px] text-[var(--text-muted)]">
-                    {label}
+                <div className={CHART_TOOLTIP_CLASS}>
+                  <p className="font-semibold text-[var(--text-primary)] mb-1">
+                    {point.label}
                   </p>
                   {payload.map((entry) => (
                     <p
                       key={String(entry.dataKey)}
-                      className="flex items-center justify-between gap-3 text-[var(--text-primary)]"
+                      className="font-medium"
+                      style={{ color: entry.color }}
                     >
-                      <span>{entry.name}</span>
-                      <span className="font-mono-tabular font-semibold">
-                        {AppFormatters.formatCurrency(Number(entry.value ?? 0))}
-                      </span>
+                      {entry.name}: {AppFormatters.formatCurrency(Number(entry.value))}
                     </p>
                   ))}
                 </div>
               );
             }}
           />
-          <Legend wrapperStyle={{ fontSize: '11px' }} />
+          <Legend
+            wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }}
+          />
           <Line
             type="monotone"
             dataKey="priceA"
             name={itemA.displayName}
             stroke="var(--accent)"
-            strokeWidth={2.2}
-            connectNulls
+            strokeWidth={2.5}
             dot={{ r: 3.5 }}
+            connectNulls
           />
           <Line
             type="monotone"
             dataKey="priceB"
             name={itemB.displayName}
             stroke="var(--blue)"
-            strokeWidth={2.2}
-            connectNulls
+            strokeWidth={2.5}
             dot={{ r: 3.5 }}
+            connectNulls
           />
         </LineChart>
       </ResponsiveContainer>

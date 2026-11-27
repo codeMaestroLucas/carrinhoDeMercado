@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Download, Share, X } from 'lucide-react';
+import {
+  dismissPwaInstallBanner,
+  isPwaInstallBannerDismissed,
+} from '../../services/storageService';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -14,13 +18,9 @@ export function PwaInstallBanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      if (window.localStorage?.getItem?.('pwa_install_banner_dismissed') === '1') {
-        setDismissed(true);
-        return;
-      }
-    } catch {
-      // Ignore storage access restrictions
+    if (isPwaInstallBannerDismissed()) {
+      setDismissed(true);
+      return;
     }
 
     const isStandalone =
@@ -49,11 +49,7 @@ export function PwaInstallBanner() {
 
   const dismiss = () => {
     setDismissed(true);
-    try {
-      window.localStorage?.setItem?.('pwa_install_banner_dismissed', '1');
-    } catch {
-      // Ignore storage access restrictions
-    }
+    dismissPwaInstallBanner();
   };
 
   const handleInstallClick = async () => {

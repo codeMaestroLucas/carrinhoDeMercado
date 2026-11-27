@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { Unsubscribe } from 'firebase/firestore';
 import {
   PRODUCT_CATEGORIES,
   categoryFromId,
@@ -17,7 +16,14 @@ import {
   type ShoppingItem,
 } from '../types/shopping';
 import { CategoryClassifier } from '../services/categoryClassifier';
-import { CloudSyncService } from '../services/cloudSyncService';
+import {
+  CloudSyncService,
+  type CloudUnsubscribe,
+} from '../services/cloudSyncService';
+import {
+  findLastHistoricalPrice as findLastHistoricalPriceFromHistory,
+  getMarketRecommendationsForProduct,
+} from '../services/productHistoryService';
 import {
   clearPersistedSessionSync,
   loadPersistedState,
@@ -79,7 +85,7 @@ function createDefaultMarkets(): MarketProfile[] {
 const LOCAL_SAVE_DEBOUNCE_MS = 400;
 const CLOUD_PUSH_DEBOUNCE_MS = 2500;
 
-let cloudUnsubscribe: Unsubscribe | null = null;
+let cloudUnsubscribe: CloudUnsubscribe | null = null;
 let localSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let cloudPushTimer: ReturnType<typeof setTimeout> | null = null;
 let lastAppliedRemoteTimestampMs = 0;
@@ -87,7 +93,7 @@ let dirtyCloudFields = new Set<keyof SharedSpaceStatePayload>();
 let forceFullCloudPush = false;
 let needsSnapshotRebuild = true;
 
-export interface ShoppingState {
+interface ShoppingState {
   isHydrated: boolean;
   clientId: string;
   items: ShoppingItem[];
@@ -116,9 +122,6 @@ export interface ShoppingState {
   isDuplicateItemName: (name: string, excludeItemId?: string) => boolean;
   findLastHistoricalPrice: (itemName: string, marketId?: string) => number | null;
   marketRecommendationsForProduct: (itemName: string) => MarketPriceRecommendation[];
-  recommendCheapestMarketForProduct: (
-    itemName: string,
-  ) => MarketPriceRecommendation | null;
 
   addSingleItem: (
     name: string,
@@ -214,7 +217,10 @@ function buildStateMap(state: ShoppingState): SharedSpaceStatePayload {
 
 function parseRemoteState(
   data: Record<string, unknown>,
-  current: ShoppingState,
+  current: Pick<
+    ShoppingState,
+    'categoryDictionary' | 'markets' | 'history' | 'selectedMarketId' | 'showCheckedItems'
+  >,
   options?: { isRemoteSync?: boolean },
 ): Partial<ShoppingState> {
   const isRemoteSync = options?.isRemoteSync ?? false;
@@ -521,21 +527,53 @@ function startCloudListener(
   });
 }
 
+function learnCategoryInDictionary(
+  currentDict: Record<ProductCategoryId, string[]>,
+  currentLearned: Record<string, ProductCategoryId>,
+  rawKeyword: string,
+  category: ProductCategoryId,
+): {
+  categoryDictionary: Record<ProductCategoryId, string[]>;
+  learnedCategories: Record<string, ProductCategoryId>;
+  normalizedKeyword: string;
+} | null {
+  const clean = rawKeyword.trim().toLowerCase();
+  const normalizedNew = CategoryClassifier.normalize(clean);
+  if (!normalizedNew) return null;
+
+  const nextDict = { ...currentDict };
+  for (const cat of PRODUCT_CATEGORIES) {
+    nextDict[cat.id] = (nextDict[cat.id] ?? []).filter(
+      (existing) => CategoryClassifier.normalize(existing) !== normalizedNew,
+    );
+  }
+  nextDict[category] = [clean, ...(nextDict[category] ?? [])];
+
+  return {
+    categoryDictionary: nextDict,
+    learnedCategories: {
+      ...currentLearned,
+      [normalizedNew]: category,
+    },
+    normalizedKeyword: normalizedNew,
+  };
+}
+
 function getInitialSynchronousState(): Partial<ShoppingState> {
   const sync = loadPersistedStateSync();
   if (!sync) return {};
-
-  const dummyCurrent = {
-    categoryDictionary: CategoryClassifier.cloneDefaultDictionary(),
-    markets: createDefaultMarkets(),
-    history: [],
-  } as unknown as ShoppingState;
 
   if (typeof sync.lastAppliedRemoteTimestampMs === 'number') {
     lastAppliedRemoteTimestampMs = sync.lastAppliedRemoteTimestampMs;
   }
 
-  const patch = parseRemoteState(sync as Record<string, unknown>, dummyCurrent);
+  const patch = parseRemoteState(sync as Record<string, unknown>, {
+    categoryDictionary: CategoryClassifier.cloneDefaultDictionary(),
+    markets: createDefaultMarkets(),
+    history: [],
+    selectedMarketId: 'mercado_padrao',
+    showCheckedItems: true,
+  });
   const prefersDark =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-color-scheme: dark)').matches;
@@ -587,7 +625,6 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
     cloudError: null,
 
     async initializeApp() {
-      // 1. Asynchronously reconcile with IndexedDB in background without blocking UI
       try {
         const saved = await loadPersistedState();
         if (saved) {
@@ -623,7 +660,6 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         set({ isHydrated: true });
       }
 
-      // 2. Refresh local home snapshot in background
       try {
         const snapshot = buildHomeSnapshot(
           get().history,
@@ -632,10 +668,8 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
         );
         saveHomeSnapshot(snapshot);
       } catch {
-        // Ignore snapshot generation failure
       }
 
-      // 3. Optimistic session validation & parallel sync in background
       const spaceCode = get().sharedSpaceCode;
       if (spaceCode) {
         void get().validateAndSyncInBackground(spaceCode);
@@ -658,7 +692,6 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
 
       startCloudListener(spaceCode, get, set);
 
-      // Strategy 3: Parallelize space fetch and pending push using Promise.allSettled
       set({ isSyncingCloud: true });
       const hadPendingPush = get().hasPendingCloudPush;
 
@@ -674,18 +707,17 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
 
       set({ isSyncingCloud: false });
 
-      // Strategy 1: Check for 401 / permission-denied / unauthenticated
       if (fetchResult.status === 'rejected') {
         const errorMsg =
           fetchResult.reason instanceof Error
             ? fetchResult.reason.message
             : String(fetchResult.reason);
         const isAuthError =
+          CloudSyncService.isPermissionDeniedError(fetchResult.reason) ||
           errorMsg.includes('permission-denied') ||
           errorMsg.includes('unauthenticated') ||
           errorMsg.includes('401') ||
-          errorMsg.includes('403') ||
-          errorMsg.includes('Permissão negada');
+          errorMsg.includes('403');
 
         if (isAuthError) {
           clearPersistedSessionSync();
@@ -793,85 +825,12 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
   },
 
   findLastHistoricalPrice(itemName, marketId) {
-    const normalized = CategoryClassifier.normalize(itemName);
-    if (!normalized) return null;
-    const history = get().history;
-
-    if (marketId) {
-      for (const record of history) {
-        if (record.marketId !== marketId) continue;
-        for (const item of record.items) {
-          if (
-            CategoryClassifier.normalize(item.name) === normalized &&
-            item.price > 0
-          ) {
-            return item.price;
-          }
-        }
-      }
-    }
-
-    for (const record of history) {
-      for (const item of record.items) {
-        if (
-          CategoryClassifier.normalize(item.name) === normalized &&
-          item.price > 0
-        ) {
-          return item.price;
-        }
-      }
-    }
-    return null;
+    return findLastHistoricalPriceFromHistory(get().history, itemName, marketId);
   },
 
   marketRecommendationsForProduct(itemName) {
-    const normalized = CategoryClassifier.normalize(itemName);
-    if (!normalized) return [];
     const { history, markets } = get();
-    const pricesByMarketId = new Map<string, number[]>();
-    const marketNameFallback = new Map<string, string>();
-
-    for (const record of history) {
-      for (const item of record.items) {
-        if (item.price <= 0) continue;
-        if (CategoryClassifier.normalize(item.name) === normalized) {
-          const matchedMarket = markets.find(
-            (m) =>
-              m.id === record.marketId ||
-              CategoryClassifier.normalize(m.name) ===
-                CategoryClassifier.normalize(record.marketName),
-          );
-          const key = matchedMarket?.id ?? record.marketId;
-          marketNameFallback.set(key, matchedMarket?.name ?? record.marketName);
-          const arr = pricesByMarketId.get(key) ?? [];
-          arr.push(item.price);
-          pricesByMarketId.set(key, arr);
-        }
-      }
-    }
-
-    const recs: MarketPriceRecommendation[] = [];
-    for (const [marketId, prices] of pricesByMarketId.entries()) {
-      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-      const last = prices[0];
-      const market =
-        markets.find((m) => m.id === marketId) ??
-        ({
-          id: marketId,
-          name: marketNameFallback.get(marketId) ?? 'Mercado',
-          categoryOrder: PRODUCT_CATEGORIES.map((c) => c.id),
-        } satisfies MarketProfile);
-
-      recs.push({ market, averagePrice: avg, lastPrice: last });
-    }
-
-    recs.sort((a, b) => a.averagePrice - b.averagePrice);
-    return recs;
-  },
-
-  recommendCheapestMarketForProduct(itemName) {
-    const recs = get().marketRecommendationsForProduct(itemName);
-    return recs[0] ?? null;
+    return getMarketRecommendationsForProduct(history, markets, itemName);
   },
 
   addSingleItem(name, options) {
@@ -1014,30 +973,18 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
     }
 
     const updatedCategory = updates.category ?? current.category;
-    const nextDict = { ...get().categoryDictionary };
-    const nextLearned = { ...get().learnedCategories };
-
-    if (updates.category) {
-      const cleanKeyword = updatedName.trim().toLowerCase();
-      const normalizedNew = CategoryClassifier.normalize(cleanKeyword);
-      if (normalizedNew) {
-        for (const cat of PRODUCT_CATEGORIES) {
-          nextDict[cat.id] = (nextDict[cat.id] ?? []).filter(
-            (existing) =>
-              CategoryClassifier.normalize(existing) !== normalizedNew,
-          );
-        }
-        nextDict[updatedCategory] = [
-          cleanKeyword,
-          ...(nextDict[updatedCategory] ?? []),
-        ];
-        nextLearned[normalizedNew] = updatedCategory;
-      }
-    }
+    const learnedUpdate = updates.category
+      ? learnCategoryInDictionary(
+          get().categoryDictionary,
+          get().learnedCategories,
+          updatedName,
+          updatedCategory,
+        )
+      : null;
 
     set((s) => ({
-      categoryDictionary: nextDict,
-      learnedCategories: nextLearned,
+      categoryDictionary: learnedUpdate?.categoryDictionary ?? s.categoryDictionary,
+      learnedCategories: learnedUpdate?.learnedCategories ?? s.learnedCategories,
       items: s.items.map((item) => {
         if (item.id !== id) return item;
         return {
@@ -1105,32 +1052,23 @@ export const useShoppingStore = create<ShoppingState>((set, get) => {
   },
 
   addKeywordToCategory(category, rawKeyword) {
-    const clean = rawKeyword.trim().toLowerCase();
-    const normalizedNew = CategoryClassifier.normalize(clean);
-    if (!normalizedNew) return false;
-
-    const nextDict = { ...get().categoryDictionary };
-    for (const cat of PRODUCT_CATEGORIES) {
-      nextDict[cat.id] = (nextDict[cat.id] ?? []).filter(
-        (existing) => CategoryClassifier.normalize(existing) !== normalizedNew,
-      );
-    }
-    nextDict[category] = [clean, ...(nextDict[category] ?? [])];
-
-    const nextLearned = {
-      ...get().learnedCategories,
-      [normalizedNew]: category,
-    };
+    const learnedUpdate = learnCategoryInDictionary(
+      get().categoryDictionary,
+      get().learnedCategories,
+      rawKeyword,
+      category,
+    );
+    if (!learnedUpdate) return false;
 
     const nextItems = get().items.map((item) =>
-      CategoryClassifier.normalize(item.name) === normalizedNew
+      CategoryClassifier.normalize(item.name) === learnedUpdate.normalizedKeyword
         ? { ...item, category }
         : item,
     );
 
     set({
-      categoryDictionary: nextDict,
-      learnedCategories: nextLearned,
+      categoryDictionary: learnedUpdate.categoryDictionary,
+      learnedCategories: learnedUpdate.learnedCategories,
       items: nextItems,
     });
     scheduleSave(get, set, {

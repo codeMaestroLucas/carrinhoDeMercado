@@ -22,8 +22,13 @@ import {
 import { useShoppingStore } from '../store/useShoppingStore';
 import { CategoryDot, CategoryIcon } from '../components/common/CategoryIcon';
 import { GooeyMarketSelector } from '../components/common/GooeyMarketSelector';
+import { ToastHud } from '../components/common/ToastHud';
 import { MarketAisleReorderList } from '../components/config/MarketAisleReorderList';
 import { ThemeToggleButton } from '../components/layout/ThemeToggleButton';
+import { useMarketSelectionDirection } from '../hooks/useMarketSelectionDirection';
+import { useToast } from '../hooks/useToast';
+
+const KEYWORD_PREVIEW_LIMIT = 40;
 
 export function MarketConfigPage() {
   const markets = useShoppingStore((s) => s.markets);
@@ -66,16 +71,10 @@ export function MarketConfigPage() {
     useState<ProductCategoryId | null>(null);
   const [showAllKeywords, setShowAllKeywords] = useState(false);
   const [newKeywordInput, setNewKeywordInput] = useState('');
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [marketDirection, setMarketDirection] = useState<'forward' | 'backward'>('forward');
+  const { message: feedback, showToast: notify } = useToast();
   const [isFullscreen, setIsFullscreen] = useState(
     typeof document !== 'undefined' && Boolean(document.fullscreenElement),
   );
-
-  const notify = (msg: string) => {
-    setFeedback(msg);
-    setTimeout(() => setFeedback(null), 3000);
-  };
 
   const toggleFullscreen = async () => {
     try {
@@ -94,11 +93,12 @@ export function MarketConfigPage() {
   const selectedMarket =
     markets.find((m) => m.id === selectedMarketId) ?? markets[0];
 
+  const marketDirection = useMarketSelectionDirection(
+    markets.findIndex((m) => m.id === selectedMarket.id),
+  );
+
   const handleSelectMarket = (nextId: string) => {
     if (nextId === selectedMarket.id) return;
-    const curIdx = markets.findIndex((m) => m.id === selectedMarket.id);
-    const nextIdx = markets.findIndex((m) => m.id === nextId);
-    setMarketDirection(nextIdx >= curIdx ? 'forward' : 'backward');
     selectMarket(nextId);
     setEditingMarketName(null);
   };
@@ -126,7 +126,6 @@ export function MarketConfigPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] pb-28 pt-safe md:pb-16">
-      {/* Page Header Band */}
       <section className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
           <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
@@ -140,7 +139,6 @@ export function MarketConfigPage() {
 
       <div className="mx-auto max-w-5xl px-4 pt-6 animate-enter sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-          {/* Left Column: Market Profiles & Aisle Order */}
           <div className="space-y-6 md:col-span-7">
             <section className="surface-card p-5 sm:p-6">
               <div className="mb-4 flex items-start justify-between gap-3">
@@ -288,9 +286,7 @@ export function MarketConfigPage() {
             </section>
           </div>
 
-          {/* Right Column: Cloud Sync, Display & Category Dictionary */}
           <div className="space-y-6 md:col-span-5">
-            {/* Cloud Sync */}
             <section className="surface-card p-5 sm:p-6">
               <div className="mb-4 flex items-start gap-3">
                 <div
@@ -410,7 +406,6 @@ export function MarketConfigPage() {
               )}
             </section>
 
-            {/* Fullscreen Mode */}
             <section className="surface-card p-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
@@ -441,7 +436,6 @@ export function MarketConfigPage() {
               </div>
             </section>
 
-            {/* Smart Category Dictionary */}
             <section className="surface-card p-5 sm:p-6">
               <div className="mb-4 flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
@@ -534,7 +528,7 @@ export function MarketConfigPage() {
                               <div className="flex flex-wrap gap-1.5">
                                 {(showAllKeywords
                                   ? keywords
-                                  : keywords.slice(0, 40)
+                                  : keywords.slice(0, KEYWORD_PREVIEW_LIMIT)
                                 ).map((kw) => (
                                   <span
                                     key={kw}
@@ -553,16 +547,16 @@ export function MarketConfigPage() {
                                     </button>
                                   </span>
                                 ))}
-                                {keywords.length > 40 && !showAllKeywords && (
+                                {keywords.length > KEYWORD_PREVIEW_LIMIT && !showAllKeywords && (
                                   <button
                                     type="button"
                                     onClick={() => setShowAllKeywords(true)}
                                     className="font-mono-tabular rounded-full border border-[var(--border-hairline)] bg-[var(--bg-subtle)] px-3 py-1 text-xs font-semibold text-[var(--accent-fg)] transition-colors hover:bg-[var(--bg-app)]"
                                   >
-                                    +{keywords.length - 40} termos
+                                    +{keywords.length - KEYWORD_PREVIEW_LIMIT} termos
                                   </button>
                                 )}
-                                {keywords.length > 40 && showAllKeywords && (
+                                {keywords.length > KEYWORD_PREVIEW_LIMIT && showAllKeywords && (
                                   <button
                                     type="button"
                                     onClick={() => setShowAllKeywords(false)}
@@ -585,11 +579,10 @@ export function MarketConfigPage() {
         </div>
       </div>
 
-      {feedback && (
-        <div className="apple-glass-strong fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-8">
-          {feedback}
-        </div>
-      )}
+      <ToastHud
+        message={feedback}
+        className="apple-glass-strong fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-xs font-medium text-[var(--text-primary)] shadow-[var(--shadow-float)] md:bottom-8"
+      />
     </div>
   );
 }

@@ -1,4 +1,21 @@
+export const COMMON_UNITS = ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'] as const;
+
+function getShortDateParts(dateInput: Date | string): {
+  date: Date;
+  shortDate: string;
+} {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return { date, shortDate: `${day}/${month}/${year}` };
+}
+
 export const AppFormatters = {
+  formatPriceInput(value: number): string {
+    return value.toFixed(2).replace('.', ',');
+  },
+
   formatCurrency(value: number): string {
     const isNegative = value < 0;
     const absVal = Math.abs(value);
@@ -67,21 +84,14 @@ export const AppFormatters = {
   },
 
   formatDate(dateInput: Date | string): string {
-    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
+    const { date, shortDate } = getShortDateParts(dateInput);
     const hour = String(date.getHours()).padStart(2, '0');
     const minute = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} às ${hour}:${minute}`;
+    return `${shortDate} às ${hour}:${minute}`;
   },
 
   formatShortDate(dateInput: Date | string): string {
-    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return getShortDateParts(dateInput).shortDate;
   },
 
   normalizeUnit(rawUnit: string): string {

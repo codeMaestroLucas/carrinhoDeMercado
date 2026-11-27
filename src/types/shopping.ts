@@ -11,7 +11,7 @@ export type ProductCategoryId =
   | 'bazar'
   | 'diversos';
 
-export interface ProductCategoryInfo {
+interface ProductCategoryInfo {
   id: ProductCategoryId;
   label: string;
   color: string;
@@ -83,7 +83,7 @@ export function categoryFromId(id?: string | null): ProductCategoryId {
   return 'diversos';
 }
 
-export function normalizeCategoryOrder(
+function normalizeCategoryOrder(
   order: ProductCategoryId[],
 ): ProductCategoryId[] {
   const result: ProductCategoryId[] = [];
@@ -164,14 +164,7 @@ export interface PurchaseHistoryItem {
   unit: string;
 }
 
-export function getEffectiveUnitPrice(
-  item: Pick<PurchaseHistoryItem, 'price' | 'unitPrice' | 'quantity'>,
-): number {
-  if (item.unitPrice != null && item.unitPrice > 0) return item.unitPrice;
-  return item.quantity > 0 ? item.price / item.quantity : item.price;
-}
-
-export function purchaseHistoryItemFromJson(
+function purchaseHistoryItemFromJson(
   json: Record<string, unknown>,
 ): PurchaseHistoryItem {
   const qty = typeof json.quantity === 'number' && json.quantity > 0 ? json.quantity : 1.0;
@@ -222,6 +215,18 @@ export interface MarketPriceRecommendation {
   market: MarketProfile;
   averagePrice: number;
   lastPrice: number;
+}
+
+export interface MarketBargainItem {
+  item: ShoppingItem;
+  cheapestPrice: number;
+  highestPrice: number;
+  savingsPercent: number;
+}
+
+export interface MarketBargainGroup {
+  market: MarketProfile;
+  bargains: MarketBargainItem[];
 }
 
 export interface ProductVariationItem {

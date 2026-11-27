@@ -5,6 +5,7 @@ import {
   accumulateScannedItems,
   cleanReceiptProductName,
   isTotalProductName,
+  MAX_PLAUSIBLE_RECEIPT_TOTAL,
 } from './receiptParserService';
 
 const UF_BY_CODE: Record<string, string> = {
@@ -312,10 +313,6 @@ export function parseNfceQuantity(raw: string): number {
   return Number(s.replace(',', '.')) || 1.0;
 }
 
-export function cleanNfceProductName(raw: string): string {
-  return cleanReceiptProductName(raw);
-}
-
 const NAMED_HTML_ENTITIES: Record<string, string> = {
   nbsp: ' ',
   amp: '&',
@@ -406,26 +403,6 @@ function stripEmbeddedCodeTags(htmlFragment: string): string {
       /<span[^>]*class="[^"]*(?:RCod|fixo-prod-cod|codigo)[^"]*"[^>]*>[\s\S]*?<\/span>/gi,
       ' ',
     );
-}
-
-export function cleanMarketName(raw: string): string {
-  const s = stripTags(raw)
-    .replace(/\s*-\s*filial\s*\d+.*$/i, '')
-    .replace(/\s*\/\s*filial\s*\d+.*$/i, '')
-    .replace(/\s*-\s*matriz.*$/i, '')
-    .replace(/\b(?:s\.?a\.?|s\/a|ltda\.?|eireli\.?|me|epp)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const words = s.split(' ');
-  const minor = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
-  return words
-    .map((w) => {
-      const lower = w.toLowerCase();
-      if (minor.has(lower)) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join(' ');
 }
 
 function extractMarketName(html: string): string | undefined {
@@ -544,7 +521,7 @@ function buildScannedItem(
     (qty > 0
       ? Number((effectiveTotal / qty).toFixed(4))
       : effectiveTotal);
-  const cleanedName = cleanNfceProductName(rawName);
+  const cleanedName = cleanReceiptProductName(rawName);
   if (cleanedName.length < 2) return null;
   if (isTotalProductName(cleanedName)) return null;
 
@@ -867,7 +844,7 @@ function parseTableGeneric(html: string): ScannedReceiptItem[] {
     const cutIdx = metaIdx !== -1 && metaIdx < firstPriceIdx ? metaIdx : firstPriceIdx;
     const nameSection = text.slice(0, cutIdx).trim();
 
-    if (price != null && price > 0 && price < 10000) {
+    if (price != null && price > 0 && price < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
       const item = buildScannedItem(
         nameSection,
         price,
@@ -967,7 +944,7 @@ export async function fetchAndParseNfceViaProxy(
         json.items = accumulateScannedItems(
           json.items
             .map((it): ScannedReceiptItem | null => {
-              const cleaned = cleanNfceProductName(it.name);
+              const cleaned = cleanReceiptProductName(it.name);
               if (cleaned.length < 2 || isTotalProductName(cleaned)) return null;
               return {
                 ...it,
@@ -1002,7 +979,6 @@ export const NfceScannerService = {
   buildPortalUrlFromKey,
   resolveUrlFromInput,
   parseNfceQuantity,
-  cleanNfceProductName,
   parseNfceHtml,
   fetchAndParseNfceViaProxy,
 };

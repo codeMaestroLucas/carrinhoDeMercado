@@ -7,10 +7,9 @@ import {
   type ShoppingItem,
 } from '../../types/shopping';
 import { useShoppingStore } from '../../store/useShoppingStore';
-import { AppFormatters } from '../../utils/formatters';
+import { AppFormatters, COMMON_UNITS } from '../../utils/formatters';
 import { CategoryIcon } from '../common/CategoryIcon';
-
-const UNITS = ['un', 'kg', 'g', 'L', 'ml', 'dz', 'cx', 'pct'];
+import { ModalShell } from '../common/ModalShell';
 
 interface EditItemModalProps {
   item: ShoppingItem;
@@ -31,7 +30,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
 
   const [name, setName] = useState(item.name);
   const [priceStr, setPriceStr] = useState(
-    item.price != null ? item.price.toFixed(2).replace('.', ',') : '',
+    item.price != null ? AppFormatters.formatPriceInput(item.price) : '',
   );
   const [quantity, setQuantity] = useState(item.quantity);
   const [unit, setUnit] = useState(item.unit || 'un');
@@ -77,15 +76,12 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
-      onClick={onClose}
+    <ModalShell
+      onClose={onClose}
+      ariaLabel={`Editar ${item.name}`}
+      panelClassName="max-h-[92vh] overflow-y-auto p-6 pb-8"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="animate-modal-in max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -150,7 +146,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                 <button
                   type="button"
                   onClick={() =>
-                    setPriceStr(lastPrice.toFixed(2).replace('.', ','))
+                    setPriceStr(AppFormatters.formatPriceInput(lastPrice))
                   }
                   className="mt-1.5 text-xs font-semibold text-[var(--positive)] hover:underline"
                 >
@@ -178,7 +174,7 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
                   onChange={(e) => setUnit(e.target.value)}
                   className="h-11 flex-1 rounded-2xl border border-[var(--border-hairline)] bg-[var(--bg-app)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:bg-[var(--bg-surface)]"
                 >
-                  {UNITS.map((u) => (
+                  {COMMON_UNITS.map((u) => (
                     <option key={u} value={u}>
                       {u}
                     </option>
@@ -306,7 +302,6 @@ export function EditItemModal({ item, onClose }: EditItemModalProps) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

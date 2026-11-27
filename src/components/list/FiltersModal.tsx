@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { PRODUCT_CATEGORIES } from '../../types/shopping';
 import { useShoppingStore } from '../../store/useShoppingStore';
 import { CategoryDot, CategoryIcon } from '../common/CategoryIcon';
+import { ModalShell } from '../common/ModalShell';
 
 interface FiltersModalProps {
   onClose: () => void;
@@ -15,15 +16,12 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
   const items = useShoppingStore((s) => s.items);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
-      onClick={onClose}
+    <ModalShell
+      onClose={onClose}
+      ariaLabel="Filtros da lista"
+      panelClassName="max-h-[85vh] overflow-y-auto p-6 pb-8"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="animate-modal-in max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
         <div className="mb-5 flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold text-[var(--text-primary)]">
@@ -113,7 +111,6 @@ export function FiltersModal({ onClose }: FiltersModalProps) {
             );
           })}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

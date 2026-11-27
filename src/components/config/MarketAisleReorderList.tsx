@@ -5,6 +5,7 @@ import {
   type ProductCategoryId,
 } from '../../types/shopping';
 import { CategoryDot, CategoryIcon } from '../common/CategoryIcon';
+import { prefersReducedMotion, triggerHaptic } from '../../utils/browser';
 
 interface MarketAisleReorderListProps {
   categoryOrder: ProductCategoryId[];
@@ -38,11 +39,6 @@ interface PendingHold {
 interface PendingSettle {
   timer: ReturnType<typeof setTimeout>;
   run: () => void;
-}
-
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 function readCssMs(varName: string, fallback: number): number {
@@ -242,7 +238,6 @@ export function MarketAisleReorderList({
     };
 
     if (prefersReducedMotion()) {
-      settleRef.current = { run: commit, timer: setTimeout(commit, 0) };
       commit();
       return;
     }
@@ -278,13 +273,7 @@ export function MarketAisleReorderList({
       if (isHandle) {
         e.preventDefault();
         e.stopPropagation();
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try {
-            navigator.vibrate(14);
-          } catch {
-            // Ignore unsupported vibrate
-          }
-        }
+        triggerHaptic(14);
         beginDrag(touch.identifier, 'touch', catId, itemEl, touch.clientY);
         return;
       }
@@ -299,13 +288,7 @@ export function MarketAisleReorderList({
       const timer = setTimeout(() => {
         const currentHold = holdRef.current;
         if (!currentHold || currentHold.idKey !== touchId) return;
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try {
-            navigator.vibrate(18);
-          } catch {
-            // Ignore unsupported vibrate
-          }
-        }
+        triggerHaptic(18);
         beginDrag(touchId, 'touch', catId, itemEl, currentHold.lastY);
       }, 180);
 
@@ -434,7 +417,6 @@ export function MarketAisleReorderList({
     };
   }, [beginDrag, clearHold, finishDrag, updateDragPosition]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       clearHold();
@@ -449,7 +431,6 @@ export function MarketAisleReorderList({
     };
   }, [clearHold, lockBodyScroll]);
 
-  // FLIP animation after arrow-button reorder commits new categoryOrder
   useLayoutEffect(() => {
     const snapshots = flipSnapshotsRef.current;
     const movedId = flipMovedIdRef.current;

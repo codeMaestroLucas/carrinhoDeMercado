@@ -146,20 +146,27 @@ describe('PWA Performance & High-Speed Initialization Architecture', () => {
 
   describe('3. Parallel Execution & Elimination of Cascading Waterfalls', () => {
     it('executes remote fetch and pending push simultaneously via Promise.allSettled', async () => {
-      let fetchStartedAt = 0;
-      let pushStartedAt = 0;
+      let resolveFetch!: (val: Record<string, unknown>) => void;
+      let pushStartedWhileFetchPending = false;
+      let fetchPending = true;
 
       vi.spyOn(CloudSyncService, 'initializeFirebase').mockReturnValue(true);
-      vi.spyOn(CloudSyncService, 'fetchSharedSpace').mockImplementation(async () => {
-        fetchStartedAt = Date.now();
-        await new Promise((r) => setTimeout(r, 20));
-        return { items: [], spaceCode: 'PARALLEL-123' };
-      });
+      vi.spyOn(CloudSyncService, 'fetchSharedSpace').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = (val) => {
+              fetchPending = false;
+              resolve(val);
+            };
+          }),
+      );
 
-      const pushSpy = vi.spyOn(useShoppingStore.getState(), 'flushPendingSync').mockImplementation(async () => {
-        pushStartedAt = Date.now();
-        await new Promise((r) => setTimeout(r, 20));
-      });
+      const pushSpy = vi
+        .spyOn(useShoppingStore.getState(), 'flushPendingSync')
+        .mockImplementation(async () => {
+          pushStartedWhileFetchPending = fetchPending;
+          resolveFetch({ items: [], spaceCode: 'PARALLEL-123' });
+        });
 
       useShoppingStore.setState({
         sharedSpaceCode: 'PARALLEL-123',
@@ -169,8 +176,7 @@ describe('PWA Performance & High-Speed Initialization Architecture', () => {
       await useShoppingStore.getState().validateAndSyncInBackground('PARALLEL-123');
 
       expect(pushSpy).toHaveBeenCalled();
-      // Both tasks should have started concurrently (within 10ms of each other) rather than sequentially
-      expect(Math.abs(fetchStartedAt - pushStartedAt)).toBeLessThanOrEqual(15);
+      expect(pushStartedWhileFetchPending).toBe(true);
     });
 
     it('tolerates secondary push failure without blocking data hydration', async () => {

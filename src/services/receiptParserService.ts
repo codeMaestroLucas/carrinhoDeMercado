@@ -548,9 +548,7 @@ const KNOWN_SINGLE_WORDS: Set<string> = (() => {
   return set;
 })();
 
-function normalizeWordForLookup(word: string): string {
-  return CategoryClassifier.normalize(word);
-}
+export const MAX_PLAUSIBLE_RECEIPT_TOTAL = 10000;
 
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -951,7 +949,7 @@ export function mergeSplitWords(rawTokens: string[]): string[] {
       if (!minorPrepositions.has(t1) && !minorPrepositions.has(t2)) {
         const triple = `${rawTokens[i]}${rawTokens[i + 1]}${rawTokens[i + 2]}`;
         const repairedTriple = repairReceiptWord(triple);
-        if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedTriple))) {
+        if (KNOWN_SINGLE_WORDS.has(CategoryClassifier.normalize(repairedTriple))) {
           result.push(repairedTriple);
           i += 3;
           continue;
@@ -963,7 +961,7 @@ export function mergeSplitWords(rawTokens: string[]): string[] {
       if (!minorPrepositions.has(t1)) {
         const pair = `${rawTokens[i]}${rawTokens[i + 1]}`;
         const repairedPair = repairReceiptWord(pair);
-        if (KNOWN_SINGLE_WORDS.has(normalizeWordForLookup(repairedPair))) {
+        if (KNOWN_SINGLE_WORDS.has(CategoryClassifier.normalize(repairedPair))) {
           result.push(repairedPair);
           i += 2;
           continue;
@@ -1636,7 +1634,7 @@ function reconcileReceiptAmounts(params: {
   // Huge magnitude mismatch (e.g. 0.084 * 84.90 = 7.13 vs OCR "71.13" or "1.13")
   if (
     expectedTot > 0 &&
-    expectedTot < 10000 &&
+    expectedTot < MAX_PLAUSIBLE_RECEIPT_TOTAL &&
     (totalPrice > expectedTot * 4 || totalPrice < expectedTot * 0.25)
   ) {
     return { qty, unitPrice, totalPrice: expectedTot };
@@ -1678,11 +1676,12 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   const items: ScannedReceiptItem[] = [];
   let pendingProductName: string | null = null;
   let pendingItemIndex: number | undefined;
-  let pendingSefazDetail: {
+  type PendingSefazDetail = {
     qty: number;
     unit: string;
     unitPrice: number | null;
-  } | null = null;
+  };
+  let pendingSefazDetail: PendingSefazDetail | null = null;
   let inReceiptFooter = false;
 
   const priceRegex = /(\d{1,3}(?:\.\d{3})*[,.]\d{2})\b/g;
@@ -1704,8 +1703,6 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
   const trailingAttachedUnitQtyRegex =
     /\s+(\d+[,.]\d{3,4}|0\d{1,2})\s*(un|und|unid|pc|pct|cx)(?:\s+(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2,4}))?\s*$/i;
 
-  const getPendingDetail = () => pendingSefazDetail;
-
   const flushPendingSefazDetail = () => {
     const detail = pendingSefazDetail;
     if (
@@ -1716,7 +1713,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
     ) {
       const qty = detail.qty > 0 ? detail.qty : 1.0;
       const total = Number((detail.unitPrice * qty).toFixed(2));
-      if (total > 0 && total < 10000) {
+      if (total > 0 && total < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
         items.push({
           name: pendingProductName,
           price: total,
@@ -1753,10 +1750,10 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
     const itemTotalMatch = sefazItemTotalLabelRegex.exec(rawLine);
     if (itemTotalMatch && pendingProductName && !isTotalProductName(pendingProductName)) {
       const priceStr = itemTotalMatch[1];
-      const activeDetail = getPendingDetail();
+      const activeDetail = pendingSefazDetail;
       if (priceStr) {
         const parsedTotal = AppFormatters.parsePrice(priceStr);
-        if (parsedTotal != null && parsedTotal > 0 && parsedTotal < 10000) {
+        if (parsedTotal != null && parsedTotal > 0 && parsedTotal < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
           const qty = activeDetail?.qty && activeDetail.qty > 0 ? activeDetail.qty : 1.0;
           const unit = activeDetail?.unit || 'un';
           const unitPrice =
@@ -1811,7 +1808,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
       }
 
       if (pendingProductName && !isTotalProductName(pendingProductName)) {
-        const prevDetail = getPendingDetail();
+        const prevDetail = pendingSefazDetail as PendingSefazDetail | null;
         let qty: number = prevDetail?.qty ?? 1.0;
         let unit: string = prevDetail?.unit ?? 'un';
         let unitPrice: number | null = prevDetail?.unitPrice ?? null;
@@ -1838,7 +1835,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
         const totm = /vl\.?\s*total\.?:?\s*(?:r\$\s*)?(\d{1,3}(?:\.\d{3})*[,.]\d{2})/i.exec(rawLine);
         if (totm) {
           const parsedTotal = AppFormatters.parsePrice(totm[1]);
-          if (parsedTotal != null && parsedTotal > 0 && parsedTotal < 10000) {
+          if (parsedTotal != null && parsedTotal > 0 && parsedTotal < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
             const effectiveTotal =
               qty > 1 && unitPrice != null && parsedTotal <= unitPrice
                 ? Number((unitPrice * qty).toFixed(2))
@@ -1907,7 +1904,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
           ? Math.max(2, matches.length)
           : matches.length;
 
-        if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
+        if (parsedPrice != null && parsedPrice > 0 && parsedPrice < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
           const reconciled = reconcileReceiptAmounts({
             qty: parsedQty > 0 ? parsedQty : 1.0,
             unit: unitStr || 'un',
@@ -1915,7 +1912,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
             totalPrice: parsedPrice,
             priceCount: effectivePriceCount,
           });
-          if (reconciled.totalPrice > 0 && reconciled.totalPrice < 10000) {
+          if (reconciled.totalPrice > 0 && reconciled.totalPrice < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
             items.push({
               name: pendingProductName,
               price: reconciled.totalPrice,
@@ -2002,7 +1999,7 @@ export function parseReceiptText(rawText: string): ScannedReceiptItem[] {
       const lineItemIdx = extractItemIndex(rawLine) ?? pendingItemIndex;
       const cleanedName = cleanReceiptProductName(beforePrices);
 
-      if (parsedPrice != null && parsedPrice > 0 && parsedPrice < 10000) {
+      if (parsedPrice != null && parsedPrice > 0 && parsedPrice < MAX_PLAUSIBLE_RECEIPT_TOTAL) {
         const reconciled = reconcileReceiptAmounts({
           qty: parsedQty > 0 ? parsedQty : 1.0,
           unit: parsedUnit || 'un',

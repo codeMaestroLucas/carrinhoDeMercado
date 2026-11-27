@@ -3,6 +3,7 @@ import { CheckCircle2, X } from 'lucide-react';
 import { useShoppingStore } from '../../store/useShoppingStore';
 import { AppFormatters } from '../../utils/formatters';
 import { getEffectiveTotalAmount } from '../../types/shopping';
+import { ModalShell } from '../common/ModalShell';
 
 interface FinishPurchaseModalProps {
   onClose: () => void;
@@ -37,15 +38,13 @@ export function FinishPurchaseModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs sm:items-center sm:p-4"
-      onClick={onClose}
+    <ModalShell
+      onClose={onClose}
+      ariaLabel="Finalizar compra"
+      maxWidthClass="max-w-md"
+      panelClassName="p-6 pb-8"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="animate-modal-in w-full max-w-md rounded-t-3xl border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-6 pb-8 shadow-2xl sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
+      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--border-subtle)] sm:hidden" />
 
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -136,7 +135,6 @@ export function FinishPurchaseModal({
             Salvar no histórico
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
